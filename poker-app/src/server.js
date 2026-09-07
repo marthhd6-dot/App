@@ -2,6 +2,7 @@
 // Minimaler Echtzeit-Server. Ein Prozess = ein Tisch (für den Start bewusst einfach gehalten).
 // Nächste Ausbaustufe mit Claude Code: mehrere Tische/Räume, Auth, Persistenz.
 
+const path = require('path');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -14,6 +15,7 @@ const io = new Server(server, { cors: { origin: '*' } });
 const table = new Table({ smallBlind: 5, bigBlind: 10 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 io.on('connection', (socket) => {
   console.log(`Spieler verbunden: ${socket.id}`);
