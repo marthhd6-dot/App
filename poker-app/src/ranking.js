@@ -41,4 +41,48 @@ function applyMatchResult(winnerRating, loserRating) {
   };
 }
 
-module.exports = { RANK_TIERS, STARTING_RATING, K_FACTOR, tierForRating, expectedScore, applyMatchResult };
+// Wie weit die Ratings zweier Spieler auseinanderliegen dürfen, damit das
+// Matchmaking sie zusammenlegt. Wächst mit der Wartezeit, damit niemand
+// unbegrenzt in der Warteschlange hängen bleibt, nur weil kein ähnlich
+// bewerteter Gegner da ist.
+const MATCH_TOLERANCE_BASE = 100;
+const MATCH_TOLERANCE_GROWTH_PER_SEC = 15;
+
+function matchTolerance(waitedMs) {
+  return MATCH_TOLERANCE_BASE + (Math.max(0, waitedMs) / 1000) * MATCH_TOLERANCE_GROWTH_PER_SEC;
+}
+
+// Sucht in einer Warteschlange (Array aus { rating, joinedAt }, in
+// Beitritts-Reihenfolge) das erste passende Paar. Bevorzugt dabei immer den
+// am längsten wartenden Spieler (Index 0 zuerst) und wählt unter dessen
+// akzeptablen Gegnern den mit dem ähnlichsten Rating. Gibt [indexA, indexB]
+// zurück (indexA < indexB) oder null, wenn aktuell niemand zusammenpasst.
+function findMatchmakingPair(queue, now = Date.now()) {
+  for (let i = 0; i < queue.length; i++) {
+    const a = queue[i];
+    let bestIdx = -1;
+    let bestDiff = Infinity;
+    for (let j = i + 1; j < queue.length; j++) {
+      const b = queue[j];
+      const diff = Math.abs(a.rating - b.rating);
+      const tolerance = Math.max(matchTolerance(now - a.joinedAt), matchTolerance(now - b.joinedAt));
+      if (diff <= tolerance && diff < bestDiff) {
+        bestDiff = diff;
+        bestIdx = j;
+      }
+    }
+    if (bestIdx !== -1) return [i, bestIdx];
+  }
+  return null;
+}
+
+module.exports = {
+  RANK_TIERS,
+  STARTING_RATING,
+  K_FACTOR,
+  tierForRating,
+  expectedScore,
+  applyMatchResult,
+  matchTolerance,
+  findMatchmakingPair,
+};
