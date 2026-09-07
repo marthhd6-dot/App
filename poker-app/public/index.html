@@ -4,45 +4,65 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Poker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    <div id="confetti-container" class="confetti-container"></div>
+
     <div id="join-screen" class="screen">
-      <h1>Texas Hold'em</h1>
-      <p>Erstelle einen neuen Tisch, tritt einem bestehenden per Code bei, oder spiele 1v1 Ranked.</p>
-      <div id="join-error" class="error-banner" hidden></div>
-      <input id="name-input" type="text" placeholder="Dein Name" maxlength="20" />
-      <div id="my-rank-label" class="rank-label" hidden></div>
+      <div class="panel">
+        <div class="brand">
+          <span class="brand-chip">♠</span>
+          <h1>Texas Hold'em</h1>
+        </div>
+        <p>Erstelle einen neuen Tisch, tritt einem bestehenden per Code bei, oder spiele 1v1 Ranked.</p>
+        <div id="join-error" class="error-banner" hidden></div>
+        <input id="name-input" type="text" placeholder="Dein Name" maxlength="20" />
+        <div id="my-rank-label" class="rank-label" hidden></div>
 
-      <div class="join-row">
-        <button id="create-room-btn">Neuen Tisch erstellen</button>
-      </div>
-      <div class="join-row">
-        <input id="room-code-input" type="text" placeholder="Raum-Code" maxlength="4" />
-        <button id="join-room-btn">Tisch beitreten</button>
-      </div>
+        <div class="join-row">
+          <button id="create-room-btn" class="btn btn-primary">Neuen Tisch erstellen</button>
+        </div>
+        <div class="join-row">
+          <input id="room-code-input" type="text" placeholder="Raum-Code" maxlength="4" />
+          <button id="join-room-btn" class="btn btn-ghost">Tisch beitreten</button>
+        </div>
 
-      <hr class="join-divider" />
+        <hr class="join-divider" />
 
-      <div class="join-row">
-        <button id="ranked-queue-btn">1v1 Ranked spielen</button>
-        <button id="leaderboard-btn">Bestenliste</button>
+        <div class="join-row">
+          <button id="ranked-queue-btn" class="btn btn-ranked">🏆 1v1 Ranked spielen</button>
+          <button id="leaderboard-btn" class="btn btn-ghost">Bestenliste</button>
+        </div>
       </div>
     </div>
 
     <div id="queue-screen" class="screen" hidden>
-      <h1>Suche Gegner …</h1>
-      <p id="queue-rank-label" class="rank-label"></p>
-      <div class="join-row">
-        <button id="cancel-queue-btn">Abbrechen</button>
+      <div class="panel">
+        <div class="queue-spinner"></div>
+        <h1>Suche Gegner …</h1>
+        <p id="queue-rank-label" class="rank-label"></p>
+        <div class="join-row">
+          <button id="cancel-queue-btn" class="btn btn-ghost">Abbrechen</button>
+        </div>
       </div>
     </div>
 
     <div id="leaderboard-screen" class="screen" hidden>
-      <h1>Bestenliste</h1>
-      <div id="leaderboard-list" class="leaderboard-list"></div>
-      <div class="join-row">
-        <button id="leaderboard-close-btn">Zurück</button>
+      <div class="panel panel-wide">
+        <h1>🏆 Bestenliste</h1>
+        <div id="leaderboard-list" class="leaderboard-list"></div>
+        <div class="join-row">
+          <button id="leaderboard-close-btn" class="btn btn-ghost">Zurück</button>
+        </div>
       </div>
     </div>
 
@@ -53,39 +73,46 @@
       <div id="error-banner" class="error-banner" hidden></div>
       <div id="ranked-match-over-banner" class="hand-result ranked-banner" hidden>
         <span id="ranked-match-over-text"></span>
-        <button id="ranked-back-to-menu-btn">Neues Match suchen</button>
+        <button id="ranked-back-to-menu-btn" class="btn btn-primary btn-small">Neues Match suchen</button>
       </div>
       <div id="hand-result" class="hand-result" hidden></div>
 
       <div class="table-header">
         <span id="room-code-label" class="room-code-label"></span>
-        <span id="ranked-badge" class="ranked-badge" hidden>1v1 RANKED</span>
+        <span id="ranked-badge" class="ranked-badge" hidden>🏆 1v1 RANKED</span>
         <span id="phase-label" class="phase-label"></span>
-        <span id="pot-label" class="pot-label"></span>
         <span id="current-bet-label" class="current-bet-label"></span>
       </div>
 
-      <div id="community-cards" class="card-row"></div>
-
-      <div id="players-list" class="players-list"></div>
+      <div class="table-felt">
+        <div class="felt-rail"></div>
+        <div class="pot-display">
+          <span class="pot-chips-icon">
+            <span class="chip-stack-mini"></span>
+          </span>
+          <span id="pot-label" class="pot-amount">Pot: 0</span>
+        </div>
+        <div id="community-cards" class="card-row community-row"></div>
+        <div id="players-list" class="seats"></div>
+      </div>
 
       <div class="my-hand">
         <h2>Deine Karten</h2>
-        <div id="my-cards" class="card-row"></div>
+        <div id="my-cards" class="card-row my-card-row"></div>
       </div>
 
       <div class="action-bar">
-        <button id="start-hand-btn">Hand starten</button>
-        <button id="fold-btn">Fold</button>
-        <button id="check-btn">Check</button>
-        <button id="call-btn">Call</button>
+        <button id="start-hand-btn" class="btn btn-primary">▶ Hand starten</button>
+        <button id="fold-btn" class="btn btn-fold">Fold</button>
+        <button id="check-btn" class="btn btn-neutral">Check</button>
+        <button id="call-btn" class="btn btn-call">Call</button>
         <span class="bet-control">
           <input id="bet-input" type="number" min="1" placeholder="Betrag" />
-          <button id="bet-btn">Bet</button>
+          <button id="bet-btn" class="btn btn-raise">Bet</button>
         </span>
         <span class="bet-control">
           <input id="raise-input" type="number" min="1" placeholder="Raise auf …" />
-          <button id="raise-btn">Raise</button>
+          <button id="raise-btn" class="btn btn-raise">Raise</button>
         </span>
       </div>
     </div>
