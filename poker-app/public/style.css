@@ -39,6 +39,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background: radial-gradient(ellipse at 50% -10%, #0e3d2c 0%, var(--bg-deep) 55%), var(--bg-deep);
+  background-image: radial-gradient(ellipse at 50% -10%, #0e3d2c 0%, var(--bg-deep) 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Ctext x='14' y='34' font-size='30' fill='%23ffffff' opacity='0.02'%3E%E2%99%A0%3C/text%3E%3Ctext x='74' y='94' font-size='30' fill='%23ffffff' opacity='0.02'%3E%E2%99%A5%3C/text%3E%3C/svg%3E"),
+    var(--bg-deep);
   color: var(--text);
   font-family: var(--font-body);
   display: flex;
@@ -158,6 +161,28 @@ h2 {
 #leaderboard-screen h1 {
   font-size: 1.9rem;
   font-weight: 800;
+}
+
+/* Dezenter Glanz-Effekt über den Markentitel, der einmalig durchläuft. */
+#join-screen h1 {
+  background: linear-gradient(
+    100deg,
+    var(--text) 30%,
+    var(--accent-bright) 45%,
+    var(--text) 60%
+  );
+  background-size: 240% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: title-shimmer 3.2s ease-in-out 0.3s 1;
+}
+
+@keyframes title-shimmer {
+  to {
+    background-position: -40% 0;
+  }
 }
 
 #join-screen p {
@@ -303,6 +328,21 @@ button:disabled {
   background: linear-gradient(180deg, var(--accent-bright), var(--accent));
 }
 
+/* Zieht den Blick auf "Hand starten", solange der Button sichtbar ist. */
+#start-hand-btn:not([hidden]) {
+  animation: cta-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes cta-pulse {
+  0%,
+  100% {
+    box-shadow: 0 3px 0 #a3801f, 0 8px 18px -6px rgba(232, 191, 74, 0.5);
+  }
+  50% {
+    box-shadow: 0 3px 0 #a3801f, 0 8px 30px -4px rgba(232, 191, 74, 0.85);
+  }
+}
+
 /* --- Banners -------------------------------------------------------------- */
 
 .error-banner {
@@ -403,8 +443,8 @@ button:disabled {
   border-radius: 50%;
   background: radial-gradient(ellipse at 50% 32%, var(--table-green) 0%, var(--table-green-mid) 52%, var(--table-green-dark) 100%);
   border: 13px solid var(--wood);
-  box-shadow: 0 0 0 4px #1a1009, 0 28px 60px -12px rgba(0, 0, 0, 0.65), inset 0 0 70px rgba(0, 0, 0, 0.5),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 4px #1a1009, 0 28px 60px -12px rgba(0, 0, 0, 0.65), 0 -50px 120px -40px rgba(232, 191, 74, 0.22),
+    inset 0 0 70px rgba(0, 0, 0, 0.5), inset 0 0 0 2px rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
 
@@ -541,6 +581,19 @@ button:disabled {
   padding: 1px 8px;
   border-radius: 999px;
   min-height: 1.4em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-icon {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--accent-bright), #a3801f 75%);
+  border: 1.5px dashed rgba(255, 255, 255, 0.6);
+  box-shadow: -2.5px 1.5px 0 -1.2px var(--danger), 2.5px 1.5px 0 -1.2px var(--success);
 }
 
 .seat.folded .seat-pod {
@@ -564,6 +617,23 @@ button:disabled {
   }
   50% {
     box-shadow: 0 0 0 7px rgba(232, 191, 74, 0.12), 0 6px 16px -6px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Golden hervorgehobener Sitzplatz für den/die Gewinner der zuletzt
+   gezeigten Hand, bis die nächste Hand startet. */
+.seat.winner .seat-pod {
+  border-color: var(--accent-bright);
+  animation: winner-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes winner-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(232, 191, 74, 0.35), 0 0 22px 4px rgba(232, 191, 74, 0.4), 0 6px 16px -6px rgba(0, 0, 0, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(232, 191, 74, 0.5), 0 0 38px 10px rgba(232, 191, 74, 0.55), 0 6px 16px -6px rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -614,6 +684,7 @@ button:disabled {
 }
 
 .card {
+  position: relative;
   width: 46px;
   height: 64px;
   background: linear-gradient(160deg, #ffffff, #eae7dd);
@@ -631,6 +702,38 @@ button:disabled {
 
 .card.red {
   color: var(--card-red);
+}
+
+/* Eckindizes (Rang + Symbol) oben links und gespiegelt unten rechts, wie
+   auf echten Spielkarten, plus ein großes Symbol mittig. */
+.card-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  font-size: 0.34em;
+}
+
+.card-corner-top {
+  top: 5%;
+  left: 10%;
+}
+
+.card-corner-bottom {
+  bottom: 5%;
+  right: 10%;
+  transform: rotate(180deg);
+}
+
+.card-suit-mini {
+  font-size: 0.85em;
+  margin-top: 1px;
+}
+
+.card-suit-big {
+  font-size: 1.55em;
+  opacity: 0.9;
 }
 
 .card.deal-in {

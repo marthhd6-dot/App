@@ -222,10 +222,6 @@ raiseBtn.addEventListener('click', () => {
   socket.emit('raise', { amount: Number(raiseInput.value) });
 });
 
-function cardLabel(card) {
-  return `${RANK_LABELS[card.rank] || card.rank}${SUIT_SYMBOLS[card.suit]}`;
-}
-
 function isRedSuit(suit) {
   return suit === 'H' || suit === 'D';
 }
@@ -233,7 +229,13 @@ function isRedSuit(suit) {
 function renderCard(card) {
   const el = document.createElement('div');
   el.className = 'card' + (isRedSuit(card.suit) ? ' red' : '');
-  el.textContent = cardLabel(card);
+  const rank = RANK_LABELS[card.rank] || card.rank;
+  const suit = SUIT_SYMBOLS[card.suit];
+  el.innerHTML = `
+    <span class="card-corner card-corner-top"><span>${rank}</span><span class="card-suit-mini">${suit}</span></span>
+    <span class="card-suit-big">${suit}</span>
+    <span class="card-corner card-corner-bottom"><span>${rank}</span><span class="card-suit-mini">${suit}</span></span>
+  `;
   return el;
 }
 
@@ -279,8 +281,10 @@ function avatarColorFor(name) {
 }
 
 // Ordnet alle Spieler als "Sitzplätze" kreisförmig um den ovalen Tisch an –
-// der eigene Platz liegt dabei immer unten in der Mitte.
-function renderSeats(state) {
+// der eigene Platz liegt dabei immer unten in der Mitte. winnerIds enthält
+// die Spieler, die die zuletzt gezeigte Hand gewonnen haben (leer, solange
+// keine Hand beendet ist), damit ihr Sitzplatz golden hervorgehoben wird.
+function renderSeats(state, winnerIds) {
   const container = document.getElementById('players-list');
   container.innerHTML = '';
 
@@ -314,7 +318,8 @@ function renderSeats(state) {
       (p.id === state.actingPlayerId ? ' acting' : '') +
       (p.folded ? ' folded' : '') +
       (p.disconnected ? ' disconnected' : '') +
-      (p.id === mySocketId ? ' me' : '');
+      (p.id === mySocketId ? ' me' : '') +
+      (winnerIds.has(p.id) ? ' winner' : '');
     seat.style.left = `${left}%`;
     seat.style.top = `${top}%`;
 
@@ -327,11 +332,36 @@ function renderSeats(state) {
           <span class="seat-chips">${p.chips} Chips</span>
         </div>
       </div>
-      <div class="seat-bet">${p.bet > 0 ? `Einsatz: ${p.bet}` : ''}</div>
+      <div class="seat-bet">${p.bet > 0 ? `<span class="chip-icon"></span>Einsatz: ${p.bet}` : ''}</div>
       <div class="seat-badges">${badges.map((b) => `<span class="badge ${b.cls}">${b.label}</span>`).join('')}</div>
     `;
     container.appendChild(seat);
   });
+}
+
+// Lässt die Pot-Anzeige sanft zum neuen Wert hochzählen (bzw. wieder auf 0
+// zurückfallen, wenn ein gewonnener Pot ausgezahlt wurde), statt den Text
+// bei jedem State-Update abrupt zu ersetzen.
+let displayedPot = 0;
+let potAnimationFrame = null;
+function animatePotTo(target) {
+  const potLabel = document.getElementById('pot-label');
+  if (target === displayedPot) {
+    potLabel.textContent = `Pot: ${displayedPot}`;
+    return;
+  }
+  cancelAnimationFrame(potAnimationFrame);
+  const start = displayedPot;
+  const startTime = performance.now();
+  const duration = 260;
+  function step(now) {
+    const t = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    displayedPot = Math.round(start + (target - start) * eased);
+    potLabel.textContent = `Pot: ${displayedPot}`;
+    if (t < 1) potAnimationFrame = requestAnimationFrame(step);
+  }
+  potAnimationFrame = requestAnimationFrame(step);
 }
 
 function burstConfetti() {
@@ -351,7 +381,7 @@ function burstConfetti() {
 
 function render(state) {
   document.getElementById('phase-label').textContent = PHASE_LABELS[state.phase] || state.phase;
-  document.getElementById('pot-label').textContent = `Pot: ${state.pot}`;
+  animatePotTo(state.pot);
   document.getElementById('current-bet-label').textContent =
     state.currentBet > 0 ? `Aktueller Einsatz: ${state.currentBet}` : '';
 
@@ -361,7 +391,10 @@ function render(state) {
   renderCommunityCards(state.communityCards, communityDealtCount);
   communityDealtCount = state.communityCards.length;
 
-  renderSeats(state);
+  const winnerIds = new Set(
+    state.lastHandResult ? state.lastHandResult.pots.flatMap((pot) => pot.winners.map((w) => w.id)) : []
+  );
+  renderSeats(state, winnerIds);
 
   const me = state.players.find((p) => p.id === mySocketId);
   renderMyCards((me && me.holeCards) || [], isNewHand);
