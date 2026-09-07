@@ -1,6 +1,7 @@
 // src/ranking.js
-// Rating- und Rang-Logik für den 1v1-Ranked-Modus. Reine Funktionen ohne
-// Bezug zu Sockets oder der Datenbank, damit sie unabhängig testbar bleiben.
+// Rating- und Rang-Logik für den Ranked-Modus (4 Spieler pro Tisch, siehe
+// RANKED_GROUP_SIZE in server.js). Reine Funktionen ohne Bezug zu Sockets
+// oder der Datenbank, damit sie unabhängig testbar bleiben.
 //
 // Bekannte Vereinfachung: Die Spieler-Identität ist allein der Name (wie
 // beim Reconnect-Handling) – es gibt keine echte Authentifizierung. Zwei
@@ -53,27 +54,68 @@ function matchTolerance(waitedMs) {
 }
 
 // Sucht in einer Warteschlange (Array aus { rating, joinedAt }, in
-// Beitritts-Reihenfolge) das erste passende Paar. Bevorzugt dabei immer den
-// am längsten wartenden Spieler (Index 0 zuerst) und wählt unter dessen
-// akzeptablen Gegnern den mit dem ähnlichsten Rating. Gibt [indexA, indexB]
-// zurück (indexA < indexB) oder null, wenn aktuell niemand zusammenpasst.
-function findMatchmakingPair(queue, now = Date.now()) {
+// Beitritts-Reihenfolge) die erste passende Gruppe der Größe groupSize.
+// Bevorzugt dabei immer den am längsten wartenden Spieler (Index 0 zuerst)
+// und füllt seine Gruppe mit den (groupSize - 1) Spielern auf, deren Rating
+// am nächsten an seinem liegt (einfache Heuristik, kein optimales
+// Fenster-Matching – für eine kleine Warteschlange aber ausreichend genau).
+// Passt die Gruppe nur, wenn die Spanne (höchstes minus niedrigstes Rating
+// in der Gruppe) innerhalb der Toleranz aller Beteiligten liegt. Gibt ein
+// aufsteigend sortiertes Array von Indizes zurück, oder null, wenn aktuell
+// keine Gruppe zusammenpasst.
+function findMatchmakingGroup(queue, groupSize, now = Date.now()) {
+  if (groupSize < 2 || queue.length < groupSize) return null;
+
   for (let i = 0; i < queue.length; i++) {
-    const a = queue[i];
-    let bestIdx = -1;
-    let bestDiff = Infinity;
-    for (let j = i + 1; j < queue.length; j++) {
-      const b = queue[j];
-      const diff = Math.abs(a.rating - b.rating);
-      const tolerance = Math.max(matchTolerance(now - a.joinedAt), matchTolerance(now - b.joinedAt));
-      if (diff <= tolerance && diff < bestDiff) {
-        bestDiff = diff;
-        bestIdx = j;
-      }
+    const anchor = queue[i];
+    const others = [];
+    for (let j = 0; j < queue.length; j++) {
+      if (j === i) continue;
+      others.push({ idx: j, diff: Math.abs(queue[j].rating - anchor.rating) });
     }
-    if (bestIdx !== -1) return [i, bestIdx];
+    if (others.length < groupSize - 1) continue;
+
+    others.sort((a, b) => a.diff - b.diff);
+    const chosenIdx = [i, ...others.slice(0, groupSize - 1).map((c) => c.idx)];
+    const chosenEntries = chosenIdx.map((idx) => queue[idx]);
+
+    const ratings = chosenEntries.map((e) => e.rating);
+    const spread = Math.max(...ratings) - Math.min(...ratings);
+    const tolerance = Math.max(...chosenEntries.map((e) => matchTolerance(now - e.joinedAt)));
+
+    if (spread <= tolerance) {
+      return chosenIdx.sort((a, b) => a - b);
+    }
   }
   return null;
+}
+
+// Berechnet aus einer Platzierungsliste (bester Platz zuerst) alle
+// paarweisen Match-Ergebnisse: jeder Spieler gilt als Sieger gegen jeden
+// schlechter Platzierten (ein 4-Spieler-Match zählt so als 6 einzelne
+// 1v1-Duelle). Nützlich für Ranked-Tische mit mehr als zwei Spielern, ohne
+// applyMatchResult() selbst anfassen zu müssen.
+// ratings: { [name]: aktuelles Rating vor dem Match }.
+// Gibt { [name]: { rating, wins, losses } } zurück – wins/losses sind die
+// Anzahl gewonnener/verlorener paarweiser Duelle in diesem einen Match.
+function applyMultiwayMatchResult(placements, ratings) {
+  const result = {};
+  placements.forEach((name) => {
+    result[name] = { rating: ratings[name], wins: 0, losses: 0 };
+  });
+
+  for (let i = 0; i < placements.length; i++) {
+    for (let j = i + 1; j < placements.length; j++) {
+      const winnerName = placements[i];
+      const loserName = placements[j];
+      const { winnerRating, loserRating } = applyMatchResult(result[winnerName].rating, result[loserName].rating);
+      result[winnerName].rating = winnerRating;
+      result[winnerName].wins += 1;
+      result[loserName].rating = loserRating;
+      result[loserName].losses += 1;
+    }
+  }
+  return result;
 }
 
 module.exports = {
@@ -84,5 +126,6 @@ module.exports = {
   expectedScore,
   applyMatchResult,
   matchTolerance,
-  findMatchmakingPair,
+  findMatchmakingGroup,
+  applyMultiwayMatchResult,
 };

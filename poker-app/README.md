@@ -22,7 +22,7 @@ poker-app/
 │   │   └── table.js          # Tisch-Zustand: Spieler, Phasen, Pot
 │   ├── rooms.js              # Verwaltet mehrere Tische über Raum-Codes
 │   ├── persistence.js        # Lädt/speichert Raum-Snapshots + Ränge in SQLite
-│   ├── ranking.js            # ELO-artige Rating-/Rang-Logik für 1v1 Ranked
+│   ├── ranking.js            # ELO-artige Rating-/Rang-Logik für 1v1v1v1 Ranked
 │   └── server.js             # Express + Socket.io Server, liefert public/ aus
 ├── data/                     # Gespeicherte Chip-Stände & Ränge (rooms.db, gitignored)
 └── tests/
@@ -140,25 +140,31 @@ Chip-Stände definiert.
   (`join-room` mit demselben Namen) an ihren Platz zurück. Bei SIGINT/
   SIGTERM (z. B. Ctrl+C oder ein Deploy-Neustart) wird zusätzlich ein
   letztes Mal explizit gespeichert.
-- **1v1 Ranked** (`ranking.js` + Matchmaking in `server.js`): Über
+- **1v1v1v1 Ranked** (`ranking.js` + Matchmaking in `server.js`): Über
   `join-ranked-queue` reiht sich ein Spieler in eine Warteschlange ein.
-  `findMatchmakingPair()` sucht **Rating-basiert** einen Gegner: bevorzugt
-  wird immer der am längsten wartende Spieler, für den unter den
-  akzeptablen Kandidaten der mit dem ähnlichsten Rating gewählt wird. Die
-  akzeptierte Rating-Differenz wächst mit der Wartezeit (Start: 100
-  Punkte, +15 pro Sekunde), damit niemand unbegrenzt hängen bleibt, nur
-  weil kein ähnlich bewerteter Gegner da ist – die Suche läuft bei jedem
-  neuen Beitritt sofort und zusätzlich alle 2 Sekunden erneut. Gefundene
-  Paare spielen in einem neuen Raum mit kleinerem Startkapital (200 statt
-  1000 Chips) – kein manueller Raum-Code nötig. Ein Match endet, sobald
-  ein Spieler nach einer Hand bei 0 Chips steht;
-  der Sieger nimmt den Gegner mit einem ELO-artigen System (K-Faktor 32,
-  Startrating 250) auseinander. Sechs Ränge von **Bronze** bis
-  **Champion** (Schwellenwerte in `RANK_TIERS`), Rating und
-  Sieg/Niederlage-Zähler liegen dauerhaft in der `player_ranks`-Tabelle.
-  Eine einfache Bestenliste (`get-leaderboard`) zeigt die Top 20 nach
-  Rating. Identität ist wie beim Reconnect-Handling allein der Name,
-  keine echte Authentifizierung.
+  `findMatchmakingGroup()` sucht **Rating-basiert** eine Gruppe von
+  `RANKED_GROUP_SIZE` (4) Spielern: bevorzugt wird immer der am längsten
+  wartende Spieler, um den herum die drei Kandidaten mit dem ähnlichsten
+  Rating gewählt werden. Die akzeptierte Rating-Spanne innerhalb der
+  Gruppe wächst mit der Wartezeit (Start: 100 Punkte, +15 pro Sekunde),
+  damit niemand unbegrenzt hängen bleibt, nur weil keine ähnlich
+  bewerteten Mitspieler da sind – die Suche läuft bei jedem neuen Beitritt
+  sofort und zusätzlich alle 2 Sekunden erneut. Gefundene Gruppen spielen
+  zu viert an einem neuen Tisch mit kleinerem Startkapital (200 statt 1000
+  Chips) – kein manueller Raum-Code nötig. Scheidet ein Spieler nach einer
+  Hand mit 0 Chips aus, wird er vom Tisch entfernt und seine
+  Bust-Reihenfolge gemerkt; das Match läuft mit den verbliebenen Spielern
+  weiter. Sobald nur noch einer übrig ist, steht die Platzierung fest
+  (Sieger zuerst, dann die Ausgeschiedenen in umgekehrter
+  Bust-Reihenfolge). Aus der Platzierung ergeben sich alle sechs
+  paarweisen 1v1-Duelle (`applyMultiwayMatchResult()`), jedes bewertet
+  mit einem ELO-artigen System (K-Faktor 32, Startrating 250) – der
+  Sieger gewinnt so gegen alle drei anderen, der Letzte verliert gegen
+  alle drei. Sechs Ränge von **Bronze** bis **Champion** (Schwellenwerte
+  in `RANK_TIERS`), Rating und Sieg/Niederlage-Zähler liegen dauerhaft in
+  der `player_ranks`-Tabelle. Eine einfache Bestenliste
+  (`get-leaderboard`) zeigt die Top 20 nach Rating. Identität ist wie
+  beim Reconnect-Handling allein der Name, keine echte Authentifizierung.
 
 ## Mögliche nächste Schritte (für Claude Code)
 
@@ -176,8 +182,7 @@ Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
 
 ## Guter erster Prompt für Claude Code
 
-> "Lies dir server.js durch. Baue Räume/Turniere mit mehr als zwei
-> Spielern für den Ranked-Modus: Statt reiner 1v1-Matches sollen auch
-> 4- oder 6-Spieler-Ranked-Tische unterstützt werden, bei denen ein
-> Match endet, sobald nur noch ein Spieler Chips übrig hat, und alle
-> anderen nach ihrer Bust-Reihenfolge platziert werden."
+> "Lies dir ranking.js und server.js durch. Erweitere den Ranked-Modus um
+> ein zweites Format mit 6 Spielern pro Tisch (analog zu
+> RANKED_GROUP_SIZE), wählbar über einen zweiten Warteschlangen-Button im
+> Frontend."
