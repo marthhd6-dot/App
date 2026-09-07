@@ -24,17 +24,28 @@ io.on('connection', (socket) => {
   });
 
   socket.on('start-hand', () => {
-    try {
-      table.startHand();
-      broadcastState();
-    } catch (err) {
-      socket.emit('error-message', err.message);
-    }
+    handleAction(socket, () => table.startHand());
   });
 
-  // TODO: 'bet', 'fold', 'check', 'call', 'raise' Events ergänzen, die
-  //       table.placeBet()/fold()/check()/call()/raise() aufrufen – inklusive
-  //       Validierung und Fehler-Events, falls der Spieler nicht am Zug ist.
+  socket.on('fold', () => {
+    handleAction(socket, () => table.fold(socket.id));
+  });
+
+  socket.on('check', () => {
+    handleAction(socket, () => table.check(socket.id));
+  });
+
+  socket.on('call', () => {
+    handleAction(socket, () => table.call(socket.id));
+  });
+
+  socket.on('bet', ({ amount } = {}) => {
+    handleAction(socket, () => table.placeBet(socket.id, amount));
+  });
+
+  socket.on('raise', ({ amount } = {}) => {
+    handleAction(socket, () => table.raise(socket.id, amount));
+  });
 
   socket.on('disconnect', () => {
     console.log(`Spieler getrennt: ${socket.id}`);
@@ -42,6 +53,35 @@ io.on('connection', (socket) => {
     broadcastState();
   });
 });
+
+// Führt eine Tisch-Aktion aus, meldet Validierungsfehler nur an den
+// auslösenden Client zurück und lässt danach automatisch die nächste
+// Straße austeilen (Flop/Turn/River/Showdown), falls die Wettrunde
+// abgeschlossen ist.
+function handleAction(socket, action) {
+  try {
+    action();
+    advancePhaseIfRoundComplete();
+    broadcastState();
+  } catch (err) {
+    socket.emit('error-message', err.message);
+  }
+}
+
+// Wird nach jeder Aktion aufgerufen. Solange die aktuelle Wettrunde fertig
+// ist (niemand mehr am Zug) und die Hand noch nicht beendet ist, wird die
+// nächste Phase ausgeteilt – das schließt den Fall ein, dass alle
+// verbliebenen Spieler all-in sind und mehrere Straßen ohne weitere
+// Aktionen nacheinander aufgedeckt werden müssen.
+function advancePhaseIfRoundComplete() {
+  while (table.phase !== 'showdown' && table.actingIndex === -1) {
+    if (table.phase === 'preflop') table.dealFlop();
+    else if (table.phase === 'flop') table.dealTurn();
+    else if (table.phase === 'turn') table.dealRiver();
+    else if (table.phase === 'river') table.showdown();
+    else break; // Phase 'waiting': keine Hand läuft, nichts zu tun
+  }
+}
 
 function broadcastState() {
   for (const socket of io.sockets.sockets.values()) {
