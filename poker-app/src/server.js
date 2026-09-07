@@ -21,6 +21,7 @@ const { Server } = require('socket.io');
 const { RoomManager } = require('./rooms');
 const { loadSnapshot, saveSnapshot, getPlayerRank, savePlayerRank, getLeaderboard } = require('./persistence');
 const { STARTING_RATING, tierForRating, findMatchmakingGroup, applyMultiwayMatchResult } = require('./ranking');
+const { blindsForHandsPlayed } = require('./blinds');
 
 const app = express();
 const server = http.createServer(app);
@@ -38,9 +39,11 @@ function persist() {
   saveSnapshot(DATA_FILE, rooms.exportSnapshot());
 }
 
-// Startkapital für ein Ranked-Match (bewusst kleiner als die 1000 Chips
-// eines Casual-Tisches, damit ein Match zügig zu einem Ergebnis kommt).
-const RANKED_STARTING_CHIPS = 200;
+// Startkapital für ein Ranked-Match, wie bei einem Casual-Tisch. Die
+// Blinds starten klein (siehe blindsForHandsPlayed() in blinds.js) und
+// steigen turnierartig, damit ein Match trotzdem in endlicher Zeit zu
+// einem Ergebnis kommt.
+const RANKED_STARTING_CHIPS = 1000;
 // Anzahl Spieler pro Ranked-Tisch ("1v1v1v1").
 const RANKED_GROUP_SIZE = 4;
 
@@ -55,10 +58,12 @@ const rankedQueue = [];
 // beitritt – nötig, damit wartende Spieler von der wachsenden Toleranz
 // profitieren, statt nur bei einem neuen Beitritt geprüft zu werden.
 const MATCHMAKING_INTERVAL_MS = 2000;
-// Räume, die aus dem Ranked-Matchmaking stammen: code -> { eliminatedOrder },
-// wobei eliminatedOrder die Namen der bereits ausgeschiedenen Spieler in
-// Bust-Reihenfolge enthält (zuerst ausgeschieden zuerst). Nur für diese Codes
-// wird nach jeder Hand geprüft, ob das Match schon entschieden ist.
+// Räume, die aus dem Ranked-Matchmaking stammen: code -> { eliminatedOrder,
+// handsPlayed }. eliminatedOrder enthält die bereits ausgeschiedenen
+// Spieler in Bust-Reihenfolge (zuerst ausgeschieden zuerst); handsPlayed
+// zählt die in diesem Match bereits gestarteten Hände und steuert den
+// Blind-Zeitplan (blindsForHandsPlayed() in blinds.js). Nur für diese
+// Codes wird nach jeder Hand geprüft, ob das Match schon entschieden ist.
 const rankedRooms = new Map();
 
 function getOrCreateRank(name) {
@@ -161,7 +166,18 @@ io.on('connection', (socket) => {
   });
 
   socket.on('start-hand', () => {
-    handleAction(socket, (table) => table.startHand());
+    // In Ranked-Räumen vor jeder Hand die Blinds nach dem Turnier-Zeitplan
+    // setzen und den Hand-Zähler erhöhen (siehe blindsForHandsPlayed()).
+    const rankedEntry = rankedRooms.get(socket.data.roomCode);
+    handleAction(socket, (table) => {
+      if (rankedEntry) {
+        const { smallBlind, bigBlind } = blindsForHandsPlayed(rankedEntry.handsPlayed);
+        table.smallBlind = smallBlind;
+        table.bigBlind = bigBlind;
+        rankedEntry.handsPlayed += 1;
+      }
+      table.startHand();
+    });
   });
 
   socket.on('fold', () => {
@@ -264,7 +280,7 @@ setInterval(runMatchmakingPass, MATCHMAKING_INTERVAL_MS);
 // Bust-Erkennung nach jeder Hand (siehe maybeFinishRankedMatch).
 function startRankedMatch(entries) {
   const code = rooms.createRoom();
-  rankedRooms.set(code, { eliminatedOrder: [] });
+  rankedRooms.set(code, { eliminatedOrder: [], handsPlayed: 0 });
   const table = rooms.getTable(code);
   for (const entry of entries) {
     table.addPlayer(entry.socket.id, entry.name, RANKED_STARTING_CHIPS);

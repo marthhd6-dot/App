@@ -23,6 +23,7 @@ poker-app/
 │   ├── rooms.js              # Verwaltet mehrere Tische über Raum-Codes
 │   ├── persistence.js        # Lädt/speichert Raum-Snapshots + Ränge in SQLite
 │   ├── ranking.js            # ELO-artige Rating-/Rang-Logik für 1v1v1v1 Ranked
+│   ├── blinds.js              # Turnier-Blind-Zeitplan für Ranked-Matches
 │   └── server.js             # Express + Socket.io Server, liefert public/ aus
 ├── data/                     # Gespeicherte Chip-Stände & Ränge (rooms.db, gitignored)
 └── tests/
@@ -30,7 +31,8 @@ poker-app/
     ├── table.test.js
     ├── rooms.test.js
     ├── persistence.test.js
-    └── ranking.test.js
+    ├── ranking.test.js
+    └── blinds.test.js
 ```
 
 ## Setup
@@ -38,7 +40,7 @@ poker-app/
 ```bash
 cd poker-app
 npm install
-npm test        # prüft Hand-Evaluator, Tisch-, Raum-, Persistenz- und Rang-Logik
+npm test        # prüft Hand-Evaluator, Tisch-, Raum-, Persistenz-, Rang- und Blind-Logik
 npm start        # startet den Server auf Port 3001, Frontend unter http://localhost:3001
 
 # Gnadenfrist fürs Reconnect-Handling überschreiben (Standard: 30000ms):
@@ -140,21 +142,24 @@ Chip-Stände definiert.
   (`join-room` mit demselben Namen) an ihren Platz zurück. Bei SIGINT/
   SIGTERM (z. B. Ctrl+C oder ein Deploy-Neustart) wird zusätzlich ein
   letztes Mal explizit gespeichert.
-- **1v1v1v1 Ranked** (`ranking.js` + Matchmaking in `server.js`): Über
-  `join-ranked-queue` reiht sich ein Spieler in eine Warteschlange ein.
-  `findMatchmakingGroup()` sucht **Rating-basiert** eine Gruppe von
-  `RANKED_GROUP_SIZE` (4) Spielern: bevorzugt wird immer der am längsten
-  wartende Spieler, um den herum die drei Kandidaten mit dem ähnlichsten
-  Rating gewählt werden. Die akzeptierte Rating-Spanne innerhalb der
-  Gruppe wächst mit der Wartezeit (Start: 100 Punkte, +15 pro Sekunde),
-  damit niemand unbegrenzt hängen bleibt, nur weil keine ähnlich
+- **1v1v1v1 Ranked** (`ranking.js` + `blinds.js` + Matchmaking in
+  `server.js`): Über `join-ranked-queue` reiht sich ein Spieler in eine
+  Warteschlange ein. `findMatchmakingGroup()` sucht **Rating-basiert** eine
+  Gruppe von `RANKED_GROUP_SIZE` (4) Spielern: bevorzugt wird immer der am
+  längsten wartende Spieler, um den herum die drei Kandidaten mit dem
+  ähnlichsten Rating gewählt werden. Die akzeptierte Rating-Spanne
+  innerhalb der Gruppe wächst mit der Wartezeit (Start: 100 Punkte, +15 pro
+  Sekunde), damit niemand unbegrenzt hängen bleibt, nur weil keine ähnlich
   bewerteten Mitspieler da sind – die Suche läuft bei jedem neuen Beitritt
   sofort und zusätzlich alle 2 Sekunden erneut. Gefundene Gruppen spielen
-  zu viert an einem neuen Tisch mit kleinerem Startkapital (200 statt 1000
-  Chips) – kein manueller Raum-Code nötig. Scheidet ein Spieler nach einer
-  Hand mit 0 Chips aus, wird er vom Tisch entfernt und seine
-  Bust-Reihenfolge gemerkt; das Match läuft mit den verbliebenen Spielern
-  weiter. Sobald nur noch einer übrig ist, steht die Platzierung fest
+  zu viert an einem neuen Tisch mit demselben Startkapital wie ein Casual-
+  Tisch (1000 Chips) – kein manueller Raum-Code nötig. Damit ein Match
+  trotzdem in endlicher Zeit endet, steigen die Blinds turnierartig:
+  `blindsForHandsPlayed()` startet bei 5/10 und verdoppelt sie alle 2
+  Hände, gedeckelt bei 160/320. Scheidet ein Spieler nach einer Hand mit 0
+  Chips aus, wird er vom Tisch entfernt und seine Bust-Reihenfolge
+  gemerkt; das Match läuft mit den verbliebenen Spielern weiter. Sobald nur
+  noch einer übrig ist, steht die Platzierung fest
   (Sieger zuerst, dann die Ausgeschiedenen in umgekehrter
   Bust-Reihenfolge). Aus der Platzierung ergeben sich alle sechs
   paarweisen 1v1-Duelle (`applyMultiwayMatchResult()`), jedes bewertet
