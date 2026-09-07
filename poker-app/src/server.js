@@ -3,12 +3,15 @@
 // einen eigenen Tisch-Zustand (src/rooms.js) und wird über einen kurzen
 // Code erreicht, den Spieler zum Beitreten eingeben.
 //
-// Zusätzlich gibt es einen 1v1-Ranked-Modus: Spieler treten einer
-// Matchmaking-Warteschlange bei (statt einen Raum-Code zu teilen) und
-// werden automatisch mit einem ähnlich bewerteten Gegner zusammengelegt
-// (Rating-basiertes Matchmaking, siehe findMatchmakingPair() in
-// src/ranking.js). Der Rang wird über den Spielernamen dauerhaft
-// gespeichert (src/persistence.js) – siehe README für bekannte
+// Zusätzlich gibt es einen 4-Spieler-Ranked-Modus ("1v1v1v1"): Spieler
+// treten einer Matchmaking-Warteschlange bei (statt einen Raum-Code zu
+// teilen) und werden automatisch mit drei ähnlich bewerteten Gegnern an
+// einem Tisch zusammengelegt (Rating-basiertes Matchmaking, siehe
+// findMatchmakingGroup() in src/ranking.js). Ein Match läuft, bis nur noch
+// ein Spieler Chips übrig hat; alle anderen werden nach ihrer
+// Bust-Reihenfolge platziert und die Ratings paarweise aktualisiert (siehe
+// applyMultiwayMatchResult()). Der Rang wird über den Spielernamen
+// dauerhaft gespeichert (src/persistence.js) – siehe README für bekannte
 // Vereinfachungen (keine echte Authentifizierung).
 
 const path = require('path');
@@ -17,7 +20,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { RoomManager } = require('./rooms');
 const { loadSnapshot, saveSnapshot, getPlayerRank, savePlayerRank, getLeaderboard } = require('./persistence');
-const { STARTING_RATING, tierForRating, applyMatchResult, findMatchmakingPair } = require('./ranking');
+const { STARTING_RATING, tierForRating, findMatchmakingGroup, applyMultiwayMatchResult } = require('./ranking');
 
 const app = express();
 const server = http.createServer(app);
@@ -35,23 +38,28 @@ function persist() {
   saveSnapshot(DATA_FILE, rooms.exportSnapshot());
 }
 
-// Startkapital für ein Ranked-1v1-Match (bewusst kleiner als die 1000 Chips
+// Startkapital für ein Ranked-Match (bewusst kleiner als die 1000 Chips
 // eines Casual-Tisches, damit ein Match zügig zu einem Ergebnis kommt).
 const RANKED_STARTING_CHIPS = 200;
+// Anzahl Spieler pro Ranked-Tisch ("1v1v1v1").
+const RANKED_GROUP_SIZE = 4;
 
-// Wartende Spieler für den Ranked-1v1-Modus: { socket, name, rating,
-// joinedAt }, in Beitritts-Reihenfolge. findMatchmakingPair() (ranking.js)
-// bevorzugt den am längsten Wartenden und sucht dafür den ähnlichsten
-// verfügbaren Gegner; die akzeptierte Rating-Differenz wächst mit der
-// Wartezeit, damit niemand unbegrenzt hängen bleibt.
+// Wartende Spieler für den Ranked-Modus: { socket, name, rating,
+// joinedAt }, in Beitritts-Reihenfolge. findMatchmakingGroup() (ranking.js)
+// bevorzugt den am längsten Wartenden und sucht dafür die (RANKED_GROUP_SIZE
+// - 1) ratingmäßig ähnlichsten verfügbaren Mitspieler; die akzeptierte
+// Rating-Spanne wächst mit der Wartezeit, damit niemand unbegrenzt hängen
+// bleibt.
 const rankedQueue = [];
-// Wie oft erneut nach Paaren gesucht wird, auch ohne dass jemand neu
+// Wie oft erneut nach Gruppen gesucht wird, auch ohne dass jemand neu
 // beitritt – nötig, damit wartende Spieler von der wachsenden Toleranz
 // profitieren, statt nur bei einem neuen Beitritt geprüft zu werden.
 const MATCHMAKING_INTERVAL_MS = 2000;
-// Codes von Räumen, die aus dem Ranked-Matchmaking stammen. Nur für diese
-// wird nach jeder Hand geprüft, ob das Match durch einen Bust entschieden ist.
-const rankedRooms = new Set();
+// Räume, die aus dem Ranked-Matchmaking stammen: code -> { eliminatedOrder },
+// wobei eliminatedOrder die Namen der bereits ausgeschiedenen Spieler in
+// Bust-Reihenfolge enthält (zuerst ausgeschieden zuerst). Nur für diese Codes
+// wird nach jeder Hand geprüft, ob das Match schon entschieden ist.
+const rankedRooms = new Map();
 
 function getOrCreateRank(name) {
   return getPlayerRank(DATA_FILE, name) || { rating: STARTING_RATING, wins: 0, losses: 0 };
@@ -232,37 +240,44 @@ function joinTable(socket, code, name) {
   persist();
 }
 
-// Sucht per findMatchmakingPair() (ranking.js) so lange nach passenden
-// Paaren in der Warteschlange, bis keine mehr gefunden werden. Wird nach
-// jedem neuen Beitritt sofort aufgerufen und zusätzlich periodisch (siehe
-// MATCHMAKING_INTERVAL_MS), damit auch wartende Spieler von der mit der
-// Zeit wachsenden Toleranz profitieren.
+// Sucht per findMatchmakingGroup() (ranking.js) so lange nach passenden
+// Gruppen von RANKED_GROUP_SIZE Spielern in der Warteschlange, bis keine
+// mehr gefunden werden. Wird nach jedem neuen Beitritt sofort aufgerufen
+// und zusätzlich periodisch (siehe MATCHMAKING_INTERVAL_MS), damit auch
+// wartende Spieler von der mit der Zeit wachsenden Toleranz profitieren.
 function runMatchmakingPass() {
-  const pair = findMatchmakingPair(rankedQueue);
-  if (!pair) return;
-  const [i, j] = pair;
-  // Größeren Index zuerst entfernen, damit der kleinere Index gültig bleibt.
-  const entryB = rankedQueue.splice(j, 1)[0];
-  const entryA = rankedQueue.splice(i, 1)[0];
-  startRankedMatch(entryA, entryB);
-  runMatchmakingPass(); // in der restlichen Warteschlange könnten weitere Paare stecken
+  const group = findMatchmakingGroup(rankedQueue, RANKED_GROUP_SIZE);
+  if (!group) return;
+  // Absteigend entfernen, damit die kleineren Indizes beim Entfernen
+  // größerer Indizes gültig bleiben.
+  const entries = [...group]
+    .sort((a, b) => b - a)
+    .map((idx) => rankedQueue.splice(idx, 1)[0])
+    .reverse();
+  startRankedMatch(entries);
+  runMatchmakingPass(); // in der restlichen Warteschlange könnten weitere Gruppen stecken
 }
 setInterval(runMatchmakingPass, MATCHMAKING_INTERVAL_MS);
 
-// Legt für zwei wartende Spieler einen neuen Raum an, setzt ein kleineres
-// Ranked-Startkapital und markiert den Raum für die Bust-Erkennung nach
-// jeder Hand (siehe maybeFinishRankedMatch).
-function startRankedMatch(entryA, entryB) {
+// Legt für eine Gruppe wartender Spieler einen neuen Raum an, setzt ein
+// kleineres Ranked-Startkapital und markiert den Raum für die
+// Bust-Erkennung nach jeder Hand (siehe maybeFinishRankedMatch).
+function startRankedMatch(entries) {
   const code = rooms.createRoom();
-  rankedRooms.add(code);
+  rankedRooms.set(code, { eliminatedOrder: [] });
   const table = rooms.getTable(code);
-  table.addPlayer(entryA.socket.id, entryA.name, RANKED_STARTING_CHIPS);
-  table.addPlayer(entryB.socket.id, entryB.name, RANKED_STARTING_CHIPS);
+  for (const entry of entries) {
+    table.addPlayer(entry.socket.id, entry.name, RANKED_STARTING_CHIPS);
+  }
 
-  for (const entry of [entryA, entryB]) {
+  for (const entry of entries) {
     entry.socket.data.roomCode = code;
     entry.socket.join(code);
-    entry.socket.emit('room-joined', { code, ranked: true, opponentName: entry === entryA ? entryB.name : entryA.name });
+    entry.socket.emit('room-joined', {
+      code,
+      ranked: true,
+      opponentNames: entries.filter((e) => e !== entry).map((e) => e.name),
+    });
   }
 
   broadcastRoomState(code);
@@ -308,50 +323,69 @@ function advancePhaseIfRoundComplete(table) {
   }
 }
 
-// Prüft nach einer beendeten Hand in einem Ranked-Raum, ob einer der beiden
-// Spieler bei 0 Chips steht (= Match verloren). Aktualisiert dann die
-// Ratings beider Spieler (ELO-artig, siehe ranking.js) und benachrichtigt
-// beide Clients mit ihrem neuen Rang. Der Raum bleibt danach bestehen (die
-// Spieler sehen die letzte Hand noch), zählt aber nicht mehr als Ranked.
+// Prüft nach einer beendeten Hand in einem Ranked-Raum, ob ein oder mehrere
+// Spieler bei 0 Chips stehen (= ausgeschieden), entfernt sie vom Tisch und
+// merkt sich ihre Bust-Reihenfolge. Sobald nur noch ein Spieler übrig ist,
+// steht die Platzierung fest (Sieger zuerst, dann die Ausgeschiedenen in
+// umgekehrter Bust-Reihenfolge – wer länger durchhält, landet weiter vorn).
+// Aktualisiert dann alle Ratings paarweise (siehe applyMultiwayMatchResult
+// in ranking.js) und benachrichtigt jeden Client mit seinem Platz und
+// neuen Rang. Der Raum bleibt danach bestehen (die Spieler sehen die
+// letzte Hand noch), zählt aber nicht mehr als Ranked.
 function maybeFinishRankedMatch(code, table) {
-  if (table.players.length !== 2) return; // unerwartete Spielerzahl: nichts werten
+  const entry = rankedRooms.get(code);
+  if (!entry) return;
 
-  const busted = table.players.find((p) => p.chips === 0);
-  if (!busted) return; // Match läuft weiter
-  const winner = table.players.find((p) => p.chips > 0);
-  if (!winner) return;
-
-  rankedRooms.delete(code);
-
-  const winnerRank = getOrCreateRank(winner.name);
-  const loserRank = getOrCreateRank(busted.name);
-  const { winnerRating, loserRating } = applyMatchResult(winnerRank.rating, loserRank.rating);
-
-  savePlayerRank(DATA_FILE, winner.name, {
-    rating: winnerRating,
-    wins: winnerRank.wins + 1,
-    losses: winnerRank.losses,
-  });
-  savePlayerRank(DATA_FILE, busted.name, {
-    rating: loserRating,
-    wins: loserRank.wins,
-    losses: loserRank.losses + 1,
-  });
-
-  const socketsInRoom = io.sockets.adapter.rooms.get(code);
-  if (!socketsInRoom) return;
-  for (const socketId of socketsInRoom) {
-    const clientSocket = io.sockets.sockets.get(socketId);
-    if (!clientSocket) continue;
-    const isWinner = socketId === winner.id;
-    clientSocket.emit('ranked-match-over', {
-      result: isWinner ? 'win' : 'loss',
-      opponentName: isWinner ? busted.name : winner.name,
-      newRating: isWinner ? winnerRating : loserRating,
-      newTier: tierForRating(isWinner ? winnerRating : loserRating),
-      ratingChange: isWinner ? winnerRating - winnerRank.rating : loserRating - loserRank.rating,
-    });
+  const busted = table.players.filter((p) => p.chips === 0);
+  for (const player of busted) {
+    entry.eliminatedOrder.push({ id: player.id, name: player.name });
+    table.removePlayer(player.id);
   }
+
+  const remaining = table.players;
+  if (remaining.length > 1) {
+    // Match läuft weiter (evtl. mit weniger Spielern): Tisch-Ansicht der
+    // verbliebenen Spieler aktualisieren, falls gerade jemand entfernt wurde.
+    if (busted.length > 0) broadcastRoomState(code);
+    return;
+  }
+  rankedRooms.delete(code);
+  if (remaining.length === 0) return; // Randfall: letzter verbliebener Spieler bustet zeitgleich, keine Wertung
+
+  const winner = remaining[0];
+  // Bester Platz zuerst: der Sieger, danach die Ausgeschiedenen in
+  // umgekehrter Bust-Reihenfolge (zuletzt ausgeschieden = besserer Platz).
+  const placements = [{ id: winner.id, name: winner.name }, ...entry.eliminatedOrder.slice().reverse()];
+  const placementNames = placements.map((p) => p.name);
+
+  const priorRanks = {};
+  const ratings = {};
+  for (const name of placementNames) {
+    priorRanks[name] = getOrCreateRank(name);
+    ratings[name] = priorRanks[name].rating;
+  }
+
+  const results = applyMultiwayMatchResult(placementNames, ratings);
+
+  placements.forEach((p, idx) => {
+    const prior = priorRanks[p.name];
+    const updated = results[p.name];
+    savePlayerRank(DATA_FILE, p.name, {
+      rating: updated.rating,
+      wins: prior.wins + updated.wins,
+      losses: prior.losses + updated.losses,
+    });
+
+    const clientSocket = io.sockets.sockets.get(p.id);
+    if (!clientSocket) return;
+    clientSocket.emit('ranked-match-over', {
+      place: idx + 1,
+      totalPlayers: placements.length,
+      newRating: updated.rating,
+      newTier: tierForRating(updated.rating),
+      ratingChange: updated.rating - prior.rating,
+    });
+  });
 }
 
 // Schickt jedem Socket im Raum seine eigene Sicht auf den Tisch (fremde

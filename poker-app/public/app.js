@@ -121,13 +121,13 @@ socket.on('leaderboard', (entries) => {
   showScreen('leaderboard');
 });
 
-socket.on('ranked-match-over', ({ result, opponentName, newRating, newTier, ratingChange }) => {
-  const outcome = result === 'win' ? 'Sieg' : 'Niederlage';
+socket.on('ranked-match-over', ({ place, totalPlayers, newRating, newTier, ratingChange }) => {
+  const outcome = place === 1 ? 'Sieg' : `Platz ${place} von ${totalPlayers}`;
   const sign = ratingChange >= 0 ? '+' : '';
   document.getElementById('ranked-match-over-text').textContent =
-    `${outcome} gegen ${opponentName}! Neuer Rang: ${newTier} (${newRating}, ${sign}${ratingChange})`;
+    `${outcome}! Neuer Rang: ${newTier} (${newRating}, ${sign}${ratingChange})`;
   rankedMatchOverBanner.hidden = false;
-  if (result === 'win') burstConfetti();
+  if (place === 1) burstConfetti();
 });
 
 // Nach jedem (Wieder-)Verbinden: Wenn wir laut sessionStorage schon in
