@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Poker</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="join-screen" class="screen">
+      <h1>Texas Hold'em</h1>
+      <p>Tritt dem Tisch bei, um mitzuspielen.</p>
+      <input id="name-input" type="text" placeholder="Dein Name" maxlength="20" />
+      <button id="join-btn">Beitreten</button>
+    </div>
+
+    <div id="table-screen" class="screen" hidden>
+      <div id="error-banner" class="error-banner" hidden></div>
+      <div id="hand-result" class="hand-result" hidden></div>
+
+      <div class="table-header">
+        <span id="phase-label" class="phase-label"></span>
+        <span id="pot-label" class="pot-label"></span>
+        <span id="current-bet-label" class="current-bet-label"></span>
+      </div>
+
+      <div id="community-cards" class="card-row"></div>
+
+      <div id="players-list" class="players-list"></div>
+
+      <div class="my-hand">
+        <h2>Deine Karten</h2>
+        <div id="my-cards" class="card-row"></div>
+      </div>
+
+      <div class="action-bar">
+        <button id="start-hand-btn">Hand starten</button>
+        <button id="fold-btn">Fold</button>
+        <button id="check-btn">Check</button>
+        <button id="call-btn">Call</button>
+        <span class="bet-control">
+          <input id="bet-input" type="number" min="1" placeholder="Betrag" />
+          <button id="bet-btn">Bet</button>
+        </span>
+        <span class="bet-control">
+          <input id="raise-input" type="number" min="1" placeholder="Raise auf …" />
+          <button id="raise-btn">Raise</button>
+        </span>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
