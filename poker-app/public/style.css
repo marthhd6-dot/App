@@ -44,6 +44,22 @@ body {
   width: 220px;
 }
 
+#room-code-input {
+  width: 120px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.join-row {
+  margin-top: 14px;
+}
+
+.room-code-label {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
 button {
   font-size: 0.95rem;
   padding: 10px 16px;

@@ -9,9 +9,17 @@
   <body>
     <div id="join-screen" class="screen">
       <h1>Texas Hold'em</h1>
-      <p>Tritt dem Tisch bei, um mitzuspielen.</p>
+      <p>Erstelle einen neuen Tisch oder tritt einem bestehenden per Code bei.</p>
+      <div id="join-error" class="error-banner" hidden></div>
       <input id="name-input" type="text" placeholder="Dein Name" maxlength="20" />
-      <button id="join-btn">Beitreten</button>
+
+      <div class="join-row">
+        <button id="create-room-btn">Neuen Tisch erstellen</button>
+      </div>
+      <div class="join-row">
+        <input id="room-code-input" type="text" placeholder="Raum-Code" maxlength="4" />
+        <button id="join-room-btn">Tisch beitreten</button>
+      </div>
     </div>
 
     <div id="table-screen" class="screen" hidden>
@@ -19,6 +27,7 @@
       <div id="hand-result" class="hand-result" hidden></div>
 
       <div class="table-header">
+        <span id="room-code-label" class="room-code-label"></span>
         <span id="phase-label" class="phase-label"></span>
         <span id="pot-label" class="pot-label"></span>
         <span id="current-bet-label" class="current-bet-label"></span>
