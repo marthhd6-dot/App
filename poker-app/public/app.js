@@ -665,8 +665,12 @@ function renderSeats(state, winnerIds) {
     ordered.push(state.players[(startIndex + i) % n]);
   }
 
-  const rx = 44; // Radius in % der Tisch-Breite
-  const ry = 40; // Radius in % der Tisch-Höhe
+  // Auf schmalen Bildschirmen ist rund um den Tisch weniger Platz bis zum
+  // Viewport-Rand, deshalb dort einen etwas engeren Radius verwenden – sonst
+  // würden Sitzplätze am linken/rechten Rand über den Bildschirmrand hinausragen.
+  const isNarrow = window.innerWidth <= 640;
+  const rx = isNarrow ? 39 : 44; // Radius in % der Tisch-Breite
+  const ry = isNarrow ? 37 : 40; // Radius in % der Tisch-Höhe
 
   ordered.forEach((p, i) => {
     const angleRad = ((90 + (360 / n) * i) * Math.PI) / 180; // Start unten in der Mitte

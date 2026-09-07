@@ -171,14 +171,16 @@
       </div>
 
       <div class="table-felt">
-        <div class="felt-rail"></div>
-        <div class="pot-display">
-          <span class="pot-chips-icon">
-            <span class="chip-stack-mini"></span>
-          </span>
-          <span id="pot-label" class="pot-amount">Pot: 0</span>
+        <div class="felt-surface">
+          <div class="felt-rail"></div>
+          <div class="pot-display">
+            <span class="pot-chips-icon">
+              <span class="chip-stack-mini"></span>
+            </span>
+            <span id="pot-label" class="pot-amount">Pot: 0</span>
+          </div>
+          <div id="community-cards" class="card-row community-row"></div>
         </div>
-        <div id="community-cards" class="card-row community-row"></div>
         <div id="players-list" class="seats"></div>
       </div>
 
@@ -202,7 +204,7 @@
           <button id="bet-btn" class="btn btn-raise">Bet</button>
         </span>
         <span class="bet-control">
-          <input id="raise-input" type="number" min="1" placeholder="Raise auf …" />
+          <input id="raise-input" type="number" min="1" placeholder="Raise auf" />
           <button id="raise-btn" class="btn btn-raise">Raise</button>
         </span>
       </div>

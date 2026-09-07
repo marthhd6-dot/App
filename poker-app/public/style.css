@@ -253,10 +253,17 @@ h2 {
 }
 
 #room-code-input {
-  width: 130px !important;
+  width: 160px !important;
   text-transform: uppercase;
   letter-spacing: 0.15em;
   text-align: center;
+}
+
+/* Der Platzhaltertext ("Raum-Code") ist länger als ein tatsächlicher
+   4-stelliger Code – eigener, engerer Letter-Spacing nur fürs Placeholder,
+   damit er nicht am Feldrand abgeschnitten wird. */
+#room-code-input::placeholder {
+  letter-spacing: 0.03em;
 }
 
 .join-divider {
@@ -529,12 +536,24 @@ button:disabled {
 
 /* --- Table felt ------------------------------------------------------------ */
 
+/* .table-felt ist nur noch die layout-tragende, unbeschnittene Box: sie
+   bestimmt Größe/Seitenverhältnis und ist der Bezugsrahmen für die
+   Sitzplatz-Prozentkoordinaten (renderSeats() in app.js). Das eigentliche
+   ovale Tischbild (Holzrand, grüner Filz, Textur, Pot) lebt in
+   .felt-surface, die als einzige beschnitten wird ("overflow: hidden") –
+   so können Sitzplätze am Rand optisch auf der Holzkante sitzen, statt
+   hart abgeschnitten zu werden. */
 .table-felt {
   position: relative;
   width: 100%;
   max-width: 760px;
   aspect-ratio: 16 / 10;
-  margin: 0 auto 20px;
+  margin: 0 auto 28px;
+}
+
+.felt-surface {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
   background: radial-gradient(ellipse at 50% 32%, var(--table-green) 0%, var(--table-green-mid) 52%, var(--table-green-dark) 100%);
   border: 13px solid var(--wood);
@@ -908,7 +927,7 @@ button:disabled {
 }
 
 .bet-control input {
-  width: 92px;
+  width: 116px;
   padding: 10px 12px;
 }
 
@@ -924,6 +943,20 @@ button:disabled {
   padding: 24px 16px;
   background: rgba(2, 8, 6, 0.72);
   backdrop-filter: blur(4px);
+}
+
+/* Als Flex-Kind schrumpft .panel sonst auf ihren Inhalt (Fit-Content statt
+   feste Breite) – ohne eigene Obergrenze bläht ein langer Fließtext (z. B.
+   der Account-Hinweistext) das Panel bis fast auf Viewport-Breite auf.
+   Beide Regeln haben dieselbe Selektor-Spezifität, die zweite gewinnt daher
+   für Panels mit zusätzlicher .panel-wide-Klasse per Reihenfolge. */
+.modal-overlay .panel {
+  width: 100%;
+  max-width: 420px;
+}
+
+.modal-overlay .panel-wide {
+  max-width: 560px;
 }
 
 .friends-list {
@@ -1158,13 +1191,28 @@ button:disabled {
 @media (max-width: 640px) {
   .table-felt {
     aspect-ratio: 3 / 4;
+  }
+  .felt-surface {
     border-radius: 40px;
   }
   .seat {
-    width: 96px;
+    width: 92px;
+  }
+  .seat-pod {
+    padding: 5px 8px 5px 5px;
+    gap: 6px;
+  }
+  .seat-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
   }
   .seat-name {
-    max-width: 56px;
+    max-width: 52px;
+    font-size: 0.74rem;
+  }
+  .seat-chips {
+    font-size: 0.66rem;
   }
   .community-row .card {
     width: 34px;
