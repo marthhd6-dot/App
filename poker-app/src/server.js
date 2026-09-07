@@ -3,18 +3,23 @@
 // einen eigenen Tisch-Zustand (src/rooms.js) und wird über einen kurzen
 // Code erreicht, den Spieler zum Beitreten eingeben.
 //
-// Zusätzlich gibt es zwei automatische 4-Spieler-Modi ("1v1v1v1"), die
-// beide ohne manuellen Raum-Code über eine Matchmaking-Warteschlange
-// zusammenfinden und bei denen ein Match läuft, bis nur noch ein Spieler
-// Chips übrig hat (siehe trackEliminations()):
-// - **Ranked**: Spieler werden nach Rating gruppiert (siehe
-//   findMatchmakingGroup() in src/ranking.js). Die Platzierung nach
-//   Matchende aktualisiert die Ratings paarweise (siehe
-//   applyMultiwayMatchResult()); der Rang wird über den Spielernamen
-//   dauerhaft gespeichert (src/persistence.js).
-// - **Casual**: Die ersten vier wartenden Spieler werden ohne
-//   Rating-Bezug zusammengelegt (reines FIFO), ohne Auswirkung auf den
-//   Rang – nur zum entspannten Spielen zu viert.
+// Zusätzlich gibt es vier automatische Matchmaking-Modi, die alle ohne
+// manuellen Raum-Code über eine Warteschlange zusammenfinden:
+// - **1v1v1v1 Ranked**: 4 Spieler frei-für-sich, nach Rating gruppiert
+//   (siehe findMatchmakingGroup() in src/ranking.js). Ein Match läuft, bis
+//   nur noch einer Chips übrig hat (siehe trackEliminations()); die
+//   Platzierung aktualisiert die Ratings paarweise (siehe
+//   applyMultiwayMatchResult()).
+// - **1v1v1v1 Casual**: dieselbe Idee wie Ranked, aber reines FIFO ohne
+//   Rating-Bezug und ohne Auswirkung auf den Rang.
+// - **2v2 Ranked**: 4 nach Rating gruppierte Spieler werden zusätzlich in
+//   zwei möglichst ausgeglichene Teams aufgeteilt (siehe
+//   balanceIntoTeams()). Ein Match läuft, bis ein ganzes Team ausgeschieden
+//   ist (siehe trackTeamEliminations()); die Ratings werden teambasiert
+//   aktualisiert (siehe applyTeamMatchResult()).
+// - **2v2 Casual**: wie 2v2 Ranked, aber FIFO ohne Rating-Bezug/-Auswirkung
+//   – und als Besonderheit sieht jeder Spieler zusätzlich die Hole Cards
+//   seines Teammitglieds (siehe extraVisibleIds in broadcastRoomState()).
 // Siehe README für bekannte Vereinfachungen (keine echte Authentifizierung).
 
 const path = require('path');
@@ -23,7 +28,13 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { RoomManager } = require('./rooms');
 const { loadSnapshot, saveSnapshot, getPlayerRank, savePlayerRank, getLeaderboard } = require('./persistence');
-const { STARTING_RATING, tierForRating, findMatchmakingGroup, applyMultiwayMatchResult } = require('./ranking');
+const {
+  STARTING_RATING,
+  tierForRating,
+  findMatchmakingGroup,
+  applyMultiwayMatchResult,
+  applyTeamMatchResult,
+} = require('./ranking');
 const { blindsForHandsPlayed } = require('./blinds');
 
 const app = express();
@@ -80,6 +91,31 @@ const casualQueue = [];
 // normalen Casual-Tisch) und ohne Rating-Auswirkung nach Matchende.
 const casualMatchRooms = new Map();
 
+// Anzahl Spieler pro 2v2-Tisch (2 Teams à 2 Spieler).
+const TEAM_SIZE = 2;
+const TEAM_GROUP_SIZE = TEAM_SIZE * 2;
+
+// Wartende Spieler für 2v2 Ranked: { socket, name, rating, joinedAt }.
+// findMatchmakingGroup() sucht wie beim 1v1v1v1-Ranked-Modus die
+// TEAM_GROUP_SIZE ratingmäßig nächsten Spieler; balanceIntoTeams() teilt
+// die gefundene Gruppe danach in zwei möglichst ausgeglichene Teams auf.
+const rankedTeamQueue = [];
+// Räume aus dem 2v2-Ranked-Matchmaking: code -> { teams, members,
+// handsPlayed }. teams ordnet jede Spieler-ID (0 oder 1) einem Team zu;
+// members ist [{ id, name, team }, ...] – nötig, weil nach einem Bust der
+// Spieler-Name aus table.players verschwindet, aber für die
+// Rating-Auswertung noch gebraucht wird. handsPlayed steuert wie bei
+// rankedRooms den Turnier-Blind-Zeitplan.
+const rankedTeamRooms = new Map();
+
+// Wartende Spieler für 2v2 Casual: { socket, name, joinedAt }. Reines FIFO
+// wie beim 1v1v1v1-Casual-Modus.
+const casualTeamQueue = [];
+// Räume aus dem 2v2-Casual-Matchmaking: code -> { teams, members }. Für
+// diese Räume zeigt broadcastRoomState() jedem Spieler zusätzlich die Hole
+// Cards seines Teammitglieds.
+const casualTeamRooms = new Map();
+
 function getOrCreateRank(name) {
   return getPlayerRank(DATA_FILE, name) || { rating: STARTING_RATING, wins: 0, losses: 0 };
 }
@@ -128,12 +164,10 @@ io.on('connection', (socket) => {
     if (oldSocketId) {
       socket.data.roomCode = normalizedCode;
       clearDisconnectTimer(normalizedCode, oldSocketId);
+      remapTeamEntryId(rankedTeamRooms.get(normalizedCode), oldSocketId, socket.id);
+      remapTeamEntryId(casualTeamRooms.get(normalizedCode), oldSocketId, socket.id);
       socket.join(normalizedCode);
-      socket.emit('room-joined', {
-        code: normalizedCode,
-        ranked: rankedRooms.has(normalizedCode),
-        casual4: casualMatchRooms.has(normalizedCode),
-      });
+      socket.emit('room-joined', { code: normalizedCode, ...roomModeInfo(normalizedCode, socket.id) });
       broadcastRoomState(normalizedCode);
       return;
     }
@@ -200,6 +234,65 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('join-ranked-team-queue', ({ name } = {}) => {
+    if (socket.data.roomCode) {
+      socket.emit('error-message', 'Du bist bereits einem Raum beigetreten.');
+      return;
+    }
+    if (rankedTeamQueue.some((entry) => entry.socket === socket)) {
+      socket.emit('error-message', 'Du suchst bereits nach Mitspielern.');
+      return;
+    }
+    const trimmedName = String(name || '').trim();
+    if (!trimmedName) {
+      socket.emit('error-message', 'Bitte gib zuerst einen Namen ein.');
+      return;
+    }
+
+    const rank = getOrCreateRank(trimmedName);
+    rankedTeamQueue.push({ socket, name: trimmedName, rating: rank.rating, joinedAt: Date.now() });
+    socket.emit('queue-status', { waiting: true });
+
+    runRankedTeamMatchmakingPass();
+  });
+
+  socket.on('leave-ranked-team-queue', () => {
+    const idx = rankedTeamQueue.findIndex((entry) => entry.socket === socket);
+    if (idx !== -1) {
+      rankedTeamQueue.splice(idx, 1);
+      socket.emit('queue-status', { waiting: false });
+    }
+  });
+
+  socket.on('join-casual-team-queue', ({ name } = {}) => {
+    if (socket.data.roomCode) {
+      socket.emit('error-message', 'Du bist bereits einem Raum beigetreten.');
+      return;
+    }
+    if (casualTeamQueue.some((entry) => entry.socket === socket)) {
+      socket.emit('error-message', 'Du suchst bereits nach Mitspielern.');
+      return;
+    }
+    const trimmedName = String(name || '').trim();
+    if (!trimmedName) {
+      socket.emit('error-message', 'Bitte gib zuerst einen Namen ein.');
+      return;
+    }
+
+    casualTeamQueue.push({ socket, name: trimmedName, joinedAt: Date.now() });
+    socket.emit('queue-status', { waiting: true });
+
+    runCasualTeamMatchmakingPass();
+  });
+
+  socket.on('leave-casual-team-queue', () => {
+    const idx = casualTeamQueue.findIndex((entry) => entry.socket === socket);
+    if (idx !== -1) {
+      casualTeamQueue.splice(idx, 1);
+      socket.emit('queue-status', { waiting: false });
+    }
+  });
+
   socket.on('get-rank', ({ name } = {}) => {
     const trimmedName = String(name || '').trim();
     if (!trimmedName) return;
@@ -213,15 +306,17 @@ io.on('connection', (socket) => {
   });
 
   socket.on('start-hand', () => {
-    // In Ranked-Räumen vor jeder Hand die Blinds nach dem Turnier-Zeitplan
-    // setzen und den Hand-Zähler erhöhen (siehe blindsForHandsPlayed()).
-    const rankedEntry = rankedRooms.get(socket.data.roomCode);
+    // In beiden Ranked-Modi (1v1v1v1 und 2v2) vor jeder Hand die Blinds
+    // nach dem Turnier-Zeitplan setzen und den Hand-Zähler erhöhen (siehe
+    // blindsForHandsPlayed()).
+    const code = socket.data.roomCode;
+    const escalatingEntry = rankedRooms.get(code) || rankedTeamRooms.get(code);
     handleAction(socket, (table) => {
-      if (rankedEntry) {
-        const { smallBlind, bigBlind } = blindsForHandsPlayed(rankedEntry.handsPlayed);
+      if (escalatingEntry) {
+        const { smallBlind, bigBlind } = blindsForHandsPlayed(escalatingEntry.handsPlayed);
         table.smallBlind = smallBlind;
         table.bigBlind = bigBlind;
-        rankedEntry.handsPlayed += 1;
+        escalatingEntry.handsPlayed += 1;
       }
       table.startHand();
     });
@@ -254,6 +349,10 @@ io.on('connection', (socket) => {
     if (queueIdx !== -1) rankedQueue.splice(queueIdx, 1);
     const casualQueueIdx = casualQueue.findIndex((entry) => entry.socket === socket);
     if (casualQueueIdx !== -1) casualQueue.splice(casualQueueIdx, 1);
+    const rankedTeamQueueIdx = rankedTeamQueue.findIndex((entry) => entry.socket === socket);
+    if (rankedTeamQueueIdx !== -1) rankedTeamQueue.splice(rankedTeamQueueIdx, 1);
+    const casualTeamQueueIdx = casualTeamQueue.findIndex((entry) => entry.socket === socket);
+    if (casualTeamQueueIdx !== -1) casualTeamQueue.splice(casualTeamQueueIdx, 1);
 
     const roomCode = socket.data.roomCode;
     if (!roomCode) return;
@@ -274,6 +373,8 @@ io.on('connection', (socket) => {
         rooms.removeRoom(roomCode);
         rankedRooms.delete(roomCode);
         casualMatchRooms.delete(roomCode);
+        rankedTeamRooms.delete(roomCode);
+        casualTeamRooms.delete(roomCode);
       } else {
         broadcastRoomState(roomCode);
       }
@@ -282,6 +383,30 @@ io.on('connection', (socket) => {
     disconnectTimers.set(timerKey(roomCode, socket.id), timer);
   });
 });
+
+// Liefert die Badge-/Team-Infos für room-joined, je nachdem aus welchem
+// Matchmaking-Modus (falls überhaupt) der Raum stammt.
+function roomModeInfo(code, playerId) {
+  if (rankedRooms.has(code)) return { ranked: true };
+  if (casualMatchRooms.has(code)) return { casual4: true };
+  const rankedTeamEntry = rankedTeamRooms.get(code);
+  if (rankedTeamEntry) return { rankedTeam: true, team: rankedTeamEntry.teams[playerId] };
+  const casualTeamEntry = casualTeamRooms.get(code);
+  if (casualTeamEntry) return { casualTeam: true, team: casualTeamEntry.teams[playerId] };
+  return {};
+}
+
+// Ein Reconnect gibt dem zurückkehrenden Spieler eine neue Socket-ID (siehe
+// table.reconnectPlayer()). team-Einträge merken sich Spieler aber über
+// ihre ID, daher muss diese Zuordnung hier nachgezogen werden – sonst
+// würde der Spieler nach einem Reconnect aus seinem Team "fallen".
+function remapTeamEntryId(entry, oldId, newId) {
+  if (!entry || !(oldId in entry.teams)) return;
+  entry.teams[newId] = entry.teams[oldId];
+  delete entry.teams[oldId];
+  const member = entry.members.find((m) => m.id === oldId);
+  if (member) member.id = newId;
+}
 
 function timerKey(roomCode, socketId) {
   return `${roomCode}:${socketId}`;
@@ -301,7 +426,7 @@ function joinTable(socket, code, name) {
   table.addPlayer(socket.id, name || `Spieler-${socket.id.slice(0, 4)}`);
   socket.data.roomCode = code;
   socket.join(code);
-  socket.emit('room-joined', { code, ranked: rankedRooms.has(code), casual4: casualMatchRooms.has(code) });
+  socket.emit('room-joined', { code, ...roomModeInfo(code, socket.id) });
   broadcastRoomState(code);
   persist();
 }
@@ -387,6 +512,102 @@ function startCasualMatch(entries) {
   persist();
 }
 
+// Sucht per findMatchmakingGroup() so lange nach passenden 4er-Gruppen für
+// 2v2 Ranked, bis keine mehr gefunden werden – analog zu
+// runMatchmakingPass(), nur dass die Gruppe danach zusätzlich in zwei
+// Teams aufgeteilt wird (siehe balanceIntoTeams()).
+function runRankedTeamMatchmakingPass() {
+  const group = findMatchmakingGroup(rankedTeamQueue, TEAM_GROUP_SIZE);
+  if (!group) return;
+  const entries = [...group]
+    .sort((a, b) => b - a)
+    .map((idx) => rankedTeamQueue.splice(idx, 1)[0])
+    .reverse();
+  const [teamA, teamB] = balanceIntoTeams(entries);
+  startRankedTeamMatch(teamA, teamB);
+  runRankedTeamMatchmakingPass();
+}
+setInterval(runRankedTeamMatchmakingPass, MATCHMAKING_INTERVAL_MS);
+
+// Teilt TEAM_GROUP_SIZE (4) Spieler in zwei möglichst ausgeglichene Teams
+// auf: nach Rating sortiert spielen der stärkste und der schwächste
+// zusammen gegen die beiden mittleren – das minimiert die Differenz der
+// Team-Rating-Summen (Standard-Heuristik fürs Team-Balancing).
+function balanceIntoTeams(entries) {
+  const sorted = [...entries].sort((a, b) => a.rating - b.rating);
+  return [
+    [sorted[0], sorted[3]],
+    [sorted[1], sorted[2]],
+  ];
+}
+
+// Legt für zwei Teams einen neuen 2v2-Ranked-Raum an (Startkapital wie
+// Ranked, Turnier-Blind-Zeitplan über handsPlayed) und merkt sich die
+// Team-Zuordnung für die Bust-Erkennung (siehe maybeFinishRankedTeamMatch).
+function startRankedTeamMatch(teamA, teamB) {
+  const code = rooms.createRoom();
+  const { teams, members } = buildTeamAssignment(teamA, teamB);
+  rankedTeamRooms.set(code, { teams, members, handsPlayed: 0 });
+  const table = rooms.getTable(code);
+  for (const entry of members) {
+    table.addPlayer(entry.id, entry.name, RANKED_STARTING_CHIPS);
+  }
+  joinTeamMatchRoom(code, teamA, teamB, teams, members, { rankedTeam: true });
+}
+
+// Legt reine FIFO-2v2-Casual-Gruppen an, solange genug Spieler warten –
+// wie runCasualMatchmakingPass(), zusätzlich in zwei Teams aufgeteilt.
+function runCasualTeamMatchmakingPass() {
+  while (casualTeamQueue.length >= TEAM_GROUP_SIZE) {
+    const entries = casualTeamQueue.splice(0, TEAM_GROUP_SIZE);
+    startCasualTeamMatch([entries[0], entries[1]], [entries[2], entries[3]]);
+  }
+}
+
+// Legt für zwei Teams einen neuen 2v2-Casual-Raum an (übliches
+// Startkapital, feste Blinds). broadcastRoomState() zeigt jedem Spieler
+// dieses Raums zusätzlich die Hole Cards seines Teammitglieds.
+function startCasualTeamMatch(teamA, teamB) {
+  const code = rooms.createRoom();
+  const { teams, members } = buildTeamAssignment(teamA, teamB);
+  casualTeamRooms.set(code, { teams, members });
+  const table = rooms.getTable(code);
+  for (const entry of members) {
+    table.addPlayer(entry.id, entry.name);
+  }
+  joinTeamMatchRoom(code, teamA, teamB, teams, members, { casualTeam: true });
+}
+
+// Baut aus zwei Team-Arrays (je [{ socket, name, ... }, ...]) die von
+// rankedTeamRooms/casualTeamRooms benötigten Strukturen: teams ordnet jede
+// Socket-ID ihrem Team-Index zu, members ist die flache Liste aller
+// Mitglieder mit { id, name, team }.
+function buildTeamAssignment(teamA, teamB) {
+  const teams = {};
+  const members = [];
+  [teamA, teamB].forEach((team, teamIdx) => {
+    team.forEach((entry) => {
+      teams[entry.socket.id] = teamIdx;
+      members.push({ id: entry.socket.id, name: entry.name, team: teamIdx });
+    });
+  });
+  return { teams, members };
+}
+
+// Gemeinsamer Beitritts-Schritt für 2v2-Räume: jeden Spieler dem Socket.io-
+// Raum hinzufügen und mit seiner Team-Zugehörigkeit benachrichtigen.
+function joinTeamMatchRoom(code, teamA, teamB, teams, members, modeFlags) {
+  for (const entry of [...teamA, ...teamB]) {
+    const teamIdx = teams[entry.socket.id];
+    const teammateNames = members.filter((m) => m.team === teamIdx && m.id !== entry.socket.id).map((m) => m.name);
+    entry.socket.data.roomCode = code;
+    entry.socket.join(code);
+    entry.socket.emit('room-joined', { code, ...modeFlags, team: teamIdx, teammateNames });
+  }
+  broadcastRoomState(code);
+  persist();
+}
+
 // Führt eine Tisch-Aktion aus, meldet Validierungsfehler nur an den
 // auslösenden Client zurück und lässt danach automatisch die nächste
 // Straße austeilen (Flop/Turn/River/Showdown), falls die Wettrunde
@@ -405,6 +626,8 @@ function handleAction(socket, action) {
     if (table.phase === 'showdown') {
       if (rankedRooms.has(roomCode)) maybeFinishRankedMatch(roomCode, table);
       else if (casualMatchRooms.has(roomCode)) maybeFinishCasualMatch(roomCode, table);
+      else if (rankedTeamRooms.has(roomCode)) maybeFinishRankedTeamMatch(roomCode, table);
+      else if (casualTeamRooms.has(roomCode)) maybeFinishCasualTeamMatch(roomCode, table);
     }
     persist(); // einfach gehalten: nach jeder Aktion speichern statt nur nach Handende
   } catch (err) {
@@ -530,18 +753,127 @@ function maybeFinishCasualMatch(code, table) {
   });
 }
 
+// Prüft nach einer beendeten Hand in einem 2v2-Match (Ranked oder Casual),
+// ob ein oder mehrere Spieler bei 0 Chips stehen, entfernt sie vom Tisch
+// und prüft, ob dadurch ein ganzes Team ausgeschieden ist. Läuft das Match
+// noch (Spieler aus beiden Teams haben noch Chips), wird nur
+// { finished: false } zurückgegeben, ggf. mit changed: true. Ist nur noch
+// ein Team übrig, wird { finished: true, winningTeam } zurückgegeben
+// (winningTeam: null im Randfall, dass beide Teams zeitgleich komplett
+// ausscheiden – dann gibt es keine Wertung).
+function trackTeamEliminations(table, matchEntry) {
+  const busted = table.players.filter((p) => p.chips === 0);
+  for (const player of busted) {
+    table.removePlayer(player.id);
+  }
+
+  const remaining = table.players;
+  if (remaining.length === 0) {
+    return { finished: true, winningTeam: null, changed: busted.length > 0 };
+  }
+  const remainingTeams = new Set(remaining.map((p) => matchEntry.teams[p.id]));
+  if (remainingTeams.size > 1) {
+    return { finished: false, changed: busted.length > 0 };
+  }
+  return { finished: true, winningTeam: [...remainingTeams][0], changed: busted.length > 0 };
+}
+
+// Wertet ein beendetes 2v2-Ranked-Match aus: aktualisiert die Ratings
+// teambasiert (siehe applyTeamMatchResult in ranking.js – jedes Mitglied
+// des Sieger-Teams gilt als Sieger gegen jedes Mitglied des
+// Verlierer-Teams) und benachrichtigt jeden Client, ob sein Team gewonnen
+// hat und mit seinem neuen Rang.
+function maybeFinishRankedTeamMatch(code, table) {
+  const entry = rankedTeamRooms.get(code);
+  if (!entry) return;
+
+  const result = trackTeamEliminations(table, entry);
+  if (!result.finished) {
+    if (result.changed) broadcastRoomState(code);
+    return;
+  }
+  rankedTeamRooms.delete(code);
+  if (result.winningTeam === null) return;
+
+  const winnerNames = entry.members.filter((m) => m.team === result.winningTeam).map((m) => m.name);
+  const loserNames = entry.members.filter((m) => m.team !== result.winningTeam).map((m) => m.name);
+
+  const priorRanks = {};
+  const ratings = {};
+  for (const name of [...winnerNames, ...loserNames]) {
+    priorRanks[name] = getOrCreateRank(name);
+    ratings[name] = priorRanks[name].rating;
+  }
+
+  const results = applyTeamMatchResult(winnerNames, loserNames, ratings);
+
+  entry.members.forEach((member) => {
+    const prior = priorRanks[member.name];
+    const updated = results[member.name];
+    savePlayerRank(DATA_FILE, member.name, {
+      rating: updated.rating,
+      wins: prior.wins + updated.wins,
+      losses: prior.losses + updated.losses,
+    });
+
+    const clientSocket = io.sockets.sockets.get(member.id);
+    if (!clientSocket) return;
+    clientSocket.emit('ranked-team-match-over', {
+      won: member.team === result.winningTeam,
+      newRating: updated.rating,
+      newTier: tierForRating(updated.rating),
+      ratingChange: updated.rating - prior.rating,
+    });
+  });
+}
+
+// Wertet ein beendetes 2v2-Casual-Match aus: keine Ratings betroffen, jeder
+// Client erfährt nur, ob sein Team gewonnen hat.
+function maybeFinishCasualTeamMatch(code, table) {
+  const entry = casualTeamRooms.get(code);
+  if (!entry) return;
+
+  const result = trackTeamEliminations(table, entry);
+  if (!result.finished) {
+    if (result.changed) broadcastRoomState(code);
+    return;
+  }
+  casualTeamRooms.delete(code);
+  if (result.winningTeam === null) return;
+
+  entry.members.forEach((member) => {
+    const clientSocket = io.sockets.sockets.get(member.id);
+    if (!clientSocket) return;
+    clientSocket.emit('casual-team-match-over', { won: member.team === result.winningTeam });
+  });
+}
+
 // Schickt jedem Socket im Raum seine eigene Sicht auf den Tisch (fremde
-// Hole Cards werden von table.getPublicState() ausgeblendet).
+// Hole Cards werden von table.getPublicState() ausgeblendet – außer für
+// das eigene Teammitglied in einem 2v2-Casual-Raum, siehe extraVisibleIds
+// unten). In jedem 2v2-Raum (Ranked oder Casual) wird zusätzlich die
+// Team-Zuordnung als state.teams mitgeschickt, damit das Frontend die
+// Sitzplätze pro Team einfärben kann.
 function broadcastRoomState(code) {
   const table = rooms.getTable(code);
   if (!table) return;
+  const casualTeamEntry = casualTeamRooms.get(code);
+  const teamEntry = rankedTeamRooms.get(code) || casualTeamEntry;
   const socketsInRoom = io.sockets.adapter.rooms.get(code);
   if (!socketsInRoom) return;
   for (const socketId of socketsInRoom) {
     const clientSocket = io.sockets.sockets.get(socketId);
-    if (clientSocket) {
-      clientSocket.emit('state', table.getPublicState(socketId));
+    if (!clientSocket) continue;
+    let extraVisibleIds = [];
+    if (casualTeamEntry) {
+      const myTeam = casualTeamEntry.teams[socketId];
+      extraVisibleIds = table.players
+        .filter((p) => p.id !== socketId && casualTeamEntry.teams[p.id] === myTeam)
+        .map((p) => p.id);
     }
+    const state = table.getPublicState(socketId, extraVisibleIds);
+    if (teamEntry) state.teams = teamEntry.teams;
+    clientSocket.emit('state', state);
   }
 }
 

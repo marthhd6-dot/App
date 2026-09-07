@@ -183,6 +183,25 @@ Chip-Stände definiert.
   `totalPlayers`) – nur eben ohne jede Auswirkung auf Rang oder
   Bestenliste. Die gemeinsame Bust-Erkennung für beide 4-Spieler-Modi
   steckt in `trackEliminations()`.
+- **2v2 Ranked & 2v2 Casual** (Matchmaking in `server.js`, Warteschlangen
+  über `join-ranked-team-queue`/`join-casual-team-queue`): dieselben vier
+  Spieler wie bei 1v1v1v1, aber in zwei Teams à zwei Spieler aufgeteilt.
+  Bei Ranked sucht `findMatchmakingGroup()` wie gewohnt vier ratingmäßig
+  ähnliche Spieler, `balanceIntoTeams()` teilt sie danach in zwei möglichst
+  ausgeglichene Teams (stärkster + schwächster gegen die beiden mittleren –
+  minimiert die Differenz der Team-Rating-Summen); bei Casual ist es wieder
+  reines FIFO. Ein Match endet, sobald ein ganzes Team ausgeschieden ist
+  (`trackTeamEliminations()` – Bust-Erkennung analog zu
+  `trackEliminations()`, aber pro Team statt pro Spieler). Bei Ranked
+  werden die Ratings danach teambasiert aktualisiert: jedes Mitglied des
+  Sieger-Teams gilt als Sieger gegen jedes Mitglied des Verlierer-Teams,
+  also vier einzelne 1v1-Duelle (`applyTeamMatchResult()` in `ranking.js`)
+  – Teamkollegen werden nie gegeneinander gewertet. Bei 2v2 Casual sieht
+  jeder Spieler zusätzlich die Hole Cards seines Teammitglieds (nicht bei
+  Ranked): `table.getPublicState(forPlayerId, extraVisibleIds)` nimmt dafür
+  eine Liste weiterer Spieler-IDs entgegen, deren Karten ebenfalls sichtbar
+  sein sollen, befüllt von `broadcastRoomState()` anhand der Team-Zuordnung
+  des jeweiligen Casual-2v2-Raums.
 
 ## Mögliche nächste Schritte (für Claude Code)
 
