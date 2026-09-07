@@ -4,6 +4,9 @@
   "description": "Online Texas Hold'em Poker – Startgerüst",
   "main": "src/server.js",
   "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node src/server.js",
     "test": "node tests/handEvaluator.test.js && node tests/table.test.js && node tests/rooms.test.js && node tests/persistence.test.js"
