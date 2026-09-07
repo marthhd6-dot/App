@@ -11,6 +11,10 @@
 // loadSnapshot()/saveSnapshot() haben bewusst dieselbe Signatur wie die
 // vorherige JSON-Datei-Version, damit rooms.js und server.js unverändert
 // bleiben konnten.
+//
+// Zusätzlich verwaltet diese Datei die player_ranks-Tabelle für den
+// 1v1-Ranked-Modus (siehe ranking.js): Rating und Sieg/Niederlage-Zähler
+// je Spielername, dauerhaft über Neustarts hinweg.
 
 const fs = require('fs');
 const path = require('path');
@@ -29,6 +33,12 @@ const SCHEMA = `
     name TEXT NOT NULL,
     chips INTEGER NOT NULL,
     PRIMARY KEY (room_code, seat)
+  );
+  CREATE TABLE IF NOT EXISTS player_ranks (
+    name TEXT PRIMARY KEY,
+    rating INTEGER NOT NULL,
+    wins INTEGER NOT NULL DEFAULT 0,
+    losses INTEGER NOT NULL DEFAULT 0
   );
 `;
 
@@ -102,4 +112,40 @@ function saveSnapshot(filePath, snapshot) {
   }
 }
 
-module.exports = { loadSnapshot, saveSnapshot };
+// Liest Rating/Sieg-Niederlage-Zähler eines Spielers, oder null, wenn er
+// noch nie gespeichert wurde (der Aufrufer entscheidet dann über den
+// Startwert, siehe ranking.js#STARTING_RATING).
+function getPlayerRank(filePath, name) {
+  try {
+    const db = getConnection(filePath);
+    return db.prepare('SELECT rating, wins, losses FROM player_ranks WHERE name = ?').get(name) || null;
+  } catch (err) {
+    console.error(`Konnte Rang nicht laden (${filePath}):`, err.message);
+    return null;
+  }
+}
+
+function savePlayerRank(filePath, name, { rating, wins, losses }) {
+  try {
+    const db = getConnection(filePath);
+    db.prepare(
+      `INSERT INTO player_ranks (name, rating, wins, losses) VALUES (?, ?, ?, ?)
+       ON CONFLICT(name) DO UPDATE SET rating = excluded.rating, wins = excluded.wins, losses = excluded.losses`
+    ).run(name, rating, wins, losses);
+  } catch (err) {
+    console.error(`Konnte Rang nicht speichern (${filePath}):`, err.message);
+  }
+}
+
+// Top-Spieler nach Rating absteigend, für eine einfache Bestenliste.
+function getLeaderboard(filePath, limit = 20) {
+  try {
+    const db = getConnection(filePath);
+    return db.prepare('SELECT name, rating, wins, losses FROM player_ranks ORDER BY rating DESC LIMIT ?').all(limit);
+  } catch (err) {
+    console.error(`Konnte Bestenliste nicht laden (${filePath}):`, err.message);
+    return [];
+  }
+}
+
+module.exports = { loadSnapshot, saveSnapshot, getPlayerRank, savePlayerRank, getLeaderboard };

@@ -19,6 +19,19 @@ const socket = io();
 let mySocketId = null;
 let myName = '';
 let joinedRoomCode = null;
+let isRanked = false;
+
+const screens = {
+  join: document.getElementById('join-screen'),
+  queue: document.getElementById('queue-screen'),
+  leaderboard: document.getElementById('leaderboard-screen'),
+  table: document.getElementById('table-screen'),
+};
+function showScreen(name) {
+  Object.entries(screens).forEach(([key, el]) => {
+    el.hidden = key !== name;
+  });
+}
 
 const joinScreen = document.getElementById('join-screen');
 const tableScreen = document.getElementById('table-screen');
@@ -28,6 +41,8 @@ const joinErrorEl = document.getElementById('join-error');
 const errorBanner = document.getElementById('error-banner');
 const reconnectBanner = document.getElementById('reconnect-banner');
 const handResultEl = document.getElementById('hand-result');
+const rankedBadge = document.getElementById('ranked-badge');
+const rankedMatchOverBanner = document.getElementById('ranked-match-over-banner');
 
 const foldBtn = document.getElementById('fold-btn');
 const checkBtn = document.getElementById('check-btn');
@@ -55,13 +70,58 @@ socket.on('disconnect', () => {
 
 socket.on('state', render);
 
-socket.on('room-joined', ({ code }) => {
+socket.on('room-joined', ({ code, ranked }) => {
   joinedRoomCode = code;
+  isRanked = Boolean(ranked);
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code, name: myName }));
   reconnectBanner.hidden = true;
+  rankedMatchOverBanner.hidden = true;
+  rankedBadge.hidden = !isRanked;
   document.getElementById('room-code-label').textContent = `Raum: ${code}`;
-  joinScreen.hidden = true;
-  tableScreen.hidden = false;
+  showScreen('table');
+});
+
+socket.on('queue-status', ({ waiting }) => {
+  showScreen(waiting ? 'queue' : 'join');
+});
+
+socket.on('rank-info', ({ name, rating, tier, wins, losses }) => {
+  const text = `${name}: ${tier} (${rating}) · ${wins}S/${losses}N`;
+  const myRankLabel = document.getElementById('my-rank-label');
+  myRankLabel.textContent = text;
+  myRankLabel.hidden = false;
+  const queueRankLabel = document.getElementById('queue-rank-label');
+  queueRankLabel.textContent = text;
+});
+
+socket.on('leaderboard', (entries) => {
+  const list = document.getElementById('leaderboard-list');
+  list.innerHTML = '';
+  if (entries.length === 0) {
+    list.textContent = 'Noch keine gewerteten Matches gespielt.';
+  } else {
+    entries.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'leaderboard-row';
+      row.innerHTML = `
+        <span class="leaderboard-rank">#${i + 1}</span>
+        <span class="leaderboard-name">${escapeHtml(p.name)}</span>
+        <span class="tier-badge tier-${p.tier.toLowerCase()}">${p.tier}</span>
+        <span class="leaderboard-rating">${p.rating}</span>
+        <span class="leaderboard-record">${p.wins}S/${p.losses}N</span>
+      `;
+      list.appendChild(row);
+    });
+  }
+  showScreen('leaderboard');
+});
+
+socket.on('ranked-match-over', ({ result, opponentName, newRating, newTier, ratingChange }) => {
+  const outcome = result === 'win' ? 'Sieg' : 'Niederlage';
+  const sign = ratingChange >= 0 ? '+' : '';
+  document.getElementById('ranked-match-over-text').textContent =
+    `${outcome} gegen ${opponentName}! Neuer Rang: ${newTier} (${newRating}, ${sign}${ratingChange})`;
+  rankedMatchOverBanner.hidden = false;
 });
 
 // Nach jedem (Wieder-)Verbinden: Wenn wir laut sessionStorage schon in
@@ -111,6 +171,39 @@ function joinRoom() {
   myName = nameInput.value.trim();
   socket.emit('join-room', { code: roomCodeInput.value.trim(), name: myName });
 }
+
+nameInput.addEventListener('blur', () => {
+  const trimmed = nameInput.value.trim();
+  if (trimmed) socket.emit('get-rank', { name: trimmed });
+});
+
+document.getElementById('ranked-queue-btn').addEventListener('click', () => {
+  myName = nameInput.value.trim();
+  if (!myName) {
+    joinErrorEl.textContent = 'Bitte gib zuerst einen Namen ein.';
+    joinErrorEl.hidden = false;
+    return;
+  }
+  socket.emit('get-rank', { name: myName });
+  socket.emit('join-ranked-queue', { name: myName });
+});
+
+document.getElementById('cancel-queue-btn').addEventListener('click', () => {
+  socket.emit('leave-ranked-queue');
+});
+
+document.getElementById('leaderboard-btn').addEventListener('click', () => {
+  socket.emit('get-leaderboard');
+});
+
+document.getElementById('leaderboard-close-btn').addEventListener('click', () => {
+  showScreen('join');
+});
+
+document.getElementById('ranked-back-to-menu-btn').addEventListener('click', () => {
+  sessionStorage.removeItem(SESSION_KEY);
+  location.reload();
+});
 
 startHandBtn.addEventListener('click', () => socket.emit('start-hand'));
 foldBtn.addEventListener('click', () => socket.emit('fold'));

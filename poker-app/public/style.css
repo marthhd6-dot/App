@@ -31,7 +31,9 @@ body {
   max-width: 720px;
 }
 
-#join-screen {
+#join-screen,
+#queue-screen,
+#leaderboard-screen {
   text-align: center;
 }
 
@@ -42,6 +44,19 @@ body {
   border: none;
   margin-right: 8px;
   width: 220px;
+}
+
+.join-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  margin: 20px auto 0;
+  max-width: 320px;
+}
+
+.rank-label {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-top: 6px;
 }
 
 #room-code-input {
@@ -225,4 +240,91 @@ button:not(:disabled):hover {
   border-radius: 6px;
   border: none;
   font-size: 0.95rem;
+}
+
+.ranked-badge {
+  background: var(--danger);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.ranked-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.leaderboard-list {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  text-align: left;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.leaderboard-rank {
+  color: var(--text-dim);
+  width: 2.5em;
+}
+
+.leaderboard-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.leaderboard-rating {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.leaderboard-record {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.tier-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #1a1a1a;
+}
+
+.tier-bronze {
+  background: #b08d57;
+}
+
+.tier-silber {
+  background: #c4cdd4;
+}
+
+.tier-gold {
+  background: #e2b93b;
+}
+
+.tier-platin {
+  background: #6fd8d0;
+}
+
+.tier-diamant {
+  background: #8ec9ff;
+}
+
+.tier-champion {
+  background: linear-gradient(135deg, #d9a6ff, #e2b93b);
+  color: #21201a;
 }
