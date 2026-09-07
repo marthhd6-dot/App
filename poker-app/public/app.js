@@ -22,6 +22,8 @@ let mySocketId = null;
 let myName = '';
 let joinedRoomCode = null;
 let isRanked = false;
+let isCasual4 = false;
+let queueType = null; // 'ranked' | 'casual' – bestimmt, welches leave-*-queue-Event der Abbrechen-Button feuert
 let lastPhase = null; // für Deal-Animationen: erkennt den Beginn einer neuen Hand
 let communityDealtCount = 0;
 
@@ -45,6 +47,7 @@ const errorBanner = document.getElementById('error-banner');
 const reconnectBanner = document.getElementById('reconnect-banner');
 const handResultEl = document.getElementById('hand-result');
 const rankedBadge = document.getElementById('ranked-badge');
+const casual4Badge = document.getElementById('casual4-badge');
 const rankedMatchOverBanner = document.getElementById('ranked-match-over-banner');
 
 const foldBtn = document.getElementById('fold-btn');
@@ -73,15 +76,17 @@ socket.on('disconnect', () => {
 
 socket.on('state', render);
 
-socket.on('room-joined', ({ code, ranked }) => {
+socket.on('room-joined', ({ code, ranked, casual4 }) => {
   joinedRoomCode = code;
   isRanked = Boolean(ranked);
+  isCasual4 = Boolean(casual4);
   lastPhase = null;
   communityDealtCount = 0;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code, name: myName }));
   reconnectBanner.hidden = true;
   rankedMatchOverBanner.hidden = true;
   rankedBadge.hidden = !isRanked;
+  casual4Badge.hidden = !isCasual4;
   document.getElementById('room-code-label').textContent = `Raum: ${code}`;
   showScreen('table');
 });
@@ -95,8 +100,13 @@ socket.on('rank-info', ({ name, rating, tier, wins, losses }) => {
   const myRankLabel = document.getElementById('my-rank-label');
   myRankLabel.textContent = text;
   myRankLabel.hidden = false;
-  const queueRankLabel = document.getElementById('queue-rank-label');
-  queueRankLabel.textContent = text;
+  // Im Casual-Queue-Screen ist das Rating irrelevant (kein Rating-Bezug),
+  // daher hier nicht anzeigen – auch nicht, wenn eine durchs blur-Event
+  // ausgelöste get-rank-Antwort erst nach dem Wechsel in die Casual-Queue
+  // eintrifft.
+  if (queueType !== 'casual') {
+    document.getElementById('queue-rank-label').textContent = text;
+  }
 });
 
 socket.on('leaderboard', (entries) => {
@@ -126,6 +136,15 @@ socket.on('ranked-match-over', ({ place, totalPlayers, newRating, newTier, ratin
   const sign = ratingChange >= 0 ? '+' : '';
   document.getElementById('ranked-match-over-text').textContent =
     `${outcome}! Neuer Rang: ${newTier} (${newRating}, ${sign}${ratingChange})`;
+  rankedMatchOverBanner.hidden = false;
+  if (place === 1) burstConfetti();
+});
+
+// Casual-4-Matches haben keine Rating-Auswirkung, daher nur der Platz.
+// Nutzt dieselbe Banner-Anzeige wie ranked-match-over.
+socket.on('casual-match-over', ({ place, totalPlayers }) => {
+  const outcome = place === 1 ? 'Sieg' : `Platz ${place} von ${totalPlayers}`;
+  document.getElementById('ranked-match-over-text').textContent = `${outcome}! Gutes Spiel.`;
   rankedMatchOverBanner.hidden = false;
   if (place === 1) burstConfetti();
 });
@@ -190,12 +209,25 @@ document.getElementById('ranked-queue-btn').addEventListener('click', () => {
     joinErrorEl.hidden = false;
     return;
   }
+  queueType = 'ranked';
   socket.emit('get-rank', { name: myName });
   socket.emit('join-ranked-queue', { name: myName });
 });
 
+document.getElementById('casual4-queue-btn').addEventListener('click', () => {
+  myName = nameInput.value.trim();
+  if (!myName) {
+    joinErrorEl.textContent = 'Bitte gib zuerst einen Namen ein.';
+    joinErrorEl.hidden = false;
+    return;
+  }
+  queueType = 'casual';
+  document.getElementById('queue-rank-label').textContent = '';
+  socket.emit('join-casual-queue', { name: myName });
+});
+
 document.getElementById('cancel-queue-btn').addEventListener('click', () => {
-  socket.emit('leave-ranked-queue');
+  socket.emit(queueType === 'casual' ? 'leave-casual-queue' : 'leave-ranked-queue');
 });
 
 document.getElementById('leaderboard-btn').addEventListener('click', () => {
