@@ -19,22 +19,22 @@ function run(name, fn) {
 }
 
 function tempFilePath() {
-  return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'poker-persist-')), 'rooms.json');
+  return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'poker-persist-')), 'rooms.db');
 }
 
-run('loadSnapshot gibt ein leeres Objekt zurück, wenn die Datei nicht existiert', () => {
-  const file = tempFilePath(); // Verzeichnis existiert, Datei selbst nicht
+run('loadSnapshot gibt ein leeres Objekt zurück, wenn die Datei noch nicht existiert', () => {
+  const file = tempFilePath(); // Verzeichnis existiert, Datenbankdatei selbst noch nicht
   assert.deepStrictEqual(loadSnapshot(file), {});
 });
 
 run('loadSnapshot gibt ein leeres Objekt zurück, wenn der Ordner nicht existiert', () => {
-  const file = path.join(os.tmpdir(), 'poker-persist-does-not-exist', 'rooms.json');
+  const file = path.join(os.tmpdir(), 'poker-persist-does-not-exist', 'rooms.db');
   assert.deepStrictEqual(loadSnapshot(file), {});
 });
 
-run('loadSnapshot gibt bei kaputtem JSON ein leeres Objekt zurück statt zu crashen', () => {
+run('loadSnapshot gibt bei einer beschädigten Datenbankdatei ein leeres Objekt zurück statt zu crashen', () => {
   const file = tempFilePath();
-  fs.writeFileSync(file, '{ das ist kein gültiges JSON');
+  fs.writeFileSync(file, 'das ist keine SQLite-Datei');
   assert.deepStrictEqual(loadSnapshot(file), {});
 });
 
@@ -55,10 +55,23 @@ run('saveSnapshot + loadSnapshot: Round-Trip erhält den Inhalt exakt', () => {
   assert.deepStrictEqual(loadSnapshot(file), snapshot);
 });
 
+run('saveSnapshot ersetzt einen vorherigen Snapshot vollständig (kein Datenmüll von früheren Räumen)', () => {
+  const file = tempFilePath();
+  saveSnapshot(file, {
+    OLD1: { smallBlind: 5, bigBlind: 10, dealerIndex: 0, players: [{ name: 'Alt', chips: 500 }] },
+  });
+  saveSnapshot(file, {
+    NEW1: { smallBlind: 5, bigBlind: 10, dealerIndex: 0, players: [{ name: 'Neu', chips: 1000 }] },
+  });
+
+  const restored = loadSnapshot(file);
+  assert.deepStrictEqual(Object.keys(restored), ['NEW1']);
+});
+
 run('saveSnapshot legt fehlende Verzeichnisse automatisch an', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'poker-persist-'));
-  const file = path.join(dir, 'nested', 'deeper', 'rooms.json');
-  saveSnapshot(file, { X: { players: [] } });
+  const file = path.join(dir, 'nested', 'deeper', 'rooms.db');
+  saveSnapshot(file, { X: { smallBlind: 5, bigBlind: 10, dealerIndex: 0, players: [] } });
   assert.strictEqual(fs.existsSync(file), true);
 });
 

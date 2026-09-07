@@ -9,6 +9,7 @@
     "test": "node tests/handEvaluator.test.js && node tests/table.test.js && node tests/rooms.test.js && node tests/persistence.test.js"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
     "express": "^4.19.2",
     "socket.io": "^4.7.5"
   },

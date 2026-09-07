@@ -21,9 +21,9 @@ poker-app/
 │   │   ├── handEvaluator.js  # Beste 5-Karten-Hand aus 7 Karten finden
 │   │   └── table.js          # Tisch-Zustand: Spieler, Phasen, Pot
 │   ├── rooms.js              # Verwaltet mehrere Tische über Raum-Codes
-│   ├── persistence.js        # Lädt/speichert Raum-Snapshots als JSON-Datei
+│   ├── persistence.js        # Lädt/speichert Raum-Snapshots in SQLite
 │   └── server.js             # Express + Socket.io Server, liefert public/ aus
-├── data/                     # Gespeicherte Chip-Stände (rooms.json, gitignored)
+├── data/                     # Gespeicherte Chip-Stände (rooms.db, gitignored)
 └── tests/
     ├── handEvaluator.test.js
     ├── table.test.js
@@ -42,8 +42,8 @@ npm start        # startet den Server auf Port 3001, Frontend unter http://local
 # Gnadenfrist fürs Reconnect-Handling überschreiben (Standard: 30000ms):
 RECONNECT_GRACE_MS=10000 npm start
 
-# Speicherort der Chip-Stände überschreiben (Standard: data/rooms.json):
-POKER_DATA_FILE=/tmp/rooms.json npm start
+# Speicherort der Chip-Stände überschreiben (Standard: data/rooms.db):
+POKER_DATA_FILE=/tmp/rooms.db npm start
 ```
 
 ## Was schon funktioniert
@@ -90,11 +90,14 @@ POKER_DATA_FILE=/tmp/rooms.json npm start
   keine echte Authentifizierung – zwei Spieler mit demselben Namen im
   selben Raum können sich gegenseitig den Platz "stehlen".
 - **Persistenz** (`persistence.js`): Name, Chips, Blinds und
-  Dealer-Position pro Raum werden nach jeder Aktion als JSON-Datei
-  gespeichert (Standard: `data/rooms.json`, überschreibbar via
-  `POKER_DATA_FILE`) und beim Serverstart wieder geladen. Eine laufende
-  Hand (Karten, Einsätze, Phase) wird bewusst nicht gespeichert – nach
-  einem Neustart sind alle wiederhergestellten Spieler als
+  Dealer-Position pro Raum werden nach jeder Aktion in einer SQLite-Datei
+  gespeichert (via `better-sqlite3`, Standard: `data/rooms.db`,
+  überschreibbar via `POKER_DATA_FILE`) und beim Serverstart wieder
+  geladen. Jeder Speichervorgang läuft in einer Transaktion (alte Räume
+  löschen, aktuelle neu einfügen), sodass ein Absturz mitten im
+  Speichern nie einen halb geschriebenen Zustand hinterlässt. Eine
+  laufende Hand (Karten, Einsätze, Phase) wird bewusst nicht gespeichert
+  – nach einem Neustart sind alle wiederhergestellten Spieler als
   "disconnected" markiert und kommen über den normalen Reconnect-Weg
   (`join-room` mit demselben Namen) an ihren Platz zurück. Bei SIGINT/
   SIGTERM (z. B. Ctrl+C oder ein Deploy-Neustart) wird zusätzlich ein
@@ -104,20 +107,19 @@ POKER_DATA_FILE=/tmp/rooms.json npm start
 
 Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
 
-- **Echte Datenbank statt JSON-Datei**: `persistence.js` schreibt
-  aktuell synchron auf eine einzelne Datei – kein Problem für einen
-  Heim-Tisch, aber ohne Nebenläufigkeitsschutz oder Historie. Für mehr
-  Robustheit z. B. auf SQLite oder Postgres umstellen.
+- **Postgres/Supabase statt lokaler SQLite-Datei**: sinnvoll, sobald die
+  App auf mehreren Server-Prozessen/Maschinen laufen soll (SQLite ist
+  an eine einzelne Datei auf einer Maschine gebunden).
 - **Turnier-Modus**: Blinds automatisch nach einem Zeitplan erhöhen,
   Spieler mit 0 Chips aus dem Tisch nehmen.
 - **Hand-Historie & Chat**: vergangene Hände und Nachrichten pro Raum
-  anzeigen.
+  anzeigen (SQLite ist dafür bereits vorhanden und würde sich anbieten).
 - **Mobile-optimiertes UI**: Die Action-Bar und Karten-Reihen sind noch
   nicht für kleine Bildschirme optimiert.
 
 ## Guter erster Prompt für Claude Code
 
-> "Lies dir persistence.js und rooms.js durch. Wie robust ist die
-> aktuelle JSON-Datei-Persistenz bei mehreren gleichzeitigen Schreib-
-> zugriffen? Schlage vor, wie man das auf SQLite umstellen könnte, ohne
-> die restliche App-Logik anzufassen."
+> "Lies dir persistence.js durch. Ergänze eine hands-Tabelle, die nach
+> jedem Showdown das Ergebnis (Gewinner, Pot-Größe, Community Cards)
+> protokolliert, und eine Route/ein Socket-Event, über das ein Client
+> die letzten Hände seines Raums abrufen kann."

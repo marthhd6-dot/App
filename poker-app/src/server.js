@@ -17,7 +17,7 @@ const io = new Server(server, { cors: { origin: '*' } });
 // Wo Chip-Stände zwischen Server-Neustarts gespeichert werden. Über
 // POKER_DATA_FILE überschreibbar (z. B. für Tests, um nicht die echten
 // Spielstände zu überschreiben).
-const DATA_FILE = process.env.POKER_DATA_FILE || path.join(__dirname, '..', 'data', 'rooms.json');
+const DATA_FILE = process.env.POKER_DATA_FILE || path.join(__dirname, '..', 'data', 'rooms.db');
 
 const rooms = new RoomManager();
 rooms.restoreSnapshot(loadSnapshot(DATA_FILE));
