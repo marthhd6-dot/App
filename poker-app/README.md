@@ -137,12 +137,17 @@ Chip-Stände definiert.
   SIGTERM (z. B. Ctrl+C oder ein Deploy-Neustart) wird zusätzlich ein
   letztes Mal explizit gespeichert.
 - **1v1 Ranked** (`ranking.js` + Matchmaking in `server.js`): Über
-  `join-ranked-queue` reiht sich ein Spieler in eine Warteschlange ein;
-  sobald zwei da sind, werden die ersten beiden automatisch in einem
-  neuen Raum mit kleinerem Startkapital (200 statt 1000 Chips)
-  zusammengelegt – kein manueller Raum-Code nötig. Bekannte
-  Vereinfachung: reines FIFO-Matchmaking, kein Rating-basiertes Pairing.
-  Ein Match endet, sobald ein Spieler nach einer Hand bei 0 Chips steht;
+  `join-ranked-queue` reiht sich ein Spieler in eine Warteschlange ein.
+  `findMatchmakingPair()` sucht **Rating-basiert** einen Gegner: bevorzugt
+  wird immer der am längsten wartende Spieler, für den unter den
+  akzeptablen Kandidaten der mit dem ähnlichsten Rating gewählt wird. Die
+  akzeptierte Rating-Differenz wächst mit der Wartezeit (Start: 100
+  Punkte, +15 pro Sekunde), damit niemand unbegrenzt hängen bleibt, nur
+  weil kein ähnlich bewerteter Gegner da ist – die Suche läuft bei jedem
+  neuen Beitritt sofort und zusätzlich alle 2 Sekunden erneut. Gefundene
+  Paare spielen in einem neuen Raum mit kleinerem Startkapital (200 statt
+  1000 Chips) – kein manueller Raum-Code nötig. Ein Match endet, sobald
+  ein Spieler nach einer Hand bei 0 Chips steht;
   der Sieger nimmt den Gegner mit einem ELO-artigen System (K-Faktor 32,
   Startrating 250) auseinander. Sechs Ränge von **Bronze** bis
   **Champion** (Schwellenwerte in `RANK_TIERS`), Rating und
@@ -155,10 +160,6 @@ Chip-Stände definiert.
 
 Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
 
-- **Rating-basiertes Matchmaking**: Aktuell werden beim Ranked-Modus
-  einfach die ersten zwei Spieler in der Warteschlange zusammengelegt.
-  Sinnvoller wäre es, ähnlich starke Ratings zu bevorzugen (mit
-  wachsendem Suchradius, je länger jemand wartet).
 - **Postgres/Supabase statt lokaler SQLite-Datei**: sinnvoll, sobald die
   App auf mehreren Server-Prozessen/Maschinen laufen soll (SQLite ist
   an eine einzelne Datei auf einer Maschine gebunden).
@@ -171,7 +172,8 @@ Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
 
 ## Guter erster Prompt für Claude Code
 
-> "Lies dir server.js und ranking.js durch. Ersetze das FIFO-Matchmaking
-> im Ranked-Modus durch ein rating-basiertes: bevorzuge Gegner mit
-> ähnlichem Rating, aber erweitere den akzeptierten Rating-Abstand mit
-> der Wartezeit, damit niemand ewig in der Warteschlange hängt."
+> "Lies dir server.js durch. Baue Räume/Turniere mit mehr als zwei
+> Spielern für den Ranked-Modus: Statt reiner 1v1-Matches sollen auch
+> 4- oder 6-Spieler-Ranked-Tische unterstützt werden, bei denen ein
+> Match endet, sobald nur noch ein Spieler Chips übrig hat, und alle
+> anderen nach ihrer Bust-Reihenfolge platziert werden."

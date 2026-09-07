@@ -5,8 +5,9 @@
 //
 // Zusätzlich gibt es einen 1v1-Ranked-Modus: Spieler treten einer
 // Matchmaking-Warteschlange bei (statt einen Raum-Code zu teilen) und
-// werden automatisch mit dem nächsten wartenden Spieler zusammengelegt.
-// Der Rang (src/ranking.js) wird über den Spielernamen dauerhaft
+// werden automatisch mit einem ähnlich bewerteten Gegner zusammengelegt
+// (Rating-basiertes Matchmaking, siehe findMatchmakingPair() in
+// src/ranking.js). Der Rang wird über den Spielernamen dauerhaft
 // gespeichert (src/persistence.js) – siehe README für bekannte
 // Vereinfachungen (keine echte Authentifizierung).
 
@@ -16,7 +17,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { RoomManager } = require('./rooms');
 const { loadSnapshot, saveSnapshot, getPlayerRank, savePlayerRank, getLeaderboard } = require('./persistence');
-const { STARTING_RATING, tierForRating, applyMatchResult } = require('./ranking');
+const { STARTING_RATING, tierForRating, applyMatchResult, findMatchmakingPair } = require('./ranking');
 
 const app = express();
 const server = http.createServer(app);
@@ -38,10 +39,16 @@ function persist() {
 // eines Casual-Tisches, damit ein Match zügig zu einem Ergebnis kommt).
 const RANKED_STARTING_CHIPS = 200;
 
-// Wartende Spieler für den Ranked-1v1-Modus, in Beitritts-Reihenfolge.
-// Sobald zwei da sind, werden die ersten beiden sofort zusammengelegt
-// (bekannte Vereinfachung: kein Rating-basiertes Matchmaking, reines FIFO).
+// Wartende Spieler für den Ranked-1v1-Modus: { socket, name, rating,
+// joinedAt }, in Beitritts-Reihenfolge. findMatchmakingPair() (ranking.js)
+// bevorzugt den am längsten Wartenden und sucht dafür den ähnlichsten
+// verfügbaren Gegner; die akzeptierte Rating-Differenz wächst mit der
+// Wartezeit, damit niemand unbegrenzt hängen bleibt.
 const rankedQueue = [];
+// Wie oft erneut nach Paaren gesucht wird, auch ohne dass jemand neu
+// beitritt – nötig, damit wartende Spieler von der wachsenden Toleranz
+// profitieren, statt nur bei einem neuen Beitritt geprüft zu werden.
+const MATCHMAKING_INTERVAL_MS = 2000;
 // Codes von Räumen, die aus dem Ranked-Matchmaking stammen. Nur für diese
 // wird nach jeder Hand geprüft, ob das Match durch einen Bust entschieden ist.
 const rankedRooms = new Set();
@@ -118,13 +125,11 @@ io.on('connection', (socket) => {
       return;
     }
 
-    rankedQueue.push({ socket, name: trimmedName });
+    const rank = getOrCreateRank(trimmedName);
+    rankedQueue.push({ socket, name: trimmedName, rating: rank.rating, joinedAt: Date.now() });
     socket.emit('queue-status', { waiting: true });
 
-    if (rankedQueue.length >= 2) {
-      const [a, b] = rankedQueue.splice(0, 2);
-      startRankedMatch(a, b);
-    }
+    runMatchmakingPass();
   });
 
   socket.on('leave-ranked-queue', () => {
@@ -226,6 +231,23 @@ function joinTable(socket, code, name) {
   broadcastRoomState(code);
   persist();
 }
+
+// Sucht per findMatchmakingPair() (ranking.js) so lange nach passenden
+// Paaren in der Warteschlange, bis keine mehr gefunden werden. Wird nach
+// jedem neuen Beitritt sofort aufgerufen und zusätzlich periodisch (siehe
+// MATCHMAKING_INTERVAL_MS), damit auch wartende Spieler von der mit der
+// Zeit wachsenden Toleranz profitieren.
+function runMatchmakingPass() {
+  const pair = findMatchmakingPair(rankedQueue);
+  if (!pair) return;
+  const [i, j] = pair;
+  // Größeren Index zuerst entfernen, damit der kleinere Index gültig bleibt.
+  const entryB = rankedQueue.splice(j, 1)[0];
+  const entryA = rankedQueue.splice(i, 1)[0];
+  startRankedMatch(entryA, entryB);
+  runMatchmakingPass(); // in der restlichen Warteschlange könnten weitere Paare stecken
+}
+setInterval(runMatchmakingPass, MATCHMAKING_INTERVAL_MS);
 
 // Legt für zwei wartende Spieler einen neuen Raum an, setzt ein kleineres
 // Ranked-Startkapital und markiert den Raum für die Bust-Erkennung nach
