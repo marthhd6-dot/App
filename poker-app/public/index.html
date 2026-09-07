@@ -38,6 +38,26 @@
       </div>
     </div>
 
+    <div id="account-overlay" class="modal-overlay" hidden>
+      <div class="panel">
+        <h1>👤 Account</h1>
+        <p class="account-hint">
+          Ein Account schützt deinen Namen mit einem Passwort, damit ihn niemand sonst verwenden kann. Ohne Account
+          kannst du weiterhin einfach mit einem beliebigen Namen spielen.
+        </p>
+        <div id="account-error" class="error-banner" hidden></div>
+        <input id="account-username-input" type="text" placeholder="Nutzername" maxlength="20" />
+        <input id="account-password-input" type="password" placeholder="Passwort" />
+        <div class="join-row">
+          <button id="login-btn" class="btn btn-primary">Anmelden</button>
+          <button id="register-btn" class="btn btn-ghost">Account erstellen</button>
+        </div>
+        <div class="join-row">
+          <button id="account-close-btn" class="btn btn-ghost">Schließen</button>
+        </div>
+      </div>
+    </div>
+
     <div id="join-screen" class="screen">
       <div class="panel">
         <div class="brand">
@@ -49,7 +69,11 @@
           Ranked oder Casual. Im 2v2 Casual siehst du zusätzlich die Karten deines Teammitglieds.
         </p>
         <div id="join-error" class="error-banner" hidden></div>
-        <input id="name-input" type="text" placeholder="Dein Name" maxlength="20" />
+        <div class="account-bar">
+          <input id="name-input" type="text" placeholder="Dein Name" maxlength="20" />
+          <button id="account-btn" class="btn btn-ghost btn-small">👤 Account</button>
+          <button id="logout-btn" class="btn btn-ghost btn-small" hidden>Abmelden</button>
+        </div>
         <div id="my-rank-label" class="rank-label" hidden></div>
 
         <div class="join-row">

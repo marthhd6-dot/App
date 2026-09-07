@@ -27,14 +27,36 @@
 // fragen kann "sind meine Freunde gerade online?" (get-friends-status) und
 // einen Online-Freund direkt in den eigenen Raum einladen kann
 // (invite-friend -> friend-invite beim Empfänger).
-// Siehe README für bekannte Vereinfachungen (keine echte Authentifizierung).
+//
+// Accounts: Optional kann sich ein Spieler registrieren/anmelden (siehe
+// register-account/login-account), um seinen Namen fest mit einem Passwort
+// zu schützen (Hash + Salt in der users-Tabelle, siehe persistence.js) –
+// ohne Account bleibt der Name weiterhin frei wählbar wie bisher. Ist ein
+// Socket eingeloggt (socket.data.authenticatedUsername gesetzt), überschreibt
+// resolveName() jeden vom Client mitgeschickten Namen mit dem Account-Namen,
+// damit niemand den geschützten Namen eines fremden Accounts "leihen" kann.
+// Angemeldet bleiben: login-with-token prüft ein Session-Token, das der
+// Client nach dem Login in seinem localStorage ablegt (sessionTokens ist
+// rein im Server-Speicher, überlebt also keinen Neustart – ein erneutes
+// Login-with-token schlägt dann fehl und der Client zeigt wieder das
+// Login-Formular).
+// Siehe README für weitere bekannte Vereinfachungen.
 
 const path = require('path');
 const express = require('express');
 const http = require('http');
+const crypto = require('crypto');
 const { Server } = require('socket.io');
 const { RoomManager } = require('./rooms');
-const { loadSnapshot, saveSnapshot, getPlayerRank, savePlayerRank, getLeaderboard } = require('./persistence');
+const {
+  loadSnapshot,
+  saveSnapshot,
+  getPlayerRank,
+  savePlayerRank,
+  getLeaderboard,
+  createUser,
+  verifyUser,
+} = require('./persistence');
 const {
   STARTING_RATING,
   tierForRating,
@@ -150,6 +172,41 @@ function markOffline(socket) {
   if (sockets.size === 0) onlineByName.delete(name);
 }
 
+// Token -> Nutzername für eingeloggte Sessions (rein im Server-Speicher,
+// überlebt also keinen Neustart). Der Client legt sein Token nach dem Login
+// im localStorage ab und schickt es bei jedem neuen Verbindungsaufbau
+// erneut (login-with-token), um automatisch angemeldet zu bleiben.
+const sessionTokens = new Map();
+const USERNAME_MAX_LENGTH = 20; // wie maxlength des Namensfelds im Frontend
+const PASSWORD_MIN_LENGTH = 4;
+
+function createSessionToken(username) {
+  const token = crypto.randomBytes(24).toString('hex');
+  sessionTokens.set(token, username);
+  return token;
+}
+
+// Gemeinsamer Abschluss für Registrierung, Login und automatisches
+// Wieder-Einloggen per Token: markiert den Socket als eingeloggt, erzeugt
+// ein frisches Session-Token und meldet den Account-Namen als online.
+function logInSocket(socket, username) {
+  socket.data.authenticatedUsername = username;
+  const token = createSessionToken(username);
+  markOnline(socket, username);
+  socket.emit('login-success', { username, token });
+}
+
+// Liefert den Namen, der für diesen Socket tatsächlich verwendet werden
+// soll: ist der Socket eingeloggt (socket.data.authenticatedUsername
+// gesetzt), gilt immer der Account-Name – ein vom Client mitgeschickter,
+// womöglich abweichender Name wird dann ignoriert, damit niemand den
+// geschützten Namen eines fremden Accounts "leihen" kann. Ohne Account
+// gilt weiterhin einfach der übergebene (getrimmte) Name wie bisher.
+function resolveName(socket, suppliedName) {
+  if (socket.data.authenticatedUsername) return socket.data.authenticatedUsername;
+  return String(suppliedName || '').trim();
+}
+
 // Wie lange ein getrennter Spieler seinen Platz behält, bevor er endgültig
 // entfernt wird. Läuft die Zeit ab, ohne dass sich jemand mit demselben
 // Namen erneut verbindet, verhält es sich wie ein sofortiges Verlassen.
@@ -189,7 +246,7 @@ io.on('connection', (socket) => {
     // selben Raum bekommt seinen Platz, seine Chips und seine Karten zurück,
     // statt als neuer Spieler zu gelten.
     const table = rooms.getTable(normalizedCode);
-    const trimmedName = String(name || '').trim();
+    const trimmedName = resolveName(socket, name);
     const oldSocketId = trimmedName && table.reconnectPlayer(socket.id, trimmedName);
     if (oldSocketId) {
       markOnline(socket, trimmedName);
@@ -215,7 +272,7 @@ io.on('connection', (socket) => {
       socket.emit('error-message', 'Du suchst bereits nach einem Gegner.');
       return;
     }
-    const trimmedName = String(name || '').trim();
+    const trimmedName = resolveName(socket, name);
     if (!trimmedName) {
       socket.emit('error-message', 'Bitte gib zuerst einen Namen ein.');
       return;
@@ -246,7 +303,7 @@ io.on('connection', (socket) => {
       socket.emit('error-message', 'Du suchst bereits nach Mitspielern.');
       return;
     }
-    const trimmedName = String(name || '').trim();
+    const trimmedName = resolveName(socket, name);
     if (!trimmedName) {
       socket.emit('error-message', 'Bitte gib zuerst einen Namen ein.');
       return;
@@ -276,7 +333,7 @@ io.on('connection', (socket) => {
       socket.emit('error-message', 'Du suchst bereits nach Mitspielern.');
       return;
     }
-    const trimmedName = String(name || '').trim();
+    const trimmedName = resolveName(socket, name);
     if (!trimmedName) {
       socket.emit('error-message', 'Bitte gib zuerst einen Namen ein.');
       return;
@@ -307,7 +364,7 @@ io.on('connection', (socket) => {
       socket.emit('error-message', 'Du suchst bereits nach Mitspielern.');
       return;
     }
-    const trimmedName = String(name || '').trim();
+    const trimmedName = resolveName(socket, name);
     if (!trimmedName) {
       socket.emit('error-message', 'Bitte gib zuerst einen Namen ein.');
       return;
@@ -329,7 +386,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('get-rank', ({ name } = {}) => {
-    const trimmedName = String(name || '').trim();
+    const trimmedName = resolveName(socket, name);
     if (!trimmedName) return;
     const rank = getOrCreateRank(trimmedName);
     socket.emit('rank-info', { name: trimmedName, ...rank, tier: tierForRating(rank.rating) });
@@ -340,12 +397,57 @@ io.on('connection', (socket) => {
     socket.emit('leaderboard', entries);
   });
 
+  socket.on('register-account', ({ username, password } = {}) => {
+    const trimmedUsername = String(username || '').trim();
+    if (!trimmedUsername || trimmedUsername.length > USERNAME_MAX_LENGTH) {
+      socket.emit('account-error', { message: `Nutzername muss 1–${USERNAME_MAX_LENGTH} Zeichen lang sein.` });
+      return;
+    }
+    if (!password || String(password).length < PASSWORD_MIN_LENGTH) {
+      socket.emit('account-error', { message: `Passwort muss mindestens ${PASSWORD_MIN_LENGTH} Zeichen lang sein.` });
+      return;
+    }
+    const created = createUser(DATA_FILE, trimmedUsername, String(password));
+    if (!created) {
+      socket.emit('account-error', { message: `Nutzername "${trimmedUsername}" ist bereits vergeben.` });
+      return;
+    }
+    logInSocket(socket, trimmedUsername);
+  });
+
+  socket.on('login-account', ({ username, password } = {}) => {
+    const trimmedUsername = String(username || '').trim();
+    const verifiedUsername = trimmedUsername && verifyUser(DATA_FILE, trimmedUsername, String(password || ''));
+    if (!verifiedUsername) {
+      socket.emit('account-error', { message: 'Nutzername oder Passwort falsch.' });
+      return;
+    }
+    logInSocket(socket, verifiedUsername);
+  });
+
+  // Meldet einen Socket automatisch wieder an, wenn der Client noch ein
+  // gültiges Session-Token aus einem früheren Login besitzt (siehe
+  // sessionTokens weiter unten). Ungültiges/abgelaufenes Token wird still
+  // ignoriert – der Client bleibt dann einfach im Gast-Modus.
+  socket.on('login-with-token', ({ token } = {}) => {
+    const username = token && sessionTokens.get(token);
+    if (!username) return;
+    socket.data.authenticatedUsername = username;
+    markOnline(socket, username);
+    socket.emit('login-success', { username, token });
+  });
+
+  socket.on('logout-account', ({ token } = {}) => {
+    if (token) sessionTokens.delete(token);
+    socket.data.authenticatedUsername = null;
+  });
+
   // Registriert den Namen als "online", auch ohne dass der Spieler schon
   // einem Raum/einer Warteschlange beigetreten ist (z. B. direkt nach dem
   // Eintippen auf dem Startbildschirm) – nötig, damit Freunde diesen
   // Spieler in der Freundesliste als online sehen können.
   socket.on('set-name', ({ name } = {}) => {
-    markOnline(socket, name);
+    markOnline(socket, resolveName(socket, name));
   });
 
   // Beantwortet für eine Liste von Namen (die Freundesliste des Clients,
@@ -503,7 +605,7 @@ function clearDisconnectTimer(roomCode, socketId) {
 
 function joinTable(socket, code, name) {
   const table = rooms.getTable(code);
-  const resolvedName = name || `Spieler-${socket.id.slice(0, 4)}`;
+  const resolvedName = resolveName(socket, name) || `Spieler-${socket.id.slice(0, 4)}`;
   table.addPlayer(socket.id, resolvedName);
   markOnline(socket, resolvedName);
   socket.data.roomCode = code;

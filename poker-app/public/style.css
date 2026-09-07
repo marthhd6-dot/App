@@ -192,6 +192,7 @@ h2 {
 }
 
 #join-screen input,
+.modal-overlay input,
 .bet-control input {
   font-family: var(--font-body);
   font-size: 1rem;
@@ -205,11 +206,13 @@ h2 {
 }
 
 #join-screen input::placeholder,
+.modal-overlay input::placeholder,
 .bet-control input::placeholder {
   color: rgba(243, 242, 236, 0.4);
 }
 
 #join-screen input:focus,
+.modal-overlay input:focus,
 .bet-control input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(232, 191, 74, 0.18);
@@ -219,6 +222,34 @@ h2 {
   width: 100%;
   margin-right: 0;
   text-align: center;
+}
+
+.account-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.account-bar #name-input {
+  width: auto;
+  flex: 1;
+}
+
+.account-bar input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.account-hint {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin: 6px 0 16px;
+  text-align: left;
+}
+
+#account-overlay input {
+  width: 100%;
+  margin-bottom: 10px;
 }
 
 #room-code-input {

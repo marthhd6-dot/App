@@ -5,7 +5,15 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { loadSnapshot, saveSnapshot, getPlayerRank, savePlayerRank, getLeaderboard } = require('../src/persistence');
+const {
+  loadSnapshot,
+  saveSnapshot,
+  getPlayerRank,
+  savePlayerRank,
+  getLeaderboard,
+  createUser,
+  verifyUser,
+} = require('../src/persistence');
 
 function run(name, fn) {
   try {
@@ -105,6 +113,42 @@ run('getLeaderboard sortiert absteigend nach Rating und begrenzt die Anzahl', ()
     top2.map((p) => p.name),
     ['Hoch', 'Mitte']
   );
+});
+
+run('createUser + verifyUser: Round-Trip mit korrektem Passwort gibt den Nutzernamen zurück', () => {
+  const file = tempFilePath();
+  assert.strictEqual(createUser(file, 'Alice', 'geheim123'), true);
+  assert.strictEqual(verifyUser(file, 'Alice', 'geheim123'), 'Alice');
+});
+
+run('verifyUser gibt null zurück bei falschem Passwort oder unbekanntem Nutzer', () => {
+  const file = tempFilePath();
+  createUser(file, 'Alice', 'geheim123');
+  assert.strictEqual(verifyUser(file, 'Alice', 'falsch'), null);
+  assert.strictEqual(verifyUser(file, 'Unbekannt', 'irgendwas'), null);
+});
+
+run('createUser verhindert doppelt vergebene Nutzernamen (case-insensitive)', () => {
+  const file = tempFilePath();
+  assert.strictEqual(createUser(file, 'Alice', 'pass1'), true);
+  assert.strictEqual(createUser(file, 'Alice', 'pass2'), false);
+  assert.strictEqual(createUser(file, 'ALICE', 'pass3'), false);
+  // Das ursprüngliche Passwort/die ursprüngliche Schreibweise bleiben erhalten.
+  assert.strictEqual(verifyUser(file, 'alice', 'pass1'), 'Alice');
+});
+
+run('verifyUser findet einen Account unabhängig von Groß-/Kleinschreibung beim Login', () => {
+  const file = tempFilePath();
+  createUser(file, 'Bob', 'sicher!');
+  assert.strictEqual(verifyUser(file, 'BOB', 'sicher!'), 'Bob');
+  assert.strictEqual(verifyUser(file, 'bob', 'sicher!'), 'Bob');
+});
+
+run('Passwörter werden nicht im Klartext gespeichert', () => {
+  const file = tempFilePath();
+  createUser(file, 'Carol', 'mein-passwort');
+  const raw = fs.readFileSync(file, 'latin1');
+  assert.strictEqual(raw.includes('mein-passwort'), false);
 });
 
 console.log('\nAlle Tests durchgelaufen.');

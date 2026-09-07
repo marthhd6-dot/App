@@ -203,19 +203,36 @@ Chip-Stände definiert.
   sein sollen, befüllt von `broadcastRoomState()` anhand der Team-Zuordnung
   des jeweiligen Casual-2v2-Raums.
 - **Freundesliste** (`public/app.js` + Präsenz in `server.js`): Die Liste
-  selbst (nur Namen) liegt rein im `localStorage` des Browsers – es gibt
-  keinen Server-seitigen Account, an dem sie hängen könnte. Der Server
-  merkt sich stattdessen nur, welcher Name gerade online ist
-  (`onlineByName`, befüllt über `markOnline()` bei jedem Betreten eines
-  Raums/einer Warteschlange sowie über `set-name`, sobald ein Name auf dem
+  selbst (nur Namen) liegt rein im `localStorage` des Browsers – Freunde
+  sind unabhängig davon, ob einer der beiden einen Account hat (s. u.).
+  Der Server merkt sich, welcher Name gerade online ist (`onlineByName`,
+  befüllt über `markOnline()` bei jedem Betreten eines Raums/einer
+  Warteschlange sowie über `set-name`, sobald ein Name auf dem
   Startbildschirm eingegeben wird). Ein Client fragt mit
   `get-friends-status` (Namen aus seiner lokalen Liste) ab, welche davon
   online sind, und kann einen Online-Freund mit `invite-friend` direkt in
   den eigenen aktuellen Raum einladen – der Empfänger bekommt `friend-invite`
   (Absendername + Raum-Code) und kann per Klick sofort beitreten, auch ohne
-  vorher selbst in einem Raum gewesen zu sein. Bekannte Einschränkung wie
-  überall in dieser App: Namensgleichheit genügt als "derselbe Freund",
-  keine echte Authentifizierung.
+  vorher selbst in einem Raum gewesen zu sein.
+- **Accounts** (optional; `users`-Tabelle in `persistence.js`, Handler in
+  `server.js`): Ohne Account bleibt der Name weiterhin frei wählbar wie
+  überall sonst in dieser App (keine echte Authentifizierung). Wer sich
+  registriert (`register-account`) oder anmeldet (`login-account`), schützt
+  seinen Namen mit einem Passwort – gespeichert wird dabei nie das
+  Passwort selbst, sondern nur `crypto.scrypt(password, salt)` (Node-
+  Bordmittel) plus ein zufälliger Salt pro Account, verglichen beim Login
+  zeitkonstant über `crypto.timingSafeEqual`. Nutzernamen sind
+  case-insensitive eindeutig. Ein eingeloggter Socket bekommt
+  `socket.data.authenticatedUsername` gesetzt; `resolveName()` überschreibt
+  danach bei **jedem** Event, das einen Namen entgegennimmt (Raum
+  erstellen/beitreten, alle vier Warteschlangen, `set-name`), einen vom
+  Client mitgeschickten Namen mit dem Account-Namen – das gilt serverseitig,
+  nicht nur im UI, ein manipulierter Client kann den Namen also nicht
+  umgehen. Angemeldet bleiben: `login-account`/`register-account` erzeugen
+  ein zufälliges Session-Token (`sessionTokens`, nur im Server-Speicher –
+  überlebt keinen Neustart), das der Client in `localStorage` ablegt und
+  bei jedem neuen Verbindungsaufbau erneut schickt (`login-with-token`), um
+  automatisch angemeldet zu bleiben.
 
 ## Mögliche nächste Schritte (für Claude Code)
 
