@@ -1,0 +1,16 @@
+{
+  "name": "poker-app",
+  "version": "0.1.0",
+  "description": "Online Texas Hold'em Poker – Startgerüst",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node tests/handEvaluator.test.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "license": "MIT"
+}
