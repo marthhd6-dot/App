@@ -202,6 +202,20 @@ Chip-Stände definiert.
   eine Liste weiterer Spieler-IDs entgegen, deren Karten ebenfalls sichtbar
   sein sollen, befüllt von `broadcastRoomState()` anhand der Team-Zuordnung
   des jeweiligen Casual-2v2-Raums.
+- **Freundesliste** (`public/app.js` + Präsenz in `server.js`): Die Liste
+  selbst (nur Namen) liegt rein im `localStorage` des Browsers – es gibt
+  keinen Server-seitigen Account, an dem sie hängen könnte. Der Server
+  merkt sich stattdessen nur, welcher Name gerade online ist
+  (`onlineByName`, befüllt über `markOnline()` bei jedem Betreten eines
+  Raums/einer Warteschlange sowie über `set-name`, sobald ein Name auf dem
+  Startbildschirm eingegeben wird). Ein Client fragt mit
+  `get-friends-status` (Namen aus seiner lokalen Liste) ab, welche davon
+  online sind, und kann einen Online-Freund mit `invite-friend` direkt in
+  den eigenen aktuellen Raum einladen – der Empfänger bekommt `friend-invite`
+  (Absendername + Raum-Code) und kann per Klick sofort beitreten, auch ohne
+  vorher selbst in einem Raum gewesen zu sein. Bekannte Einschränkung wie
+  überall in dieser App: Namensgleichheit genügt als "derselbe Freund",
+  keine echte Authentifizierung.
 
 ## Mögliche nächste Schritte (für Claude Code)
 
