@@ -42,6 +42,46 @@ class RoomManager {
   removeRoom(code) {
     this.tables.delete(code);
   }
+
+  // Baut einen Raum aus einem gespeicherten Snapshot wieder auf (siehe
+  // exportSnapshot()). Spieler werden ohne echte Socket-Verbindung als
+  // "disconnected" angelegt – sie kommen über den normalen Reconnect-Weg
+  // (join-room mit demselben Namen) zurück an ihren Platz.
+  restoreRoom(code, { smallBlind = 5, bigBlind = 10, dealerIndex = 0, players = [] } = {}) {
+    const table = new Table({ smallBlind, bigBlind });
+    players.forEach((p, i) => {
+      const placeholderId = `restored:${code}:${i}`;
+      table.addPlayer(placeholderId, p.name, p.chips);
+      table.markDisconnected(placeholderId);
+    });
+    table.dealerIndex = players.length > 0 ? dealerIndex % players.length : 0;
+    table._firstHandDealt = players.length > 0;
+    this.tables.set(code, table);
+  }
+
+  // Baut mehrere Räume auf einmal aus einem zuvor mit exportSnapshot()
+  // erzeugten Objekt wieder auf.
+  restoreSnapshot(snapshot) {
+    for (const [code, roomData] of Object.entries(snapshot || {})) {
+      this.restoreRoom(code, roomData);
+    }
+  }
+
+  // Reduziert alle Räume auf das, was einen Neustart sinnvoll überleben
+  // kann: Name, Chips, Blinds und Dealer-Position. Eine laufende Hand
+  // (Karten, Einsätze, Phase) wird bewusst nicht mit gespeichert.
+  exportSnapshot() {
+    const snapshot = {};
+    for (const [code, table] of this.tables.entries()) {
+      snapshot[code] = {
+        smallBlind: table.smallBlind,
+        bigBlind: table.bigBlind,
+        dealerIndex: table.dealerIndex,
+        players: table.players.map((p) => ({ name: p.name, chips: p.chips })),
+      };
+    }
+    return snapshot;
+  }
 }
 
 module.exports = { RoomManager, generateCode, CODE_LENGTH, CODE_CHARS };
