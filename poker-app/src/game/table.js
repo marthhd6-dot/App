@@ -1,10 +1,11 @@
 // src/game/table.js
 // Verwaltet einen Poker-Tisch: Spieler, Deck, Phasen, Pot, Wettrunden.
 //
-// Bekannte Vereinfachung: Es gibt nur einen gemeinsamen Pot, keine Side Pots
-// bei mehreren unterschiedlich hohen All-Ins. Für einen einfachen Heim-Tisch
-// ausreichend, für ein Turnier mit vielen Stack-Größen müsste das nachgerüstet
-// werden.
+// Side Pots: Sind mehrere Spieler mit unterschiedlich hohen Stacks all-in,
+// wird der Pot beim Showdown anhand der tatsächlichen Gesamteinsätze
+// (totalContributed) in Haupt- und Neben-Pots aufgeteilt (siehe
+// _computePots()). Jeder Pot-Layer wird nur unter den Spielern verteilt,
+// die genug eingesetzt haben, um für ihn infrage zu kommen.
 
 const { createDeck, shuffle, draw } = require('./deck');
 const { determineWinners } = require('./handEvaluator');
@@ -13,7 +14,7 @@ const PHASES = ['waiting', 'preflop', 'flop', 'turn', 'river', 'showdown'];
 
 class Table {
   constructor({ smallBlind = 5, bigBlind = 10 } = {}) {
-    this.players = []; // { id, name, chips, holeCards, folded, isAllIn, bet, hasActed, disconnected }
+    this.players = []; // { id, name, chips, holeCards, folded, isAllIn, bet, hasActed, disconnected, totalContributed }
     this.deck = [];
     this.communityCards = [];
     this.pot = 0;
@@ -40,6 +41,7 @@ class Table {
       bet: 0,
       hasActed: false,
       disconnected: false,
+      totalContributed: 0,
     });
   }
 
@@ -87,6 +89,7 @@ class Table {
       p.isAllIn = false;
       p.bet = 0;
       p.hasActed = false;
+      p.totalContributed = 0;
     });
 
     // Dealer-Button vor jeder Hand außer der ersten weiterrücken
@@ -126,6 +129,7 @@ class Table {
     const actual = Math.min(amount, player.chips);
     player.chips -= actual;
     player.bet += actual;
+    player.totalContributed += actual;
     this.pot += actual;
     if (player.chips === 0) player.isAllIn = true;
   }
@@ -199,6 +203,7 @@ class Table {
     const amount = Math.min(owed, player.chips);
     player.chips -= amount;
     player.bet += amount;
+    player.totalContributed += amount;
     this.pot += amount;
     if (player.chips === 0) player.isAllIn = true;
     player.hasActed = true;
@@ -221,6 +226,7 @@ class Table {
     }
     player.chips -= actual;
     player.bet += actual;
+    player.totalContributed += actual;
     this.pot += actual;
     if (isAllIn) player.isAllIn = true;
     this.currentBet = player.bet;
@@ -253,6 +259,7 @@ class Table {
 
     player.chips -= additional;
     player.bet = newBet;
+    player.totalContributed += additional;
     this.pot += additional;
     if (isAllIn) player.isAllIn = true;
 
@@ -288,8 +295,10 @@ class Table {
     this.actingIndex = this._nextActiveIndex(this.actingIndex);
   }
 
-  // Wenn nur noch ein Spieler nicht gefoldet hat, gewinnt er den Pot sofort
-  // ohne Showdown.
+  // Wenn nur noch ein Spieler nicht gefoldet hat, gewinnt er den gesamten
+  // Pot sofort ohne Showdown – unabhängig von etwaigen Side-Pot-Grenzen,
+  // denn ohne Showdown gibt es keine Hand zu vergleichen: Wer als Letzter
+  // übrig bleibt, nimmt alles mit (genau wie am echten Tisch).
   _checkWinByFold() {
     const contenders = this.players.filter((p) => !p.folded);
     if (contenders.length !== 1) return false;
@@ -300,9 +309,8 @@ class Table {
     this.phase = 'showdown';
     this.actingIndex = -1;
     this.lastHandResult = {
-      winners: [{ id: winner.id, name: winner.name }],
       reason: 'fold',
-      potShare,
+      pots: [{ amount: potShare, winners: [{ id: winner.id, name: winner.name }], potShare }],
     };
     return true;
   }
@@ -351,26 +359,60 @@ class Table {
   showdown() {
     this._assertPhase('river');
     this._assertBettingRoundComplete();
-    const activePlayers = this.players.filter((p) => !p.folded);
-    const { winnerIndexes, results } = determineWinners(activePlayers, this.communityCards);
-    const winners = winnerIndexes.map((i) => activePlayers[i]);
-    const share = Math.floor(this.pot / winners.length);
-    winners.forEach((w) => {
-      w.chips += share;
+
+    const pots = this._computePots();
+    const potResults = pots.map((potLayer) => {
+      const eligiblePlayers = this.players.filter((p) => potLayer.eligiblePlayerIds.includes(p.id));
+      const { winnerIndexes } = determineWinners(eligiblePlayers, this.communityCards);
+      const winners = winnerIndexes.map((i) => eligiblePlayers[i]);
+      const share = Math.floor(potLayer.amount / winners.length);
+      winners.forEach((w) => {
+        w.chips += share;
+      });
+      return {
+        amount: potLayer.amount,
+        winners: winners.map((w) => ({ id: w.id, name: w.name })),
+        potShare: share,
+      };
     });
-    const potShare = this.pot;
+
     this.pot = 0;
     this.phase = 'showdown';
-    this.lastHandResult = {
-      winners: winners.map((w) => ({ id: w.id, name: w.name })),
-      reason: 'showdown',
-      potShare: share,
-    };
-    return {
-      winners: winners.map((w) => ({ id: w.id, name: w.name })),
-      results: results.map((r) => ({ name: r.name })),
-      potShare: share,
-    };
+    this.lastHandResult = { reason: 'showdown', pots: potResults };
+    return { pots: potResults };
+  }
+
+  // Teilt den Pot anhand der Gesamteinsätze (totalContributed) aller
+  // Spieler dieser Hand in "Layer" auf: einen Hauptpot und ggf. mehrere
+  // Neben-Pots, wenn Spieler mit unterschiedlich hohen Stacks all-in
+  // gegangen sind. Jeder Layer ist nur unter den Spielern zu gewinnen, die
+  // mindestens bis zur jeweiligen Grenze mitgegangen sind UND nicht
+  // gefoldet haben – wer gefoldet hat, hat seinen Einsatz trotzdem
+  // beigetragen (er bleibt im Pot), kann ihn aber nicht mehr gewinnen.
+  _computePots() {
+    const contributions = this.players
+      .filter((p) => p.totalContributed > 0)
+      .map((p) => ({ id: p.id, amount: p.totalContributed, folded: p.folded }));
+
+    const levels = [...new Set(contributions.map((c) => c.amount))].sort((a, b) => a - b);
+
+    const pots = [];
+    let previousLevel = 0;
+    for (const level of levels) {
+      const layerSize = level - previousLevel;
+      const contributors = contributions.filter((c) => c.amount >= level);
+      const amount = layerSize * contributors.length;
+      const eligiblePlayerIds = contributors.filter((c) => !c.folded).map((c) => c.id);
+      // eligiblePlayerIds ist bei korrektem Spielverlauf nie leer: Sobald nur
+      // noch ein Spieler nicht gefoldet ist, entscheidet _checkWinByFold die
+      // Hand bereits vorher ohne Showdown. Die Prüfung bleibt als defensive
+      // Absicherung stehen, damit kein Layer "ins Leere" ausgezahlt wird.
+      if (amount > 0 && eligiblePlayerIds.length > 0) {
+        pots.push({ amount, eligiblePlayerIds });
+      }
+      previousLevel = level;
+    }
+    return pots;
   }
 
   _assertPhase(expected) {

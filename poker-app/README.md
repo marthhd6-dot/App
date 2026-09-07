@@ -1,9 +1,9 @@
 # Poker-App — Startgerüst
 
 Ein spielbares Online-Texas-Hold'em mit mehreren Spielern und mehreren
-gleichzeitigen Tischen: Kartenlogik, Wettrunden, Räume, Reconnect-Handling
-und ein einfaches Browser-Frontend sind fertig. Persistenz und Side Pots
-sind offen — das baust du mit Claude Code weiter aus.
+gleichzeitigen Tischen: Kartenlogik (inkl. Side Pots), Wettrunden, Räume,
+Reconnect-Handling und ein einfaches Browser-Frontend sind fertig.
+Persistenz ist offen — das baust du mit Claude Code weiter aus.
 
 ## Struktur
 
@@ -48,6 +48,13 @@ RECONNECT_GRACE_MS=10000 npm start
 - **Wettrunden-Logik** in `table.js`: `placeBet`, `raise`, `call`, `check`,
   `fold`, inklusive Zugreihenfolge, Big-Blind-Option, Mindest-Raise,
   All-In-Behandlung und automatischem Rundenabschluss
+- **Side Pots**: Sind mehrere Spieler mit unterschiedlich hohen Stacks
+  all-in, teilt `Table._computePots()` den Pot beim Showdown korrekt in
+  Haupt- und Neben-Pots auf – jeder Layer ist nur unter den Spielern zu
+  gewinnen, die genug eingesetzt haben, um dafür infrage zu kommen.
+  Gefoldete Spieler finanzieren die Pots weiter mit, können sie aber
+  nicht mehr gewinnen. Verlässt nur noch ein Spieler das Feld durch
+  Fold, gewinnt er weiterhin sofort den kompletten Pot ohne Showdown.
 - **Blinds werden automatisch eingezogen**, der Dealer-Button rückt nach
   jeder Hand weiter (inkl. Heads-up-Sonderregel)
 - Sofortiger Gewinn durch Fold, wenn nur noch ein Spieler übrig ist
@@ -78,17 +85,14 @@ RECONNECT_GRACE_MS=10000 npm start
 
 ## Nächste Schritte (für Claude Code)
 
-Am besten der Reihe nach, jeweils mit Tests:
-
 1. **Persistenz**: Chip-Stände über Sessions hinweg speichern
-   (z. B. mit einer Datenbank wie Postgres oder Supabase).
-2. **Side Pots**: Aktuell gibt es nur einen gemeinsamen Pot; bei mehreren
-   unterschiedlich hohen All-Ins wird (noch) nicht korrekt aufgeteilt.
+   (z. B. mit einer Datenbank wie Postgres oder Supabase). Aktuell startet
+   jeder neue Spieler mit 1000 Chips und alles ist In-Memory – ein
+   Server-Neustart setzt alle Tische zurück.
 
 ## Guter erster Prompt für Claude Code
 
-> "Lies dir table.js und handEvaluator.js durch. Implementiere Side
-> Pots: Wenn mehrere Spieler mit unterschiedlich hohen Stacks all-in
-> gehen, muss der Pot in Haupt- und Neben-Pots aufgeteilt werden, auf
-> die jeweils nur die Spieler Anspruch haben, die genug Chips eingesetzt
-> haben, um dabei zu sein."
+> "Lies dir server.js, rooms.js und table.js durch. Baue Persistenz:
+> Chip-Stände sollen über einen Server-Neustart hinweg erhalten bleiben,
+> z. B. indem der Tisch-Zustand nach jeder Hand in eine Datei oder
+> Datenbank geschrieben und beim Start wieder geladen wird."
