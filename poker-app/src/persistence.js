@@ -1,32 +1,102 @@
 // src/persistence.js
-// Speichert und lädt einen Raum-Snapshot als JSON-Datei, damit Chip-Stände
-// einen Server-Neustart überleben. Bewusst einfach gehalten (keine
-// Datenbank nötig): eine JSON-Datei reicht für einen Heim-Tisch locker aus.
+// Speichert und lädt einen Raum-Snapshot in einer SQLite-Datei (via
+// better-sqlite3, synchron, keine externe Datenbank-Infrastruktur nötig),
+// damit Chip-Stände einen Server-Neustart überleben.
 //
 // Persistiert wird nur, was einen Neustart sinnvoll überleben kann: Name,
 // Chips, Blinds und Dealer-Position pro Raum. Eine laufende Hand (Karten,
 // Einsätze, Phase) wird bewusst NICHT gespeichert – nach einem Neustart
 // müssen Spieler eine neue Hand starten, behalten aber ihre Chips.
+//
+// loadSnapshot()/saveSnapshot() haben bewusst dieselbe Signatur wie die
+// vorherige JSON-Datei-Version, damit rooms.js und server.js unverändert
+// bleiben konnten.
 
 const fs = require('fs');
 const path = require('path');
+const Database = require('better-sqlite3');
+
+const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS rooms (
+    code TEXT PRIMARY KEY,
+    small_blind INTEGER NOT NULL,
+    big_blind INTEGER NOT NULL,
+    dealer_index INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS players (
+    room_code TEXT NOT NULL,
+    seat INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    chips INTEGER NOT NULL,
+    PRIMARY KEY (room_code, seat)
+  );
+`;
+
+// Eine Verbindung pro Dateipfad wird wiederverwendet, statt bei jedem
+// Speichern/Laden neu zu öffnen (spart Overhead bei sehr häufigem Speichern).
+const connections = new Map();
+
+function getConnection(filePath) {
+  let db = connections.get(filePath);
+  if (db) return db;
+
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  db = new Database(filePath);
+  db.pragma('journal_mode = WAL');
+  db.exec(SCHEMA);
+  connections.set(filePath, db);
+  return db;
+}
 
 function loadSnapshot(filePath) {
   try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
-  } catch (err) {
-    if (err.code !== 'ENOENT') {
-      console.error(`Konnte gespeicherten Zustand nicht laden (${filePath}):`, err.message);
+    const db = getConnection(filePath);
+    const rooms = db.prepare('SELECT code, small_blind, big_blind, dealer_index FROM rooms').all();
+    const players = db.prepare('SELECT room_code, name, chips FROM players ORDER BY room_code, seat').all();
+
+    const snapshot = {};
+    for (const room of rooms) {
+      snapshot[room.code] = {
+        smallBlind: room.small_blind,
+        bigBlind: room.big_blind,
+        dealerIndex: room.dealer_index,
+        players: [],
+      };
     }
+    for (const p of players) {
+      snapshot[p.room_code]?.players.push({ name: p.name, chips: p.chips });
+    }
+    return snapshot;
+  } catch (err) {
+    console.error(`Konnte gespeicherten Zustand nicht laden (${filePath}):`, err.message);
     return {};
   }
 }
 
 function saveSnapshot(filePath, snapshot) {
   try {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(snapshot, null, 2));
+    const db = getConnection(filePath);
+    const insertRoom = db.prepare(
+      'INSERT INTO rooms (code, small_blind, big_blind, dealer_index) VALUES (?, ?, ?, ?)'
+    );
+    const insertPlayer = db.prepare('INSERT INTO players (room_code, seat, name, chips) VALUES (?, ?, ?, ?)');
+
+    // Kompletter Ersatz statt Diff: Bei der überschaubaren Größe eines
+    // Heim-Tisch-Snapshots ist "alles löschen, alles neu einfügen" einfacher
+    // und robuster als Änderungen nachzuverfolgen. Läuft in einer Transaktion,
+    // damit ein Absturz mitten im Speichern nie einen halb geschriebenen
+    // Zustand hinterlässt.
+    const writeAll = db.transaction((snap) => {
+      db.prepare('DELETE FROM players').run();
+      db.prepare('DELETE FROM rooms').run();
+      for (const [code, room] of Object.entries(snap)) {
+        insertRoom.run(code, room.smallBlind, room.bigBlind, room.dealerIndex);
+        room.players.forEach((p, seat) => {
+          insertPlayer.run(code, seat, p.name, p.chips);
+        });
+      }
+    });
+    writeAll(snapshot);
   } catch (err) {
     console.error(`Konnte Zustand nicht speichern (${filePath}):`, err.message);
   }
