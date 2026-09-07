@@ -118,6 +118,30 @@ function applyMultiwayMatchResult(placements, ratings) {
   return result;
 }
 
+// Wertet ein Team-Match (z. B. 2v2) aus: jedes Mitglied des Sieger-Teams
+// gilt als Sieger gegen jedes Mitglied des Verlierer-Teams (bei 2v2 also 4
+// einzelne 1v1-Duelle) – Mitglieder desselben Teams werden nie gegeneinander
+// gewertet. ratings: { [name]: aktuelles Rating vor dem Match }. Gibt
+// { [name]: { rating, wins, losses } } zurück, für alle Mitglieder beider
+// Teams zusammen.
+function applyTeamMatchResult(winningTeamNames, losingTeamNames, ratings) {
+  const result = {};
+  [...winningTeamNames, ...losingTeamNames].forEach((name) => {
+    result[name] = { rating: ratings[name], wins: 0, losses: 0 };
+  });
+
+  for (const winnerName of winningTeamNames) {
+    for (const loserName of losingTeamNames) {
+      const { winnerRating, loserRating } = applyMatchResult(result[winnerName].rating, result[loserName].rating);
+      result[winnerName].rating = winnerRating;
+      result[winnerName].wins += 1;
+      result[loserName].rating = loserRating;
+      result[loserName].losses += 1;
+    }
+  }
+  return result;
+}
+
 module.exports = {
   RANK_TIERS,
   STARTING_RATING,
@@ -128,4 +152,5 @@ module.exports = {
   matchTolerance,
   findMatchmakingGroup,
   applyMultiwayMatchResult,
+  applyTeamMatchResult,
 };

@@ -23,7 +23,11 @@ let myName = '';
 let joinedRoomCode = null;
 let isRanked = false;
 let isCasual4 = false;
-let queueType = null; // 'ranked' | 'casual' – bestimmt, welches leave-*-queue-Event der Abbrechen-Button feuert
+let isRankedTeam = false;
+let isCasualTeam = false;
+// 'ranked' | 'casual' | 'ranked-team' | 'casual-team' – bestimmt, welches
+// leave-*-queue-Event der Abbrechen-Button feuert.
+let queueType = null;
 let lastPhase = null; // für Deal-Animationen: erkennt den Beginn einer neuen Hand
 let communityDealtCount = 0;
 
@@ -48,7 +52,10 @@ const reconnectBanner = document.getElementById('reconnect-banner');
 const handResultEl = document.getElementById('hand-result');
 const rankedBadge = document.getElementById('ranked-badge');
 const casual4Badge = document.getElementById('casual4-badge');
+const rankedTeamBadge = document.getElementById('ranked-team-badge');
+const casualTeamBadge = document.getElementById('casual-team-badge');
 const rankedMatchOverBanner = document.getElementById('ranked-match-over-banner');
+const teammateHandEl = document.getElementById('teammate-hand');
 
 const foldBtn = document.getElementById('fold-btn');
 const checkBtn = document.getElementById('check-btn');
@@ -76,10 +83,12 @@ socket.on('disconnect', () => {
 
 socket.on('state', render);
 
-socket.on('room-joined', ({ code, ranked, casual4 }) => {
+socket.on('room-joined', ({ code, ranked, casual4, rankedTeam, casualTeam }) => {
   joinedRoomCode = code;
   isRanked = Boolean(ranked);
   isCasual4 = Boolean(casual4);
+  isRankedTeam = Boolean(rankedTeam);
+  isCasualTeam = Boolean(casualTeam);
   lastPhase = null;
   communityDealtCount = 0;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code, name: myName }));
@@ -87,6 +96,8 @@ socket.on('room-joined', ({ code, ranked, casual4 }) => {
   rankedMatchOverBanner.hidden = true;
   rankedBadge.hidden = !isRanked;
   casual4Badge.hidden = !isCasual4;
+  rankedTeamBadge.hidden = !isRankedTeam;
+  casualTeamBadge.hidden = !isCasualTeam;
   document.getElementById('room-code-label').textContent = `Raum: ${code}`;
   showScreen('table');
 });
@@ -100,11 +111,11 @@ socket.on('rank-info', ({ name, rating, tier, wins, losses }) => {
   const myRankLabel = document.getElementById('my-rank-label');
   myRankLabel.textContent = text;
   myRankLabel.hidden = false;
-  // Im Casual-Queue-Screen ist das Rating irrelevant (kein Rating-Bezug),
-  // daher hier nicht anzeigen – auch nicht, wenn eine durchs blur-Event
-  // ausgelöste get-rank-Antwort erst nach dem Wechsel in die Casual-Queue
-  // eintrifft.
-  if (queueType !== 'casual') {
+  // In den Casual-Queue-Screens ist das Rating irrelevant (kein
+  // Rating-Bezug), daher hier nicht anzeigen – auch nicht, wenn eine durchs
+  // blur-Event ausgelöste get-rank-Antwort erst nach dem Wechsel in die
+  // Casual-Queue eintrifft.
+  if (queueType !== 'casual' && queueType !== 'casual-team') {
     document.getElementById('queue-rank-label').textContent = text;
   }
 });
@@ -147,6 +158,22 @@ socket.on('casual-match-over', ({ place, totalPlayers }) => {
   document.getElementById('ranked-match-over-text').textContent = `${outcome}! Gutes Spiel.`;
   rankedMatchOverBanner.hidden = false;
   if (place === 1) burstConfetti();
+});
+
+socket.on('ranked-team-match-over', ({ won, newRating, newTier, ratingChange }) => {
+  const outcome = won ? 'Team-Sieg' : 'Team-Niederlage';
+  const sign = ratingChange >= 0 ? '+' : '';
+  document.getElementById('ranked-match-over-text').textContent =
+    `${outcome}! Neuer Rang: ${newTier} (${newRating}, ${sign}${ratingChange})`;
+  rankedMatchOverBanner.hidden = false;
+  if (won) burstConfetti();
+});
+
+// 2v2-Casual-Matches haben keine Rating-Auswirkung, daher nur Sieg/Niederlage.
+socket.on('casual-team-match-over', ({ won }) => {
+  document.getElementById('ranked-match-over-text').textContent = `${won ? 'Team-Sieg' : 'Team-Niederlage'}! Gutes Spiel.`;
+  rankedMatchOverBanner.hidden = false;
+  if (won) burstConfetti();
 });
 
 // Nach jedem (Wieder-)Verbinden: Wenn wir laut sessionStorage schon in
@@ -226,8 +253,39 @@ document.getElementById('casual4-queue-btn').addEventListener('click', () => {
   socket.emit('join-casual-queue', { name: myName });
 });
 
+document.getElementById('ranked-team-queue-btn').addEventListener('click', () => {
+  myName = nameInput.value.trim();
+  if (!myName) {
+    joinErrorEl.textContent = 'Bitte gib zuerst einen Namen ein.';
+    joinErrorEl.hidden = false;
+    return;
+  }
+  queueType = 'ranked-team';
+  socket.emit('get-rank', { name: myName });
+  socket.emit('join-ranked-team-queue', { name: myName });
+});
+
+document.getElementById('casual-team-queue-btn').addEventListener('click', () => {
+  myName = nameInput.value.trim();
+  if (!myName) {
+    joinErrorEl.textContent = 'Bitte gib zuerst einen Namen ein.';
+    joinErrorEl.hidden = false;
+    return;
+  }
+  queueType = 'casual-team';
+  document.getElementById('queue-rank-label').textContent = '';
+  socket.emit('join-casual-team-queue', { name: myName });
+});
+
+const LEAVE_QUEUE_EVENTS = {
+  ranked: 'leave-ranked-queue',
+  casual: 'leave-casual-queue',
+  'ranked-team': 'leave-ranked-team-queue',
+  'casual-team': 'leave-casual-team-queue',
+};
 document.getElementById('cancel-queue-btn').addEventListener('click', () => {
-  socket.emit(queueType === 'casual' ? 'leave-casual-queue' : 'leave-ranked-queue');
+  const leaveEvent = LEAVE_QUEUE_EVENTS[queueType];
+  if (leaveEvent) socket.emit(leaveEvent);
 });
 
 document.getElementById('leaderboard-btn').addEventListener('click', () => {
@@ -287,8 +345,8 @@ function renderCommunityCards(cards, previouslyDealt) {
   });
 }
 
-function renderMyCards(cards, animate) {
-  const container = document.getElementById('my-cards');
+function renderMyCards(cards, animate, containerId = 'my-cards') {
+  const container = document.getElementById(containerId);
   container.innerHTML = '';
   cards.forEach((card, i) => {
     const el = renderCard(card);
@@ -338,7 +396,9 @@ function renderSeats(state, winnerIds) {
     const left = 50 + rx * Math.cos(angleRad);
     const top = 50 + ry * Math.sin(angleRad);
 
+    const team = state.teams ? state.teams[p.id] : undefined;
     const badges = [];
+    if (team !== undefined) badges.push({ label: `TEAM ${team + 1}`, cls: `badge-team-${team}` });
     if (p.id === state.dealerPlayerId) badges.push({ label: 'D', cls: 'badge-dealer' });
     if (p.isAllIn) badges.push({ label: 'ALL-IN', cls: 'badge-allin' });
     if (p.folded) badges.push({ label: 'FOLD', cls: 'badge-fold' });
@@ -351,7 +411,8 @@ function renderSeats(state, winnerIds) {
       (p.folded ? ' folded' : '') +
       (p.disconnected ? ' disconnected' : '') +
       (p.id === mySocketId ? ' me' : '') +
-      (winnerIds.has(p.id) ? ' winner' : '');
+      (winnerIds.has(p.id) ? ' winner' : '') +
+      (team !== undefined ? ` team-${team}` : '');
     seat.style.left = `${left}%`;
     seat.style.top = `${top}%`;
 
@@ -430,6 +491,18 @@ function render(state) {
 
   const me = state.players.find((p) => p.id === mySocketId);
   renderMyCards((me && me.holeCards) || [], isNewHand);
+
+  // Im 2v2-Casual-Modus schickt der Server zusätzlich die Hole Cards des
+  // Teammitglieds mit (siehe extraVisibleIds in server.js) – erkennbar
+  // daran, dass ein fremder Spieler holeCards != null hat.
+  const teammate = state.players.find((p) => p.id !== mySocketId && p.holeCards);
+  if (teammate) {
+    document.getElementById('teammate-name').textContent = teammate.name;
+    renderMyCards(teammate.holeCards, isNewHand, 'teammate-cards');
+    teammateHandEl.hidden = false;
+  } else {
+    teammateHandEl.hidden = true;
+  }
 
   lastPhase = state.phase;
 

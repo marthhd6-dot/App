@@ -285,6 +285,20 @@ run('getPublicState zeigt den disconnected-Status pro Spieler', () => {
   assert.strictEqual(b.disconnected, false);
 });
 
+run('getPublicState: extraVisibleIds macht zusätzlich die Karten anderer Spieler sichtbar (z. B. Teammitglied)', () => {
+  const table = makeTable(['a', 'b', 'c']);
+  table.startHand();
+
+  const withoutExtra = table.getPublicState('a');
+  assert.strictEqual(withoutExtra.players.find((p) => p.id === 'b').holeCards, null);
+  assert.strictEqual(withoutExtra.players.find((p) => p.id === 'c').holeCards, null);
+
+  const withExtra = table.getPublicState('a', ['b']);
+  assert.ok(withExtra.players.find((p) => p.id === 'a').holeCards.length === 2);
+  assert.ok(withExtra.players.find((p) => p.id === 'b').holeCards.length === 2);
+  assert.strictEqual(withExtra.players.find((p) => p.id === 'c').holeCards, null); // nicht in extraVisibleIds
+});
+
 run('Side Pot: Kurzer Stack gewinnt nur den Hauptpot, nicht den Neben-Pot der Tiefstapler', () => {
   const table = new Table({ smallBlind: 5, bigBlind: 10 });
   table.addPlayer('a', 'Alice', 1000);

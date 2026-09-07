@@ -422,7 +422,11 @@ class Table {
   }
 
   // Gibt eine für alle Clients sichere Sicht zurück (keine fremden Hole Cards)
-  getPublicState(forPlayerId) {
+  // extraVisibleIds: IDs weiterer Spieler, deren Hole Cards für forPlayerId
+  // ebenfalls sichtbar sein sollen (z. B. das Teammitglied im Casual-Team-
+  // Modus, siehe server.js). Normalerweise leer – dann sieht jeder wie
+  // gewohnt nur die eigenen Karten.
+  getPublicState(forPlayerId, extraVisibleIds = []) {
     return {
       phase: this.phase,
       pot: this.pot,
@@ -439,7 +443,7 @@ class Table {
         folded: p.folded,
         isAllIn: p.isAllIn,
         disconnected: p.disconnected,
-        holeCards: p.id === forPlayerId ? p.holeCards : null,
+        holeCards: p.id === forPlayerId || extraVisibleIds.includes(p.id) ? p.holeCards : null,
       })),
     };
   }

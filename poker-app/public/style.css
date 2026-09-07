@@ -302,6 +302,16 @@ button:disabled {
   box-shadow: 0 3px 0 #2a6f8a, 0 10px 22px -8px rgba(111, 180, 255, 0.5);
 }
 
+.btn-ranked-team {
+  background: linear-gradient(135deg, #ffb46b, #ff8a8a);
+  box-shadow: 0 3px 0 #a3501a, 0 10px 22px -8px rgba(255, 138, 138, 0.5);
+}
+
+.btn-casual-team {
+  background: linear-gradient(135deg, #7fe0e0, #6de3ac);
+  box-shadow: 0 3px 0 #1f7a6f, 0 10px 22px -8px rgba(127, 224, 224, 0.5);
+}
+
 .btn-small {
   padding: 8px 14px;
   font-size: 0.85rem;
@@ -439,6 +449,28 @@ button:disabled {
 
 .casual4-badge {
   background: linear-gradient(135deg, #6fb4ff, #6de3ac);
+  color: #0c2016;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.ranked-team-badge {
+  background: linear-gradient(135deg, #ffb46b, #ff8a8a);
+  color: #2b0d0d;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.casual-team-badge {
+  background: linear-gradient(135deg, #7fe0e0, #6de3ac);
   color: #0c2016;
   font-family: var(--font-display);
   font-size: 0.72rem;
@@ -689,6 +721,16 @@ button:disabled {
   color: white;
 }
 
+.badge-team-0 {
+  background: var(--info);
+  color: #05203a;
+}
+
+.badge-team-1 {
+  background: #ffb46b;
+  color: #2b1300;
+}
+
 /* --- Karten ---------------------------------------------------------------- */
 
 .card-row {
@@ -782,6 +824,17 @@ button:disabled {
   color: var(--text-dim);
   text-align: center;
   margin-bottom: 10px;
+}
+
+/* Teammitglied-Karten im 2v2-Casual-Modus (siehe extraVisibleIds in
+   server.js): eigene Überschriftenfarbe, damit klar ist, dass es nicht die
+   eigenen Karten sind. */
+.teammate-hand h2 {
+  color: var(--info);
+}
+
+.teammate-hand #teammate-name {
+  color: var(--text);
 }
 
 .my-card-row .card {

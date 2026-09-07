@@ -11,6 +11,7 @@ const {
   matchTolerance,
   findMatchmakingGroup,
   applyMultiwayMatchResult,
+  applyTeamMatchResult,
 } = require('../src/ranking');
 
 function run(name, fn) {
@@ -192,6 +193,38 @@ run('applyMultiwayMatchResult: reduziert sich bei zwei Spielern auf ein normales
   assert.strictEqual(result.Verlierer.rating, direct.loserRating);
   assert.strictEqual(result.Gewinner.wins, 1);
   assert.strictEqual(result.Verlierer.losses, 1);
+});
+
+run('applyTeamMatchResult: jedes Sieger-Team-Mitglied gewinnt gegen jedes Verlierer-Team-Mitglied (2v2 = 4 Duelle)', () => {
+  const ratings = { AnnaS: 1000, BenS: 1000, CoraV: 1000, DirkV: 1000 };
+  const result = applyTeamMatchResult(['AnnaS', 'BenS'], ['CoraV', 'DirkV'], ratings);
+
+  assert.strictEqual(result.AnnaS.wins, 2);
+  assert.strictEqual(result.AnnaS.losses, 0);
+  assert.strictEqual(result.BenS.wins, 2);
+  assert.strictEqual(result.BenS.losses, 0);
+  assert.strictEqual(result.CoraV.wins, 0);
+  assert.strictEqual(result.CoraV.losses, 2);
+  assert.strictEqual(result.DirkV.wins, 0);
+  assert.strictEqual(result.DirkV.losses, 2);
+
+  // Bei gleichem Start-Rating gewinnt jedes Sieger-Team-Mitglied ungefähr
+  // gleich viel (exakte Gleichheit ist wegen sequenzieller Rundung nicht
+  // garantiert, siehe applyMultiwayMatchResult).
+  assert.ok(Math.abs(result.AnnaS.rating - result.BenS.rating) <= 2);
+  assert.ok(Math.abs(result.CoraV.rating - result.DirkV.rating) <= 2);
+  assert.ok(result.AnnaS.rating > 1000 && result.BenS.rating > 1000);
+  assert.ok(result.CoraV.rating < 1000 && result.DirkV.rating < 1000);
+});
+
+run('applyTeamMatchResult: Teamkollegen werden nie gegeneinander gewertet', () => {
+  // Extrem unterschiedliche Startratings innerhalb eines Teams – trotzdem
+  // darf sich das Rating der beiden Sieger nur durch Duelle mit dem
+  // Verlierer-Team ändern, niemals durch einen Vergleich miteinander.
+  const ratings = { StarkS: 2000, SchwachS: 100, GegnerA: 1000, GegnerB: 1000 };
+  const result = applyTeamMatchResult(['StarkS', 'SchwachS'], ['GegnerA', 'GegnerB'], ratings);
+  assert.strictEqual(result.StarkS.wins, 2);
+  assert.strictEqual(result.SchwachS.wins, 2);
 });
 
 console.log('\nAlle Tests durchgelaufen.');

@@ -23,7 +23,10 @@
           <span class="brand-chip">♠</span>
           <h1>Texas Hold'em</h1>
         </div>
-        <p>Erstelle einen neuen Tisch, tritt einem bestehenden per Code bei, oder spiele 1v1v1v1 Ranked oder Casual.</p>
+        <p>
+          Erstelle einen neuen Tisch, tritt einem bestehenden per Code bei, oder spiele 1v1v1v1 oder 2v2 – jeweils
+          Ranked oder Casual. Im 2v2 Casual siehst du zusätzlich die Karten deines Teammitglieds.
+        </p>
         <div id="join-error" class="error-banner" hidden></div>
         <input id="name-input" type="text" placeholder="Dein Name" maxlength="20" />
         <div id="my-rank-label" class="rank-label" hidden></div>
@@ -44,6 +47,15 @@
         </div>
         <div class="join-row">
           <button id="casual4-queue-btn" class="btn btn-casual4">🎲 1v1v1v1 Casual spielen</button>
+        </div>
+
+        <hr class="join-divider" />
+
+        <div class="join-row">
+          <button id="ranked-team-queue-btn" class="btn btn-ranked-team">⚔️ 2v2 Ranked spielen</button>
+        </div>
+        <div class="join-row">
+          <button id="casual-team-queue-btn" class="btn btn-casual-team">👥 2v2 Casual spielen</button>
         </div>
       </div>
     </div>
@@ -84,6 +96,8 @@
         <span id="room-code-label" class="room-code-label"></span>
         <span id="ranked-badge" class="ranked-badge" hidden>🏆 1v1v1v1 RANKED</span>
         <span id="casual4-badge" class="casual4-badge" hidden>🎲 1v1v1v1 CASUAL</span>
+        <span id="ranked-team-badge" class="ranked-team-badge" hidden>⚔️ 2v2 RANKED</span>
+        <span id="casual-team-badge" class="casual-team-badge" hidden>👥 2v2 CASUAL</span>
         <span id="phase-label" class="phase-label"></span>
         <span id="current-bet-label" class="current-bet-label"></span>
       </div>
@@ -103,6 +117,11 @@
       <div class="my-hand">
         <h2>Deine Karten</h2>
         <div id="my-cards" class="card-row my-card-row"></div>
+      </div>
+
+      <div id="teammate-hand" class="my-hand teammate-hand" hidden>
+        <h2>Karten von <span id="teammate-name"></span></h2>
+        <div id="teammate-cards" class="card-row my-card-row"></div>
       </div>
 
       <div class="action-bar">
