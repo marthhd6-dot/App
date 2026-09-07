@@ -12,6 +12,8 @@ const PHASE_LABELS = {
   river: 'River',
   showdown: 'Showdown',
 };
+const AVATAR_COLORS = ['#e8bf4a', '#6de3ac', '#ff8a8a', '#8ec9ff', '#d9a6ff', '#ffb46b', '#7fe0e0', '#f6a6c1'];
+const CONFETTI_COLORS = ['#e8bf4a', '#35d68a', '#ff5c5c', '#6fb4ff', '#d9a6ff', '#ffd569'];
 
 const SESSION_KEY = 'pokerSession'; // { code, name } des zuletzt beigetretenen Raums
 
@@ -20,6 +22,8 @@ let mySocketId = null;
 let myName = '';
 let joinedRoomCode = null;
 let isRanked = false;
+let lastPhase = null; // für Deal-Animationen: erkennt den Beginn einer neuen Hand
+let communityDealtCount = 0;
 
 const screens = {
   join: document.getElementById('join-screen'),
@@ -33,7 +37,6 @@ function showScreen(name) {
   });
 }
 
-const joinScreen = document.getElementById('join-screen');
 const tableScreen = document.getElementById('table-screen');
 const nameInput = document.getElementById('name-input');
 const roomCodeInput = document.getElementById('room-code-input');
@@ -73,6 +76,8 @@ socket.on('state', render);
 socket.on('room-joined', ({ code, ranked }) => {
   joinedRoomCode = code;
   isRanked = Boolean(ranked);
+  lastPhase = null;
+  communityDealtCount = 0;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code, name: myName }));
   reconnectBanner.hidden = true;
   rankedMatchOverBanner.hidden = true;
@@ -122,6 +127,7 @@ socket.on('ranked-match-over', ({ result, opponentName, newRating, newTier, rati
   document.getElementById('ranked-match-over-text').textContent =
     `${outcome} gegen ${opponentName}! Neuer Rang: ${newTier} (${newRating}, ${sign}${ratingChange})`;
   rankedMatchOverBanner.hidden = false;
+  if (result === 'win') burstConfetti();
 });
 
 // Nach jedem (Wieder-)Verbinden: Wenn wir laut sessionStorage schon in
@@ -231,9 +237,33 @@ function renderCard(card) {
   return el;
 }
 
-function renderCardRow(container, cards) {
+// Rendert die Community Cards und animiert nur die seit dem letzten Rendern
+// neu hinzugekommenen (Flop/Turn/River), statt bei jedem State-Update alle
+// Karten erneut einfliegen zu lassen.
+function renderCommunityCards(cards, previouslyDealt) {
+  const container = document.getElementById('community-cards');
   container.innerHTML = '';
-  cards.forEach((card) => container.appendChild(renderCard(card)));
+  cards.forEach((card, i) => {
+    const el = renderCard(card);
+    if (i >= previouslyDealt) {
+      el.classList.add('deal-in');
+      el.style.animationDelay = `${(i - previouslyDealt) * 0.12}s`;
+    }
+    container.appendChild(el);
+  });
+}
+
+function renderMyCards(cards, animate) {
+  const container = document.getElementById('my-cards');
+  container.innerHTML = '';
+  cards.forEach((card, i) => {
+    const el = renderCard(card);
+    if (animate) {
+      el.classList.add('deal-in');
+      el.style.animationDelay = `${i * 0.12}s`;
+    }
+    container.appendChild(el);
+  });
 }
 
 function escapeHtml(str) {
@@ -242,42 +272,101 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function avatarColorFor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+// Ordnet alle Spieler als "Sitzplätze" kreisförmig um den ovalen Tisch an –
+// der eigene Platz liegt dabei immer unten in der Mitte.
+function renderSeats(state) {
+  const container = document.getElementById('players-list');
+  container.innerHTML = '';
+
+  const n = state.players.length;
+  if (n === 0) return;
+
+  const myIndex = state.players.findIndex((p) => p.id === mySocketId);
+  const startIndex = myIndex === -1 ? 0 : myIndex;
+  const ordered = [];
+  for (let i = 0; i < n; i++) {
+    ordered.push(state.players[(startIndex + i) % n]);
+  }
+
+  const rx = 44; // Radius in % der Tisch-Breite
+  const ry = 40; // Radius in % der Tisch-Höhe
+
+  ordered.forEach((p, i) => {
+    const angleRad = ((90 + (360 / n) * i) * Math.PI) / 180; // Start unten in der Mitte
+    const left = 50 + rx * Math.cos(angleRad);
+    const top = 50 + ry * Math.sin(angleRad);
+
+    const badges = [];
+    if (p.id === state.dealerPlayerId) badges.push({ label: 'D', cls: 'badge-dealer' });
+    if (p.isAllIn) badges.push({ label: 'ALL-IN', cls: 'badge-allin' });
+    if (p.folded) badges.push({ label: 'FOLD', cls: 'badge-fold' });
+    if (p.disconnected) badges.push({ label: 'GETRENNT', cls: 'badge-disconnected' });
+
+    const seat = document.createElement('div');
+    seat.className =
+      'seat' +
+      (p.id === state.actingPlayerId ? ' acting' : '') +
+      (p.folded ? ' folded' : '') +
+      (p.disconnected ? ' disconnected' : '') +
+      (p.id === mySocketId ? ' me' : '');
+    seat.style.left = `${left}%`;
+    seat.style.top = `${top}%`;
+
+    const initial = (p.name[0] || '?').toUpperCase();
+    seat.innerHTML = `
+      <div class="seat-pod">
+        <div class="seat-avatar" style="background:${avatarColorFor(p.name)}">${escapeHtml(initial)}</div>
+        <div class="seat-text">
+          <span class="seat-name">${escapeHtml(p.name)}</span>
+          <span class="seat-chips">${p.chips} Chips</span>
+        </div>
+      </div>
+      <div class="seat-bet">${p.bet > 0 ? `Einsatz: ${p.bet}` : ''}</div>
+      <div class="seat-badges">${badges.map((b) => `<span class="badge ${b.cls}">${b.label}</span>`).join('')}</div>
+    `;
+    container.appendChild(seat);
+  });
+}
+
+function burstConfetti() {
+  const container = document.getElementById('confetti-container');
+  for (let i = 0; i < 70; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+    piece.style.animationDuration = `${2 + Math.random() * 1.6}s`;
+    piece.style.animationDelay = `${Math.random() * 0.5}s`;
+    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    container.appendChild(piece);
+    setTimeout(() => piece.remove(), 4200);
+  }
+}
+
 function render(state) {
   document.getElementById('phase-label').textContent = PHASE_LABELS[state.phase] || state.phase;
   document.getElementById('pot-label').textContent = `Pot: ${state.pot}`;
   document.getElementById('current-bet-label').textContent =
     state.currentBet > 0 ? `Aktueller Einsatz: ${state.currentBet}` : '';
 
-  renderCardRow(document.getElementById('community-cards'), state.communityCards);
+  const isNewHand = state.phase === 'preflop' && lastPhase !== 'preflop';
+  if (isNewHand) communityDealtCount = 0;
 
-  const playersList = document.getElementById('players-list');
-  playersList.innerHTML = '';
-  state.players.forEach((p) => {
-    const badges = [];
-    if (p.id === state.dealerPlayerId) badges.push('D');
-    if (p.isAllIn) badges.push('ALL-IN');
-    if (p.folded) badges.push('FOLD');
-    if (p.disconnected) badges.push('GETRENNT');
+  renderCommunityCards(state.communityCards, communityDealtCount);
+  communityDealtCount = state.communityCards.length;
 
-    const row = document.createElement('div');
-    row.className =
-      'player-row' +
-      (p.id === state.actingPlayerId ? ' acting' : '') +
-      (p.folded ? ' folded' : '') +
-      (p.disconnected ? ' disconnected' : '') +
-      (p.id === mySocketId ? ' me' : '');
-    row.innerHTML = `
-      <span class="player-name">${escapeHtml(p.name)}${badges
-        .map((b) => `<span class="badge">${b}</span>`)
-        .join('')}</span>
-      <span class="player-chips">${p.chips} Chips</span>
-      <span class="player-bet">${p.bet > 0 ? `Einsatz: ${p.bet}` : ''}</span>
-    `;
-    playersList.appendChild(row);
-  });
+  renderSeats(state);
 
   const me = state.players.find((p) => p.id === mySocketId);
-  renderCardRow(document.getElementById('my-cards'), (me && me.holeCards) || []);
+  renderMyCards((me && me.holeCards) || [], isNewHand);
+
+  lastPhase = state.phase;
 
   const isMyTurn = state.actingPlayerId === mySocketId;
   const canAct = isMyTurn && me && !me.folded;
@@ -294,6 +383,10 @@ function render(state) {
   startHandBtn.hidden = state.phase !== 'waiting' && state.phase !== 'showdown';
 
   if (state.lastHandResult) {
+    if (handResultEl.hidden) {
+      const iWon = state.lastHandResult.pots.some((pot) => pot.winners.some((w) => w.id === mySocketId));
+      if (iWon) burstConfetti();
+    }
     const reason = state.lastHandResult.reason === 'fold' ? 'durch Fold der Gegner' : 'im Showdown';
     const multiplePots = state.lastHandResult.pots.length > 1;
     const potLines = state.lastHandResult.pots.map((pot, i) => {

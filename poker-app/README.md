@@ -107,7 +107,11 @@ Chip-Stände definiert.
   neuen Tisch erstellen oder per Code beitreten, Hole Cards, Community
   Cards, Pot/Einsatz, wer am Zug ist, Aktions-Buttons (nur aktiv, wenn der
   Spieler dran ist und die Aktion gerade gültig ist) und die
-  Gewinner-Anzeige am Ende einer Hand
+  Gewinner-Anzeige am Ende einer Hand. Optisch als ovaler Tisch mit
+  Holz-Rail: Sitzplätze kreisförmig um den Tisch (eigener Platz immer
+  unten in der Mitte), animiertes Karten-Austeilen, ein pulsierender
+  Rahmen um den aktiven Spieler, Konfetti bei einem eigenen Sieg, und
+  eine identische Optik für Ranked-Warteschlange und Bestenliste.
 - **Mehrere Tische/Räume** (`rooms.js`): `create-room` legt einen neuen
   Tisch mit 4-stelligem Code an, `join-room` tritt einem bestehenden Raum
   bei. Jeder Raum hat einen komplett unabhängigen Tisch-Zustand; ein
