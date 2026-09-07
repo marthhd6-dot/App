@@ -19,6 +19,8 @@ let mySocketId = null;
 const joinScreen = document.getElementById('join-screen');
 const tableScreen = document.getElementById('table-screen');
 const nameInput = document.getElementById('name-input');
+const roomCodeInput = document.getElementById('room-code-input');
+const joinErrorEl = document.getElementById('join-error');
 const errorBanner = document.getElementById('error-banner');
 const handResultEl = document.getElementById('hand-result');
 
@@ -37,26 +39,39 @@ socket.on('connect', () => {
 
 socket.on('state', render);
 
+socket.on('room-joined', ({ code }) => {
+  document.getElementById('room-code-label').textContent = `Raum: ${code}`;
+  joinScreen.hidden = true;
+  tableScreen.hidden = false;
+});
+
 let errorTimer = null;
 socket.on('error-message', (message) => {
-  errorBanner.textContent = message;
-  errorBanner.hidden = false;
+  // Solange wir noch keinem Raum beigetreten sind, zeigen wir den Fehler
+  // direkt auf dem Join-Screen (z. B. "Raum nicht gefunden").
+  const target = tableScreen.hidden ? joinErrorEl : errorBanner;
+  target.textContent = message;
+  target.hidden = false;
   clearTimeout(errorTimer);
   errorTimer = setTimeout(() => {
-    errorBanner.hidden = true;
+    target.hidden = true;
   }, 4000);
 });
 
-document.getElementById('join-btn').addEventListener('click', join);
-nameInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') join();
+document.getElementById('create-room-btn').addEventListener('click', () => {
+  socket.emit('create-room', { name: nameInput.value.trim() });
 });
 
-function join() {
-  const name = nameInput.value.trim();
-  socket.emit('join', { name });
-  joinScreen.hidden = true;
-  tableScreen.hidden = false;
+document.getElementById('join-room-btn').addEventListener('click', joinRoom);
+roomCodeInput.addEventListener('input', () => {
+  roomCodeInput.value = roomCodeInput.value.toUpperCase();
+});
+roomCodeInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') joinRoom();
+});
+
+function joinRoom() {
+  socket.emit('join-room', { code: roomCodeInput.value.trim(), name: nameInput.value.trim() });
 }
 
 startHandBtn.addEventListener('click', () => socket.emit('start-hand'));
