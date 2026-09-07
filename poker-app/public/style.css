@@ -1039,6 +1039,74 @@ button:disabled {
   box-shadow: 0 0 12px rgba(217, 166, 255, 0.6);
 }
 
+/* --- Rang-Pfad ("Mein Rang") -------------------------------------------------- */
+
+.rank-path-name {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin-bottom: 18px;
+}
+
+.rank-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 10px;
+  margin-bottom: 18px;
+}
+
+.rank-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  opacity: 0.35;
+  filter: grayscale(0.6);
+  transition: opacity 0.2s, filter 0.2s, transform 0.2s;
+}
+
+.rank-node.reached {
+  opacity: 1;
+  filter: none;
+}
+
+.rank-node.current {
+  transform: scale(1.14);
+}
+
+.rank-node.current .tier-badge {
+  box-shadow: 0 0 0 3px rgba(232, 191, 74, 0.35), 0 0 18px 4px rgba(232, 191, 74, 0.45);
+  animation: winner-glow 1.6s ease-in-out infinite;
+}
+
+.rank-node-min {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.rank-progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  margin: 0 auto;
+}
+
+.rank-progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+  transition: width 0.4s ease;
+}
+
+.rank-path-progress-label {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin: 10px 0 0;
+}
+
 /* --- Warteschlange ----------------------------------------------------------- */
 
 .queue-spinner {

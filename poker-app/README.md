@@ -233,6 +233,12 @@ Chip-Stände definiert.
   überlebt keinen Neustart), das der Client in `localStorage` ablegt und
   bei jedem neuen Verbindungsaufbau erneut schickt (`login-with-token`), um
   automatisch angemeldet zu bleiben.
+- **„Mein Rang"-Pfad** (`public/app.js`, Button auf dem Startbildschirm):
+  zeigt alle sechs Ränge (Bronze bis Champion) als Pfad, hebt den
+  aktuellen Rang optisch hervor (Glow-Ring, noch nicht erreichte Ränge
+  ausgegraut) und zeigt einen Fortschrittsbalken bis zum nächsten Rang.
+  Die Schwellenwerte (`RANK_TIERS`) kommen dafür im `rank-info`-Event vom
+  Server mit, damit das Frontend sie nicht separat duplizieren muss.
 
 ## Mögliche nächste Schritte (für Claude Code)
 

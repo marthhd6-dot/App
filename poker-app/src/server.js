@@ -59,6 +59,7 @@ const {
 } = require('./persistence');
 const {
   STARTING_RATING,
+  RANK_TIERS,
   tierForRating,
   findMatchmakingGroup,
   applyMultiwayMatchResult,
@@ -389,7 +390,10 @@ io.on('connection', (socket) => {
     const trimmedName = resolveName(socket, name);
     if (!trimmedName) return;
     const rank = getOrCreateRank(trimmedName);
-    socket.emit('rank-info', { name: trimmedName, ...rank, tier: tierForRating(rank.rating) });
+    // RANK_TIERS wird mitgeschickt, damit das Frontend den kompletten
+    // Rang-Pfad (Bronze bis Champion) zeichnen kann, ohne die Schwellenwerte
+    // selbst zu duplizieren (siehe "Mein Rang" in app.js).
+    socket.emit('rank-info', { name: trimmedName, ...rank, tier: tierForRating(rank.rating), tiers: RANK_TIERS });
   });
 
   socket.on('get-leaderboard', () => {

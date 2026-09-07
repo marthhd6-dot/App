@@ -34,6 +34,7 @@ let queueType = null;
 let lastPhase = null; // für Deal-Animationen: erkennt den Beginn einer neuen Hand
 let communityDealtCount = 0;
 let isLoggedIn = false;
+let pendingRankPathView = false; // wartet der "Mein Rang"-Button auf die nächste rank-info-Antwort?
 
 // Freundesliste: nur Namen, gespeichert im localStorage dieses Browsers.
 // Der Server kennt keine Freundschaften, nur wer gerade online ist (siehe
@@ -55,6 +56,7 @@ const screens = {
   join: document.getElementById('join-screen'),
   queue: document.getElementById('queue-screen'),
   leaderboard: document.getElementById('leaderboard-screen'),
+  rank: document.getElementById('rank-screen'),
   table: document.getElementById('table-screen'),
 };
 function showScreen(name) {
@@ -129,7 +131,7 @@ socket.on('queue-status', ({ waiting }) => {
   showScreen(waiting ? 'queue' : 'join');
 });
 
-socket.on('rank-info', ({ name, rating, tier, wins, losses }) => {
+socket.on('rank-info', ({ name, rating, tier, wins, losses, tiers }) => {
   const text = `${name}: ${tier} (${rating}) · ${wins}S/${losses}N`;
   const myRankLabel = document.getElementById('my-rank-label');
   myRankLabel.textContent = text;
@@ -140,6 +142,13 @@ socket.on('rank-info', ({ name, rating, tier, wins, losses }) => {
   // Casual-Queue eintrifft.
   if (queueType !== 'casual' && queueType !== 'casual-team') {
     document.getElementById('queue-rank-label').textContent = text;
+  }
+  // "Mein Rang"-Button wurde geklickt und wartet auf diese Antwort, um den
+  // Rang-Pfad zu zeichnen (siehe rank-path-btn weiter unten).
+  if (pendingRankPathView && tiers) {
+    pendingRankPathView = false;
+    renderRankPath({ name, rating, tier, wins, losses, tiers });
+    showScreen('rank');
   }
 });
 
@@ -361,6 +370,21 @@ document.getElementById('leaderboard-close-btn').addEventListener('click', () =>
   showScreen('join');
 });
 
+document.getElementById('rank-path-btn').addEventListener('click', () => {
+  const name = nameInput.value.trim();
+  if (!name) {
+    joinErrorEl.textContent = 'Bitte gib zuerst einen Namen ein.';
+    joinErrorEl.hidden = false;
+    return;
+  }
+  pendingRankPathView = true;
+  socket.emit('get-rank', { name });
+});
+
+document.getElementById('rank-close-btn').addEventListener('click', () => {
+  showScreen('join');
+});
+
 document.getElementById('ranked-back-to-menu-btn').addEventListener('click', () => {
   sessionStorage.removeItem(SESSION_KEY);
   location.reload();
@@ -515,6 +539,44 @@ document.getElementById('friend-invite-join-btn').addEventListener('click', () =
   myName = nameInput.value.trim() || myName;
   socket.emit('join-room', { code, name: myName });
 });
+
+// --- Rang-Pfad ("Mein Rang") ---------------------------------------------
+
+// Zeichnet alle Ränge (Bronze bis Champion, aus tiers – siehe RANK_TIERS in
+// ranking.js, vom Server mitgeschickt) als Pfad, hebt den aktuellen Rang
+// hervor und zeigt den Fortschritt bis zum nächsten Rang als Balken.
+function renderRankPath({ name, rating, tier, wins, losses, tiers }) {
+  document.getElementById('rank-path-name').textContent = `${name} · ${wins}S/${losses}N`;
+
+  const container = document.getElementById('rank-path');
+  container.innerHTML = '';
+  const currentIdx = tiers.findIndex((t) => t.name === tier);
+
+  tiers.forEach((t, i) => {
+    const isCurrent = i === currentIdx;
+    const reached = i <= currentIdx;
+    const node = document.createElement('div');
+    node.className = 'rank-node' + (isCurrent ? ' current' : '') + (reached ? ' reached' : '');
+    node.innerHTML = `
+      <span class="tier-badge tier-${t.name.toLowerCase()}">${t.name}</span>
+      <span class="rank-node-min">${t.min}+</span>
+    `;
+    container.appendChild(node);
+  });
+
+  const progressLabel = document.getElementById('rank-path-progress');
+  const progressFill = document.getElementById('rank-progress-fill');
+  const nextTier = tiers[currentIdx + 1];
+  if (nextTier) {
+    const span = nextTier.min - tiers[currentIdx].min;
+    const progressPct = Math.max(0, Math.min(100, Math.round(((rating - tiers[currentIdx].min) / span) * 100)));
+    progressFill.style.width = `${progressPct}%`;
+    progressLabel.textContent = `${rating} Rating · noch ${nextTier.min - rating} bis ${nextTier.name} (${progressPct}%)`;
+  } else {
+    progressFill.style.width = '100%';
+    progressLabel.textContent = `${rating} Rating · höchster Rang erreicht!`;
+  }
+}
 
 startHandBtn.addEventListener('click', () => socket.emit('start-hand'));
 foldBtn.addEventListener('click', () => socket.emit('fold'));
