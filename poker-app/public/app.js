@@ -18,6 +18,7 @@ const CONFETTI_COLORS = ['#e8bf4a', '#35d68a', '#ff5c5c', '#6fb4ff', '#d9a6ff', 
 const SESSION_KEY = 'pokerSession'; // { code, name } des zuletzt beigetretenen Raums
 const FRIENDS_KEY = 'pokerFriends'; // Freundesliste (nur Namen) – rein lokal im Browser, siehe README
 const FRIENDS_POLL_MS = 5000; // wie oft der Online-Status der Freunde bei geöffnetem Panel aktualisiert wird
+const ACCOUNT_TOKEN_KEY = 'pokerAccountToken'; // Session-Token nach Login/Registrierung, siehe README
 
 const socket = io();
 let mySocketId = null;
@@ -32,6 +33,7 @@ let isCasualTeam = false;
 let queueType = null;
 let lastPhase = null; // für Deal-Animationen: erkennt den Beginn einer neuen Hand
 let communityDealtCount = 0;
+let isLoggedIn = false;
 
 // Freundesliste: nur Namen, gespeichert im localStorage dieses Browsers.
 // Der Server kennt keine Freundschaften, nur wer gerade online ist (siehe
@@ -87,6 +89,8 @@ const startHandBtn = document.getElementById('start-hand-btn');
 socket.on('connect', () => {
   mySocketId = socket.id;
   attemptAutoRejoin();
+  const savedToken = localStorage.getItem(ACCOUNT_TOKEN_KEY);
+  if (savedToken) socket.emit('login-with-token', { token: savedToken });
 });
 
 // Feuert, wenn die Verbindung abbricht (Netzwerk-Aussetzer, Server-Neustart
@@ -206,6 +210,30 @@ socket.on('friend-invite', ({ fromName, roomCode }) => {
   const banner = document.getElementById('friend-invite-banner');
   banner.hidden = false;
   banner.dataset.roomCode = roomCode;
+});
+
+// Nach Registrierung, Login oder automatischem Wieder-Einloggen per Token
+// (siehe 'connect'-Handler oben): Name fest auf den Account-Namen setzen
+// und das Namensfeld sperren, damit niemand aus Versehen unter einem
+// anderen Namen spielt (der Server würde das ohnehin überschreiben, siehe
+// resolveName() in server.js – das hier ist nur für ein stimmiges UI).
+socket.on('login-success', ({ username, token }) => {
+  isLoggedIn = true;
+  myName = username;
+  localStorage.setItem(ACCOUNT_TOKEN_KEY, token);
+  nameInput.value = username;
+  nameInput.disabled = true;
+  document.getElementById('account-btn').hidden = true;
+  document.getElementById('logout-btn').hidden = false;
+  document.getElementById('account-error').hidden = true;
+  document.getElementById('account-overlay').hidden = true;
+  socket.emit('get-rank', { name: username });
+});
+
+socket.on('account-error', ({ message }) => {
+  const el = document.getElementById('account-error');
+  el.textContent = message;
+  el.hidden = false;
 });
 
 // Nach jedem (Wieder-)Verbinden: Wenn wir laut sessionStorage schon in
@@ -336,6 +364,48 @@ document.getElementById('leaderboard-close-btn').addEventListener('click', () =>
 document.getElementById('ranked-back-to-menu-btn').addEventListener('click', () => {
   sessionStorage.removeItem(SESSION_KEY);
   location.reload();
+});
+
+// --- Account -------------------------------------------------------------
+
+const accountOverlay = document.getElementById('account-overlay');
+const accountErrorEl = document.getElementById('account-error');
+
+document.getElementById('account-btn').addEventListener('click', () => {
+  accountErrorEl.hidden = true;
+  accountOverlay.hidden = false;
+});
+
+document.getElementById('account-close-btn').addEventListener('click', () => {
+  accountOverlay.hidden = true;
+});
+
+function submitAccountForm(eventName) {
+  const username = document.getElementById('account-username-input').value.trim();
+  const password = document.getElementById('account-password-input').value;
+  accountErrorEl.hidden = true;
+  if (!username) {
+    accountErrorEl.textContent = 'Bitte gib einen Nutzernamen ein.';
+    accountErrorEl.hidden = false;
+    return;
+  }
+  socket.emit(eventName, { username, password });
+}
+
+document.getElementById('login-btn').addEventListener('click', () => submitAccountForm('login-account'));
+document.getElementById('register-btn').addEventListener('click', () => submitAccountForm('register-account'));
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+  const token = localStorage.getItem(ACCOUNT_TOKEN_KEY);
+  socket.emit('logout-account', { token });
+  localStorage.removeItem(ACCOUNT_TOKEN_KEY);
+  isLoggedIn = false;
+  myName = '';
+  nameInput.value = '';
+  nameInput.disabled = false;
+  document.getElementById('account-btn').hidden = false;
+  document.getElementById('logout-btn').hidden = true;
+  document.getElementById('my-rank-label').hidden = true;
 });
 
 // --- Freundesliste -----------------------------------------------------
