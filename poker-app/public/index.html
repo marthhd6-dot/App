@@ -17,6 +17,27 @@
     <div class="bg-glow bg-glow-2"></div>
     <div id="confetti-container" class="confetti-container"></div>
 
+    <div id="friend-invite-banner" class="error-banner invite-banner" hidden>
+      <span id="friend-invite-text"></span>
+      <button id="friend-invite-join-btn" class="btn btn-primary btn-small">Beitreten</button>
+      <button id="friend-invite-dismiss-btn" class="btn btn-ghost btn-small">✕</button>
+    </div>
+
+    <div id="friends-overlay" class="modal-overlay" hidden>
+      <div class="panel panel-wide">
+        <h1>👥 Freunde</h1>
+        <div id="friends-error" class="error-banner" hidden></div>
+        <div class="join-row">
+          <input id="friend-name-input" type="text" placeholder="Name des Freundes" maxlength="20" />
+          <button id="add-friend-btn" class="btn btn-ghost">Hinzufügen</button>
+        </div>
+        <div id="friends-list" class="friends-list"></div>
+        <div class="join-row">
+          <button id="friends-close-btn" class="btn btn-ghost">Schließen</button>
+        </div>
+      </div>
+    </div>
+
     <div id="join-screen" class="screen">
       <div class="panel">
         <div class="brand">
@@ -56,6 +77,12 @@
         </div>
         <div class="join-row">
           <button id="casual-team-queue-btn" class="btn btn-casual-team">👥 2v2 Casual spielen</button>
+        </div>
+
+        <hr class="join-divider" />
+
+        <div class="join-row">
+          <button id="friends-btn" class="btn btn-ghost">👥 Freunde</button>
         </div>
       </div>
     </div>
@@ -100,6 +127,7 @@
         <span id="casual-team-badge" class="casual-team-badge" hidden>👥 2v2 CASUAL</span>
         <span id="phase-label" class="phase-label"></span>
         <span id="current-bet-label" class="current-bet-label"></span>
+        <button id="friends-btn-table" class="btn btn-ghost btn-small" title="Freunde einladen">👥</button>
       </div>
 
       <div class="table-felt">

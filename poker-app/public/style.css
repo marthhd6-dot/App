@@ -382,6 +382,22 @@ button:disabled {
   animation: result-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* Einladungs-Banner eines Freundes: schwebt fix oben, unabhängig davon,
+   welcher Screen (Join/Queue/Tisch/...) gerade sichtbar ist. */
+.invite-banner {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(90vw, 480px);
+  background: linear-gradient(135deg, #7fe0e0, #6fb4ff);
+  color: #05203a;
+}
+
 .ranked-banner {
   display: flex;
   align-items: center;
@@ -863,6 +879,57 @@ button:disabled {
 .bet-control input {
   width: 92px;
   padding: 10px 12px;
+}
+
+/* --- Freundesliste ----------------------------------------------------------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(2, 8, 6, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.friends-list {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+  text-align: left;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+.friend-status {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.friend-status.online {
+  background: var(--success);
+  box-shadow: 0 0 8px 1px rgba(53, 214, 138, 0.6);
+}
+
+.friend-name {
+  flex: 1;
+  font-weight: 700;
 }
 
 /* --- Bestenliste ------------------------------------------------------------ */

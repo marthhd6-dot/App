@@ -16,6 +16,8 @@ const AVATAR_COLORS = ['#e8bf4a', '#6de3ac', '#ff8a8a', '#8ec9ff', '#d9a6ff', '#
 const CONFETTI_COLORS = ['#e8bf4a', '#35d68a', '#ff5c5c', '#6fb4ff', '#d9a6ff', '#ffd569'];
 
 const SESSION_KEY = 'pokerSession'; // { code, name } des zuletzt beigetretenen Raums
+const FRIENDS_KEY = 'pokerFriends'; // Freundesliste (nur Namen) – rein lokal im Browser, siehe README
+const FRIENDS_POLL_MS = 5000; // wie oft der Online-Status der Freunde bei geöffnetem Panel aktualisiert wird
 
 const socket = io();
 let mySocketId = null;
@@ -30,6 +32,22 @@ let isCasualTeam = false;
 let queueType = null;
 let lastPhase = null; // für Deal-Animationen: erkennt den Beginn einer neuen Hand
 let communityDealtCount = 0;
+
+// Freundesliste: nur Namen, gespeichert im localStorage dieses Browsers.
+// Der Server kennt keine Freundschaften, nur wer gerade online ist (siehe
+// README) – onlineFriends wird per get-friends-status/friends-status
+// aktualisiert, solange das Freunde-Panel geöffnet ist.
+function loadFriends() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(FRIENDS_KEY));
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+}
+let friends = loadFriends();
+let onlineFriends = new Set();
+let friendsPollTimer = null;
 
 const screens = {
   join: document.getElementById('join-screen'),
@@ -100,6 +118,7 @@ socket.on('room-joined', ({ code, ranked, casual4, rankedTeam, casualTeam }) => 
   casualTeamBadge.hidden = !isCasualTeam;
   document.getElementById('room-code-label').textContent = `Raum: ${code}`;
   showScreen('table');
+  renderFriendsList(); // "Einladen" ist erst ab hier möglich (siehe joinedRoomCode)
 });
 
 socket.on('queue-status', ({ waiting }) => {
@@ -176,6 +195,19 @@ socket.on('casual-team-match-over', ({ won }) => {
   if (won) burstConfetti();
 });
 
+socket.on('friends-status', ({ online }) => {
+  onlineFriends = new Set(online);
+  renderFriendsList();
+});
+
+// Ein Freund hat uns per Freundesliste in seinen Raum eingeladen.
+socket.on('friend-invite', ({ fromName, roomCode }) => {
+  document.getElementById('friend-invite-text').textContent = `${fromName} lädt dich zu Raum ${roomCode} ein.`;
+  const banner = document.getElementById('friend-invite-banner');
+  banner.hidden = false;
+  banner.dataset.roomCode = roomCode;
+});
+
 // Nach jedem (Wieder-)Verbinden: Wenn wir laut sessionStorage schon in
 // einem Raum waren, automatisch mit demselben Namen erneut beitreten.
 // Innerhalb der Gnadenfrist des Servers bekommen wir dadurch nahtlos
@@ -226,7 +258,12 @@ function joinRoom() {
 
 nameInput.addEventListener('blur', () => {
   const trimmed = nameInput.value.trim();
-  if (trimmed) socket.emit('get-rank', { name: trimmed });
+  if (trimmed) {
+    socket.emit('get-rank', { name: trimmed });
+    // Meldet den Namen schon vorm Beitreten als "online", damit Freunde
+    // diesen Spieler sofort in ihrer Freundesliste sehen können.
+    socket.emit('set-name', { name: trimmed });
+  }
 });
 
 document.getElementById('ranked-queue-btn').addEventListener('click', () => {
@@ -299,6 +336,114 @@ document.getElementById('leaderboard-close-btn').addEventListener('click', () =>
 document.getElementById('ranked-back-to-menu-btn').addEventListener('click', () => {
   sessionStorage.removeItem(SESSION_KEY);
   location.reload();
+});
+
+// --- Freundesliste -----------------------------------------------------
+
+const friendsOverlay = document.getElementById('friends-overlay');
+const friendsErrorEl = document.getElementById('friends-error');
+
+function openFriendsOverlay() {
+  friendsOverlay.hidden = false;
+  renderFriendsList();
+  refreshFriendsStatus();
+  clearInterval(friendsPollTimer);
+  friendsPollTimer = setInterval(refreshFriendsStatus, FRIENDS_POLL_MS);
+}
+
+function closeFriendsOverlay() {
+  friendsOverlay.hidden = true;
+  clearInterval(friendsPollTimer);
+}
+
+function refreshFriendsStatus() {
+  if (friends.length > 0) socket.emit('get-friends-status', { names: friends });
+}
+
+document.getElementById('friends-btn').addEventListener('click', openFriendsOverlay);
+document.getElementById('friends-btn-table').addEventListener('click', openFriendsOverlay);
+document.getElementById('friends-close-btn').addEventListener('click', closeFriendsOverlay);
+
+document.getElementById('add-friend-btn').addEventListener('click', addFriend);
+document.getElementById('friend-name-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') addFriend();
+});
+
+function addFriend() {
+  const input = document.getElementById('friend-name-input');
+  const name = input.value.trim();
+  friendsErrorEl.hidden = true;
+  if (!name) return;
+  if (name === myName) {
+    friendsErrorEl.textContent = 'Das bist du selbst.';
+    friendsErrorEl.hidden = false;
+    return;
+  }
+  if (friends.includes(name)) {
+    friendsErrorEl.textContent = `${name} ist schon in deiner Freundesliste.`;
+    friendsErrorEl.hidden = false;
+    return;
+  }
+  friends.push(name);
+  localStorage.setItem(FRIENDS_KEY, JSON.stringify(friends));
+  input.value = '';
+  renderFriendsList();
+  refreshFriendsStatus();
+}
+
+// Klicks auf "Einladen"/"Entfernen" innerhalb der Liste per Event-
+// Delegation behandeln, statt bei jedem Rendern neue Listener anzuhängen.
+document.getElementById('friends-list').addEventListener('click', (e) => {
+  const inviteBtn = e.target.closest('.btn-invite-friend');
+  if (inviteBtn) {
+    socket.emit('invite-friend', { friendName: inviteBtn.dataset.name });
+    return;
+  }
+  const removeBtn = e.target.closest('.btn-remove-friend');
+  if (removeBtn) {
+    friends = friends.filter((f) => f !== removeBtn.dataset.name);
+    localStorage.setItem(FRIENDS_KEY, JSON.stringify(friends));
+    renderFriendsList();
+  }
+});
+
+function renderFriendsList() {
+  const list = document.getElementById('friends-list');
+  if (!list) return;
+  list.innerHTML = '';
+  if (friends.length === 0) {
+    list.textContent = 'Noch keine Freunde hinzugefügt.';
+    return;
+  }
+  friends.forEach((name) => {
+    const isOnline = onlineFriends.has(name);
+    const canInvite = isOnline && Boolean(joinedRoomCode);
+    const row = document.createElement('div');
+    row.className = 'friend-row';
+    row.innerHTML = `
+      <span class="friend-status ${isOnline ? 'online' : 'offline'}" title="${isOnline ? 'Online' : 'Offline'}"></span>
+      <span class="friend-name">${escapeHtml(name)}</span>
+      <button class="btn btn-small btn-invite-friend" data-name="${escapeHtml(name)}" ${canInvite ? '' : 'disabled'}>
+        Einladen
+      </button>
+      <button class="btn btn-ghost btn-small btn-remove-friend" data-name="${escapeHtml(name)}">✕</button>
+    `;
+    list.appendChild(row);
+  });
+}
+renderFriendsList();
+
+document.getElementById('friend-invite-dismiss-btn').addEventListener('click', () => {
+  document.getElementById('friend-invite-banner').hidden = true;
+});
+
+document.getElementById('friend-invite-join-btn').addEventListener('click', () => {
+  const banner = document.getElementById('friend-invite-banner');
+  const code = banner.dataset.roomCode;
+  banner.hidden = true;
+  if (!code) return;
+  myName = nameInput.value.trim() || myName;
+  socket.emit('join-room', { code, name: myName });
 });
 
 startHandBtn.addEventListener('click', () => socket.emit('start-hand'));

@@ -20,6 +20,13 @@
 // - **2v2 Casual**: wie 2v2 Ranked, aber FIFO ohne Rating-Bezug/-Auswirkung
 //   – und als Besonderheit sieht jeder Spieler zusätzlich die Hole Cards
 //   seines Teammitglieds (siehe extraVisibleIds in broadcastRoomState()).
+//
+// Freundesliste: Die Liste selbst liegt nur im Browser (localStorage) des
+// jeweiligen Spielers – der Server speichert keine Freundschaften, sondern
+// nur, welcher Name gerade online ist (onlineByName), damit ein Client
+// fragen kann "sind meine Freunde gerade online?" (get-friends-status) und
+// einen Online-Freund direkt in den eigenen Raum einladen kann
+// (invite-friend -> friend-invite beim Empfänger).
 // Siehe README für bekannte Vereinfachungen (keine echte Authentifizierung).
 
 const path = require('path');
@@ -120,6 +127,29 @@ function getOrCreateRank(name) {
   return getPlayerRank(DATA_FILE, name) || { rating: STARTING_RATING, wins: 0, losses: 0 };
 }
 
+// Welcher Name ist gerade online: name -> Set<socket.id>. Ein Name kann
+// mehrfach vertreten sein (mehrere Tabs, oder zwei Personen mit demselben
+// Namen – siehe README, keine echte Authentifizierung); "online" heißt
+// hier nur "mindestens ein verbundener Socket kennt aktuell diesen Namen".
+const onlineByName = new Map();
+
+function markOnline(socket, name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return;
+  socket.data.name = trimmed;
+  if (!onlineByName.has(trimmed)) onlineByName.set(trimmed, new Set());
+  onlineByName.get(trimmed).add(socket.id);
+}
+
+function markOffline(socket) {
+  const name = socket.data.name;
+  if (!name) return;
+  const sockets = onlineByName.get(name);
+  if (!sockets) return;
+  sockets.delete(socket.id);
+  if (sockets.size === 0) onlineByName.delete(name);
+}
+
 // Wie lange ein getrennter Spieler seinen Platz behält, bevor er endgültig
 // entfernt wird. Läuft die Zeit ab, ohne dass sich jemand mit demselben
 // Namen erneut verbindet, verhält es sich wie ein sofortiges Verlassen.
@@ -162,6 +192,7 @@ io.on('connection', (socket) => {
     const trimmedName = String(name || '').trim();
     const oldSocketId = trimmedName && table.reconnectPlayer(socket.id, trimmedName);
     if (oldSocketId) {
+      markOnline(socket, trimmedName);
       socket.data.roomCode = normalizedCode;
       clearDisconnectTimer(normalizedCode, oldSocketId);
       remapTeamEntryId(rankedTeamRooms.get(normalizedCode), oldSocketId, socket.id);
@@ -190,6 +221,7 @@ io.on('connection', (socket) => {
       return;
     }
 
+    markOnline(socket, trimmedName);
     const rank = getOrCreateRank(trimmedName);
     rankedQueue.push({ socket, name: trimmedName, rating: rank.rating, joinedAt: Date.now() });
     socket.emit('queue-status', { waiting: true });
@@ -220,6 +252,7 @@ io.on('connection', (socket) => {
       return;
     }
 
+    markOnline(socket, trimmedName);
     casualQueue.push({ socket, name: trimmedName, joinedAt: Date.now() });
     socket.emit('queue-status', { waiting: true });
 
@@ -249,6 +282,7 @@ io.on('connection', (socket) => {
       return;
     }
 
+    markOnline(socket, trimmedName);
     const rank = getOrCreateRank(trimmedName);
     rankedTeamQueue.push({ socket, name: trimmedName, rating: rank.rating, joinedAt: Date.now() });
     socket.emit('queue-status', { waiting: true });
@@ -279,6 +313,7 @@ io.on('connection', (socket) => {
       return;
     }
 
+    markOnline(socket, trimmedName);
     casualTeamQueue.push({ socket, name: trimmedName, joinedAt: Date.now() });
     socket.emit('queue-status', { waiting: true });
 
@@ -303,6 +338,50 @@ io.on('connection', (socket) => {
   socket.on('get-leaderboard', () => {
     const entries = getLeaderboard(DATA_FILE, 20).map((p) => ({ ...p, tier: tierForRating(p.rating) }));
     socket.emit('leaderboard', entries);
+  });
+
+  // Registriert den Namen als "online", auch ohne dass der Spieler schon
+  // einem Raum/einer Warteschlange beigetreten ist (z. B. direkt nach dem
+  // Eintippen auf dem Startbildschirm) – nötig, damit Freunde diesen
+  // Spieler in der Freundesliste als online sehen können.
+  socket.on('set-name', ({ name } = {}) => {
+    markOnline(socket, name);
+  });
+
+  // Beantwortet für eine Liste von Namen (die Freundesliste des Clients,
+  // die nur lokal im Browser gespeichert ist), welche davon gerade online
+  // sind.
+  socket.on('get-friends-status', ({ names } = {}) => {
+    const list = Array.isArray(names) ? names : [];
+    const online = list.filter((n) => {
+      const sockets = onlineByName.get(String(n || '').trim());
+      return sockets && sockets.size > 0;
+    });
+    socket.emit('friends-status', { online });
+  });
+
+  // Lädt einen (laut onlineByName) gerade online befindlichen Freund in den
+  // eigenen aktuellen Raum ein. Der Absender muss selbst in einem Raum
+  // sein; Namensgleichheit genügt wie überall in dieser App als "Freund
+  // gefunden" (keine echte Authentifizierung).
+  socket.on('invite-friend', ({ friendName } = {}) => {
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) {
+      socket.emit('error-message', 'Du bist in keinem Raum, um Freunde einzuladen.');
+      return;
+    }
+    const trimmed = String(friendName || '').trim();
+    const friendSockets = onlineByName.get(trimmed);
+    if (!friendSockets || friendSockets.size === 0) {
+      socket.emit('error-message', `${trimmed} ist gerade nicht online.`);
+      return;
+    }
+    const fromName = socket.data.name || 'Jemand';
+    for (const friendSocketId of friendSockets) {
+      const friendSocket = io.sockets.sockets.get(friendSocketId);
+      if (friendSocket) friendSocket.emit('friend-invite', { fromName, roomCode });
+    }
+    socket.emit('invite-sent', { friendName: trimmed });
   });
 
   socket.on('start-hand', () => {
@@ -344,6 +423,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`Spieler getrennt: ${socket.id}`);
+    markOffline(socket);
 
     const queueIdx = rankedQueue.findIndex((entry) => entry.socket === socket);
     if (queueIdx !== -1) rankedQueue.splice(queueIdx, 1);
@@ -423,7 +503,9 @@ function clearDisconnectTimer(roomCode, socketId) {
 
 function joinTable(socket, code, name) {
   const table = rooms.getTable(code);
-  table.addPlayer(socket.id, name || `Spieler-${socket.id.slice(0, 4)}`);
+  const resolvedName = name || `Spieler-${socket.id.slice(0, 4)}`;
+  table.addPlayer(socket.id, resolvedName);
+  markOnline(socket, resolvedName);
   socket.data.roomCode = code;
   socket.join(code);
   socket.emit('room-joined', { code, ...roomModeInfo(code, socket.id) });
