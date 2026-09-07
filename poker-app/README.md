@@ -46,6 +46,38 @@ RECONNECT_GRACE_MS=10000 npm start
 POKER_DATA_FILE=/tmp/rooms.db npm start
 ```
 
+## Deployment (Render)
+
+Im Repo-Root liegt eine `render.yaml` ([Render Blueprint](https://render.com/docs/blueprint-spec)),
+die einen Web-Service für `poker-app/` samt persistenter Disk für die
+Chip-Stände definiert.
+
+1. Repo zu GitHub pushen (bereits erledigt, falls du diesen Text liest).
+2. Auf [render.com](https://render.com): **New → Blueprint** → das Repo
+   auswählen. Render erkennt `render.yaml` automatisch und schlägt den
+   Service `poker-app` vor.
+3. Deployen. Die App läuft danach unter der von Render vergebenen URL
+   (z. B. `https://poker-app-xxxx.onrender.com`) – dort direkt im Browser
+   testen, Raum-Code an Mitspieler weitergeben.
+
+**Wichtig zu wissen:**
+
+- Persistente Disks (für `data/rooms.db`, damit Chip-Stände einen
+  Neustart/Deploy überleben) gibt es bei Render erst ab dem
+  **Starter-Plan** (kostenpflichtig), nicht im Free-Tier. `render.yaml`
+  ist entsprechend auf `plan: starter` gesetzt.
+- Zum reinen Ausprobieren reicht auch der Free-Tier: dazu in
+  `render.yaml` den `disk`-Block entfernen und `plan: starter` auf `plan:
+  free` ändern. Dann startet die App bei jedem Neustart mit leeren
+  Tischen (kein persistenter Speicher), und der Service schläft nach
+  15 Minuten Inaktivität ein (Cold Start beim nächsten Aufruf trennt
+  alle laufenden Verbindungen).
+- `NODE_VERSION=22` ist in `render.yaml` gesetzt, weil `better-sqlite3`
+  Node ≥22 voraussetzt (siehe `package.json#engines`).
+- Ohne Blueprint geht es auch manuell: **New → Web Service**, Root
+  Directory `poker-app`, Build Command `npm ci`, Start Command
+  `npm start`, dieselben Env-Vars wie oben von Hand setzen.
+
 ## Was schon funktioniert
 
 - Deck erzeugen & fair mischen

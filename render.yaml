@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: poker-app
+    runtime: node
+    plan: starter # persistente Disks brauchen einen bezahlten Plan, siehe poker-app/README.md
+    rootDir: poker-app
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: POKER_DATA_FILE
+        value: /data/rooms.db
+    disk:
+      name: poker-data
+      mountPath: /data
+      sizeGB: 1
