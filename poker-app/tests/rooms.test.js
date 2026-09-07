@@ -69,4 +69,71 @@ run('removeRoom entfernt den Tisch wieder', () => {
   assert.strictEqual(rooms.getTable(code), undefined);
 });
 
+run('exportSnapshot reduziert einen Raum auf Name, Chips, Blinds und Dealer-Position', () => {
+  const rooms = new RoomManager();
+  const code = rooms.createRoom({ smallBlind: 1, bigBlind: 2 });
+  const table = rooms.getTable(code);
+  table.addPlayer('socket-a', 'Alice', 990);
+  table.addPlayer('socket-b', 'Bob', 1010);
+  table.dealerIndex = 1;
+
+  const snapshot = rooms.exportSnapshot();
+
+  assert.deepStrictEqual(snapshot[code], {
+    smallBlind: 1,
+    bigBlind: 2,
+    dealerIndex: 1,
+    players: [
+      { name: 'Alice', chips: 990 },
+      { name: 'Bob', chips: 1010 },
+    ],
+  });
+});
+
+run('restoreRoom baut einen Raum aus einem Snapshot wieder auf, Spieler sind reconnect-bereit', () => {
+  const rooms = new RoomManager();
+  rooms.restoreRoom('WXYZ', {
+    smallBlind: 5,
+    bigBlind: 10,
+    dealerIndex: 1,
+    players: [
+      { name: 'Alice', chips: 990 },
+      { name: 'Bob', chips: 1010 },
+    ],
+  });
+
+  const table = rooms.getTable('WXYZ');
+  assert.ok(table);
+  assert.strictEqual(table.smallBlind, 5);
+  assert.strictEqual(table.bigBlind, 10);
+  assert.strictEqual(table.dealerIndex, 1);
+  assert.strictEqual(table.players.length, 2);
+  table.players.forEach((p) => assert.strictEqual(p.disconnected, true));
+
+  // Reconnect über den Namen holt die Chips zurück
+  const oldId = table.reconnectPlayer('new-socket-id', 'Bob');
+  assert.ok(oldId);
+  const bob = table.players.find((p) => p.name === 'Bob');
+  assert.strictEqual(bob.id, 'new-socket-id');
+  assert.strictEqual(bob.chips, 1010);
+  assert.strictEqual(bob.disconnected, false);
+});
+
+run('exportSnapshot + restoreSnapshot: Round-Trip über mehrere Räume erhält Chips exakt', () => {
+  const original = new RoomManager();
+  const codeA = original.createRoom();
+  original.getTable(codeA).addPlayer('a1', 'Alice', 750);
+  const codeB = original.createRoom({ smallBlind: 25, bigBlind: 50 });
+  original.getTable(codeB).addPlayer('b1', 'Carol', 2500);
+
+  const snapshot = original.exportSnapshot();
+
+  const restored = new RoomManager();
+  restored.restoreSnapshot(snapshot);
+
+  assert.strictEqual(restored.getTable(codeA).players[0].chips, 750);
+  assert.strictEqual(restored.getTable(codeB).players[0].chips, 2500);
+  assert.strictEqual(restored.getTable(codeB).bigBlind, 50);
+});
+
 console.log('\nAlle Tests durchgelaufen.');

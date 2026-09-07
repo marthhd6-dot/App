@@ -2,8 +2,9 @@
 
 Ein spielbares Online-Texas-Hold'em mit mehreren Spielern und mehreren
 gleichzeitigen Tischen: Kartenlogik (inkl. Side Pots), Wettrunden, Räume,
-Reconnect-Handling und ein einfaches Browser-Frontend sind fertig.
-Persistenz ist offen — das baust du mit Claude Code weiter aus.
+Reconnect-Handling, Persistenz und ein einfaches Browser-Frontend sind
+fertig. Ideen für mögliche nächste Schritte stehen unten — das baust du
+mit Claude Code weiter aus.
 
 ## Struktur
 
@@ -20,11 +21,14 @@ poker-app/
 │   │   ├── handEvaluator.js  # Beste 5-Karten-Hand aus 7 Karten finden
 │   │   └── table.js          # Tisch-Zustand: Spieler, Phasen, Pot
 │   ├── rooms.js              # Verwaltet mehrere Tische über Raum-Codes
+│   ├── persistence.js        # Lädt/speichert Raum-Snapshots als JSON-Datei
 │   └── server.js             # Express + Socket.io Server, liefert public/ aus
+├── data/                     # Gespeicherte Chip-Stände (rooms.json, gitignored)
 └── tests/
     ├── handEvaluator.test.js
     ├── table.test.js
-    └── rooms.test.js
+    ├── rooms.test.js
+    └── persistence.test.js
 ```
 
 ## Setup
@@ -32,11 +36,14 @@ poker-app/
 ```bash
 cd poker-app
 npm install
-npm test        # prüft Hand-Evaluator, Tisch-Logik und Raum-Verwaltung
+npm test        # prüft Hand-Evaluator, Tisch-, Raum- und Persistenz-Logik
 npm start        # startet den Server auf Port 3001, Frontend unter http://localhost:3001
 
 # Gnadenfrist fürs Reconnect-Handling überschreiben (Standard: 30000ms):
 RECONNECT_GRACE_MS=10000 npm start
+
+# Speicherort der Chip-Stände überschreiben (Standard: data/rooms.json):
+POKER_DATA_FILE=/tmp/rooms.json npm start
 ```
 
 ## Was schon funktioniert
@@ -82,17 +89,35 @@ RECONNECT_GRACE_MS=10000 npm start
   Vereinfachung: Die Wiedererkennung läuft allein über den Namen, es gibt
   keine echte Authentifizierung – zwei Spieler mit demselben Namen im
   selben Raum können sich gegenseitig den Platz "stehlen".
+- **Persistenz** (`persistence.js`): Name, Chips, Blinds und
+  Dealer-Position pro Raum werden nach jeder Aktion als JSON-Datei
+  gespeichert (Standard: `data/rooms.json`, überschreibbar via
+  `POKER_DATA_FILE`) und beim Serverstart wieder geladen. Eine laufende
+  Hand (Karten, Einsätze, Phase) wird bewusst nicht gespeichert – nach
+  einem Neustart sind alle wiederhergestellten Spieler als
+  "disconnected" markiert und kommen über den normalen Reconnect-Weg
+  (`join-room` mit demselben Namen) an ihren Platz zurück. Bei SIGINT/
+  SIGTERM (z. B. Ctrl+C oder ein Deploy-Neustart) wird zusätzlich ein
+  letztes Mal explizit gespeichert.
 
-## Nächste Schritte (für Claude Code)
+## Mögliche nächste Schritte (für Claude Code)
 
-1. **Persistenz**: Chip-Stände über Sessions hinweg speichern
-   (z. B. mit einer Datenbank wie Postgres oder Supabase). Aktuell startet
-   jeder neue Spieler mit 1000 Chips und alles ist In-Memory – ein
-   Server-Neustart setzt alle Tische zurück.
+Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
+
+- **Echte Datenbank statt JSON-Datei**: `persistence.js` schreibt
+  aktuell synchron auf eine einzelne Datei – kein Problem für einen
+  Heim-Tisch, aber ohne Nebenläufigkeitsschutz oder Historie. Für mehr
+  Robustheit z. B. auf SQLite oder Postgres umstellen.
+- **Turnier-Modus**: Blinds automatisch nach einem Zeitplan erhöhen,
+  Spieler mit 0 Chips aus dem Tisch nehmen.
+- **Hand-Historie & Chat**: vergangene Hände und Nachrichten pro Raum
+  anzeigen.
+- **Mobile-optimiertes UI**: Die Action-Bar und Karten-Reihen sind noch
+  nicht für kleine Bildschirme optimiert.
 
 ## Guter erster Prompt für Claude Code
 
-> "Lies dir server.js, rooms.js und table.js durch. Baue Persistenz:
-> Chip-Stände sollen über einen Server-Neustart hinweg erhalten bleiben,
-> z. B. indem der Tisch-Zustand nach jeder Hand in eine Datei oder
-> Datenbank geschrieben und beim Start wieder geladen wird."
+> "Lies dir persistence.js und rooms.js durch. Wie robust ist die
+> aktuelle JSON-Datei-Persistenz bei mehreren gleichzeitigen Schreib-
+> zugriffen? Schlage vor, wie man das auf SQLite umstellen könnte, ohne
+> die restliche App-Logik anzufassen."

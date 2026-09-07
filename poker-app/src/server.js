@@ -8,12 +8,23 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const { RoomManager } = require('./rooms');
+const { loadSnapshot, saveSnapshot } = require('./persistence');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
+// Wo Chip-Stände zwischen Server-Neustarts gespeichert werden. Über
+// POKER_DATA_FILE überschreibbar (z. B. für Tests, um nicht die echten
+// Spielstände zu überschreiben).
+const DATA_FILE = process.env.POKER_DATA_FILE || path.join(__dirname, '..', 'data', 'rooms.json');
+
 const rooms = new RoomManager();
+rooms.restoreSnapshot(loadSnapshot(DATA_FILE));
+
+function persist() {
+  saveSnapshot(DATA_FILE, rooms.exportSnapshot());
+}
 
 // Wie lange ein getrennter Spieler seinen Platz behält, bevor er endgültig
 // entfernt wird. Läuft die Zeit ab, ohne dass sich jemand mit demselben
@@ -117,6 +128,7 @@ io.on('connection', (socket) => {
       } else {
         broadcastRoomState(code);
       }
+      persist();
     }, RECONNECT_GRACE_MS);
     disconnectTimers.set(timerKey(code, socketId), timer);
   });
@@ -141,6 +153,7 @@ function joinTable(socket, code, name) {
   socket.join(code);
   socket.emit('room-joined', { code });
   broadcastRoomState(code);
+  persist();
 }
 
 // Führt eine Tisch-Aktion aus, meldet Validierungsfehler nur an den
@@ -157,6 +170,7 @@ function handleAction(socket, roomCode, action) {
     action(table);
     advancePhaseIfRoundComplete(table);
     broadcastRoomState(roomCode);
+    persist(); // einfach gehalten: nach jeder Aktion speichern statt nur nach Handende
   } catch (err) {
     socket.emit('error-message', err.message);
   }
@@ -196,3 +210,12 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Poker-Server läuft auf Port ${PORT}`);
 });
+
+// Bei einem sauberen Neustart/Deploy (Ctrl+C, SIGTERM) ein letztes Mal
+// speichern, statt auf die nächste Aktion zu warten.
+function shutdown() {
+  persist();
+  process.exit(0);
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
