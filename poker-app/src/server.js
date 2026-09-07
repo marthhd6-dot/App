@@ -32,8 +32,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  // TODO: 'bet', 'fold', 'check', 'call' Events – rufen table.placeBet() etc. auf,
-  //       sobald diese Methoden implementiert sind.
+  // TODO: 'bet', 'fold', 'check', 'call', 'raise' Events ergänzen, die
+  //       table.placeBet()/fold()/check()/call()/raise() aufrufen – inklusive
+  //       Validierung und Fehler-Events, falls der Spieler nicht am Zug ist.
 
   socket.on('disconnect', () => {
     console.log(`Spieler getrennt: ${socket.id}`);

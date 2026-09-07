@@ -34,30 +34,36 @@ npm start        # startet den Server auf Port 3001
 - Beste Hand aus 2 Hole Cards + 5 Community Cards ermitteln
   (inkl. Splitpot-Erkennung, Ass-tief-Straße)
 - Grundstruktur für einen Tisch mit mehreren Spielern
+- **Wettrunden-Logik** in `table.js`: `placeBet`, `raise`, `call`, `check`,
+  `fold`, inklusive Zugreihenfolge, Big-Blind-Option, Mindest-Raise,
+  All-In-Behandlung und automatischem Rundenabschluss
+- **Blinds werden automatisch eingezogen**, der Dealer-Button rückt nach
+  jeder Hand weiter (inkl. Heads-up-Sonderregel)
+- Sofortiger Gewinn durch Fold, wenn nur noch ein Spieler übrig ist
 - Socket.io-Server, der Spieler verbinden und Karten austeilen kann
 
 ## Nächste Schritte (für Claude Code)
 
 Am besten der Reihe nach, jeweils mit Tests:
 
-1. **Wettrunden-Logik** in `table.js`: `placeBet`, `fold`, `check`, `call`,
-   `raise`. Muss verfolgen, wer schon dran war und ob die Runde
-   abgeschlossen ist (alle haben gleich viel gesetzt oder gefoldet).
-2. **Blinds automatisch einziehen** in `startHand()` und den Dealer-Button
-   nach jeder Hand weiterrücken lassen.
-3. **Server-Events** für die neuen Aktionen ergänzen (`src/server.js`),
-   inklusive Validierung (ist der Spieler überhaupt dran?).
-4. **Mehrere Tische/Räume** statt nur einem globalen Tisch — Räume über
+1. **Server-Events** für die Wettrunden-Aktionen ergänzen (`src/server.js`):
+   `bet`/`fold`/`check`/`call`/`raise` auf `table.placeBet()` usw. mappen,
+   inklusive Validierung und Fehler-Events, falls der Spieler nicht am Zug
+   ist.
+2. **Mehrere Tische/Räume** statt nur einem globalen Tisch — Räume über
    einen Code beitreten lassen.
-5. **Frontend** (React oder React Native): verbindet sich per Socket.io,
+3. **Frontend** (React oder React Native): verbindet sich per Socket.io,
    zeigt Karten, Pot, Buttons für Aktionen.
-6. **Persistenz**: Chip-Stände über Sessions hinweg speichern
+4. **Persistenz**: Chip-Stände über Sessions hinweg speichern
    (z. B. mit einer Datenbank wie Postgres oder Supabase).
-7. **Reconnect-Handling**: Was passiert, wenn ein Spieler mitten in
+5. **Reconnect-Handling**: Was passiert, wenn ein Spieler mitten in
    der Hand die Verbindung verliert?
+6. **Side Pots**: Aktuell gibt es nur einen gemeinsamen Pot; bei mehreren
+   unterschiedlich hohen All-Ins wird (noch) nicht korrekt aufgeteilt.
 
 ## Guter erster Prompt für Claude Code
 
-> "Lies dir table.js und server.js durch. Implementiere die
-> Wettrunden-Logik (placeBet, fold, check, call, raise) inklusive
-> Tests, die prüfen, wann eine Wettrunde abgeschlossen ist."
+> "Lies dir table.js und server.js durch. Ergänze die Socket.io-Events
+> für bet, fold, check, call und raise, die auf die entsprechenden
+> table.js-Methoden mappen und Validierungsfehler an den Client
+> zurückmelden."
