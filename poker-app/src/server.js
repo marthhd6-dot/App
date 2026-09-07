@@ -3,16 +3,19 @@
 // einen eigenen Tisch-Zustand (src/rooms.js) und wird über einen kurzen
 // Code erreicht, den Spieler zum Beitreten eingeben.
 //
-// Zusätzlich gibt es einen 4-Spieler-Ranked-Modus ("1v1v1v1"): Spieler
-// treten einer Matchmaking-Warteschlange bei (statt einen Raum-Code zu
-// teilen) und werden automatisch mit drei ähnlich bewerteten Gegnern an
-// einem Tisch zusammengelegt (Rating-basiertes Matchmaking, siehe
-// findMatchmakingGroup() in src/ranking.js). Ein Match läuft, bis nur noch
-// ein Spieler Chips übrig hat; alle anderen werden nach ihrer
-// Bust-Reihenfolge platziert und die Ratings paarweise aktualisiert (siehe
-// applyMultiwayMatchResult()). Der Rang wird über den Spielernamen
-// dauerhaft gespeichert (src/persistence.js) – siehe README für bekannte
-// Vereinfachungen (keine echte Authentifizierung).
+// Zusätzlich gibt es zwei automatische 4-Spieler-Modi ("1v1v1v1"), die
+// beide ohne manuellen Raum-Code über eine Matchmaking-Warteschlange
+// zusammenfinden und bei denen ein Match läuft, bis nur noch ein Spieler
+// Chips übrig hat (siehe trackEliminations()):
+// - **Ranked**: Spieler werden nach Rating gruppiert (siehe
+//   findMatchmakingGroup() in src/ranking.js). Die Platzierung nach
+//   Matchende aktualisiert die Ratings paarweise (siehe
+//   applyMultiwayMatchResult()); der Rang wird über den Spielernamen
+//   dauerhaft gespeichert (src/persistence.js).
+// - **Casual**: Die ersten vier wartenden Spieler werden ohne
+//   Rating-Bezug zusammengelegt (reines FIFO), ohne Auswirkung auf den
+//   Rang – nur zum entspannten Spielen zu viert.
+// Siehe README für bekannte Vereinfachungen (keine echte Authentifizierung).
 
 const path = require('path');
 const express = require('express');
@@ -66,6 +69,17 @@ const MATCHMAKING_INTERVAL_MS = 2000;
 // Codes wird nach jeder Hand geprüft, ob das Match schon entschieden ist.
 const rankedRooms = new Map();
 
+// Anzahl Spieler pro Casual-4-Tisch ("1v1v1v1", ohne Rating-Bezug).
+const CASUAL_GROUP_SIZE = 4;
+// Wartende Spieler für den Casual-4-Modus: { socket, name, joinedAt }.
+// Ohne Rating-Konzept genügt reines FIFO: sobald CASUAL_GROUP_SIZE
+// Spieler warten, werden die ersten vier sofort zusammengelegt.
+const casualQueue = [];
+// Räume aus dem Casual-4-Matchmaking: code -> { eliminatedOrder }. Wie
+// rankedRooms, aber ohne Blind-Zeitplan (feste Blinds wie an einem
+// normalen Casual-Tisch) und ohne Rating-Auswirkung nach Matchende.
+const casualMatchRooms = new Map();
+
 function getOrCreateRank(name) {
   return getPlayerRank(DATA_FILE, name) || { rating: STARTING_RATING, wins: 0, losses: 0 };
 }
@@ -115,7 +129,11 @@ io.on('connection', (socket) => {
       socket.data.roomCode = normalizedCode;
       clearDisconnectTimer(normalizedCode, oldSocketId);
       socket.join(normalizedCode);
-      socket.emit('room-joined', { code: normalizedCode, ranked: rankedRooms.has(normalizedCode) });
+      socket.emit('room-joined', {
+        code: normalizedCode,
+        ranked: rankedRooms.has(normalizedCode),
+        casual4: casualMatchRooms.has(normalizedCode),
+      });
       broadcastRoomState(normalizedCode);
       return;
     }
@@ -149,6 +167,35 @@ io.on('connection', (socket) => {
     const idx = rankedQueue.findIndex((entry) => entry.socket === socket);
     if (idx !== -1) {
       rankedQueue.splice(idx, 1);
+      socket.emit('queue-status', { waiting: false });
+    }
+  });
+
+  socket.on('join-casual-queue', ({ name } = {}) => {
+    if (socket.data.roomCode) {
+      socket.emit('error-message', 'Du bist bereits einem Raum beigetreten.');
+      return;
+    }
+    if (casualQueue.some((entry) => entry.socket === socket)) {
+      socket.emit('error-message', 'Du suchst bereits nach Mitspielern.');
+      return;
+    }
+    const trimmedName = String(name || '').trim();
+    if (!trimmedName) {
+      socket.emit('error-message', 'Bitte gib zuerst einen Namen ein.');
+      return;
+    }
+
+    casualQueue.push({ socket, name: trimmedName, joinedAt: Date.now() });
+    socket.emit('queue-status', { waiting: true });
+
+    runCasualMatchmakingPass();
+  });
+
+  socket.on('leave-casual-queue', () => {
+    const idx = casualQueue.findIndex((entry) => entry.socket === socket);
+    if (idx !== -1) {
+      casualQueue.splice(idx, 1);
       socket.emit('queue-status', { waiting: false });
     }
   });
@@ -205,6 +252,8 @@ io.on('connection', (socket) => {
 
     const queueIdx = rankedQueue.findIndex((entry) => entry.socket === socket);
     if (queueIdx !== -1) rankedQueue.splice(queueIdx, 1);
+    const casualQueueIdx = casualQueue.findIndex((entry) => entry.socket === socket);
+    if (casualQueueIdx !== -1) casualQueue.splice(casualQueueIdx, 1);
 
     const roomCode = socket.data.roomCode;
     if (!roomCode) return;
@@ -224,6 +273,7 @@ io.on('connection', (socket) => {
       if (currentTable.players.length === 0) {
         rooms.removeRoom(roomCode);
         rankedRooms.delete(roomCode);
+        casualMatchRooms.delete(roomCode);
       } else {
         broadcastRoomState(roomCode);
       }
@@ -251,7 +301,7 @@ function joinTable(socket, code, name) {
   table.addPlayer(socket.id, name || `Spieler-${socket.id.slice(0, 4)}`);
   socket.data.roomCode = code;
   socket.join(code);
-  socket.emit('room-joined', { code, ranked: rankedRooms.has(code) });
+  socket.emit('room-joined', { code, ranked: rankedRooms.has(code), casual4: casualMatchRooms.has(code) });
   broadcastRoomState(code);
   persist();
 }
@@ -300,6 +350,43 @@ function startRankedMatch(entries) {
   persist();
 }
 
+// Legt reine FIFO-Gruppen von CASUAL_GROUP_SIZE wartenden Spielern an,
+// solange genug in der Warteschlange stehen – kein Rating-Bezug, daher
+// keine Toleranz und kein periodischer Timer nötig wie beim Ranked-Modus.
+function runCasualMatchmakingPass() {
+  while (casualQueue.length >= CASUAL_GROUP_SIZE) {
+    const entries = casualQueue.splice(0, CASUAL_GROUP_SIZE);
+    startCasualMatch(entries);
+  }
+}
+
+// Legt für eine Gruppe wartender Spieler einen neuen Casual-Raum mit dem
+// üblichen Startkapital und festen Blinds an (kein Turnier-Zeitplan) und
+// markiert ihn für die Bust-Erkennung nach jeder Hand (siehe
+// maybeFinishCasualMatch).
+function startCasualMatch(entries) {
+  const code = rooms.createRoom();
+  casualMatchRooms.set(code, { eliminatedOrder: [] });
+  const table = rooms.getTable(code);
+  for (const entry of entries) {
+    table.addPlayer(entry.socket.id, entry.name);
+  }
+
+  for (const entry of entries) {
+    entry.socket.data.roomCode = code;
+    entry.socket.join(code);
+    entry.socket.emit('room-joined', {
+      code,
+      ranked: false,
+      casual4: true,
+      opponentNames: entries.filter((e) => e !== entry).map((e) => e.name),
+    });
+  }
+
+  broadcastRoomState(code);
+  persist();
+}
+
 // Führt eine Tisch-Aktion aus, meldet Validierungsfehler nur an den
 // auslösenden Client zurück und lässt danach automatisch die nächste
 // Straße austeilen (Flop/Turn/River/Showdown), falls die Wettrunde
@@ -315,8 +402,9 @@ function handleAction(socket, action) {
     action(table);
     advancePhaseIfRoundComplete(table);
     broadcastRoomState(roomCode);
-    if (rankedRooms.has(roomCode) && table.phase === 'showdown') {
-      maybeFinishRankedMatch(roomCode, table);
+    if (table.phase === 'showdown') {
+      if (rankedRooms.has(roomCode)) maybeFinishRankedMatch(roomCode, table);
+      else if (casualMatchRooms.has(roomCode)) maybeFinishCasualMatch(roomCode, table);
     }
     persist(); // einfach gehalten: nach jeder Aktion speichern statt nur nach Handende
   } catch (err) {
@@ -339,39 +427,56 @@ function advancePhaseIfRoundComplete(table) {
   }
 }
 
-// Prüft nach einer beendeten Hand in einem Ranked-Raum, ob ein oder mehrere
-// Spieler bei 0 Chips stehen (= ausgeschieden), entfernt sie vom Tisch und
-// merkt sich ihre Bust-Reihenfolge. Sobald nur noch ein Spieler übrig ist,
-// steht die Platzierung fest (Sieger zuerst, dann die Ausgeschiedenen in
-// umgekehrter Bust-Reihenfolge – wer länger durchhält, landet weiter vorn).
-// Aktualisiert dann alle Ratings paarweise (siehe applyMultiwayMatchResult
-// in ranking.js) und benachrichtigt jeden Client mit seinem Platz und
-// neuen Rang. Der Raum bleibt danach bestehen (die Spieler sehen die
-// letzte Hand noch), zählt aber nicht mehr als Ranked.
-function maybeFinishRankedMatch(code, table) {
-  const entry = rankedRooms.get(code);
-  if (!entry) return;
-
+// Prüft nach einer beendeten Hand in einem 4-Spieler-Match (Ranked oder
+// Casual), ob ein oder mehrere Spieler bei 0 Chips stehen (= ausgeschieden),
+// entfernt sie vom Tisch und merkt sich ihre Bust-Reihenfolge in
+// matchEntry.eliminatedOrder. Läuft das Match noch (mehr als ein Spieler
+// übrig), wird nur { finished: false } zurückgegeben, ggf. mit changed:
+// true, falls gerade jemand entfernt wurde (Tisch-Ansicht muss dann neu
+// verschickt werden). Sobald nur noch ein Spieler übrig ist, steht die
+// Platzierung fest (Sieger zuerst, dann die Ausgeschiedenen in
+// umgekehrter Bust-Reihenfolge – wer länger durchhält, landet weiter
+// vorn) und wird als { finished: true, placements } zurückgegeben (leeres
+// placements-Array im Randfall, dass der letzte verbliebene Spieler
+// zeitgleich mitbustet – dann gibt es keine Wertung).
+function trackEliminations(table, matchEntry) {
   const busted = table.players.filter((p) => p.chips === 0);
   for (const player of busted) {
-    entry.eliminatedOrder.push({ id: player.id, name: player.name });
+    matchEntry.eliminatedOrder.push({ id: player.id, name: player.name });
     table.removePlayer(player.id);
   }
 
   const remaining = table.players;
   if (remaining.length > 1) {
-    // Match läuft weiter (evtl. mit weniger Spielern): Tisch-Ansicht der
-    // verbliebenen Spieler aktualisieren, falls gerade jemand entfernt wurde.
-    if (busted.length > 0) broadcastRoomState(code);
+    return { finished: false, changed: busted.length > 0 };
+  }
+  if (remaining.length === 0) {
+    return { finished: true, placements: [] };
+  }
+
+  const winner = remaining[0];
+  const placements = [{ id: winner.id, name: winner.name }, ...matchEntry.eliminatedOrder.slice().reverse()];
+  return { finished: true, placements };
+}
+
+// Wertet ein beendetes Ranked-Match aus: aktualisiert alle Ratings
+// paarweise anhand der Platzierung (siehe applyMultiwayMatchResult in
+// ranking.js) und benachrichtigt jeden Client mit seinem Platz und neuen
+// Rang. Der Raum bleibt danach bestehen (die Spieler sehen die letzte
+// Hand noch), zählt aber nicht mehr als Ranked.
+function maybeFinishRankedMatch(code, table) {
+  const entry = rankedRooms.get(code);
+  if (!entry) return;
+
+  const result = trackEliminations(table, entry);
+  if (!result.finished) {
+    if (result.changed) broadcastRoomState(code);
     return;
   }
   rankedRooms.delete(code);
-  if (remaining.length === 0) return; // Randfall: letzter verbliebener Spieler bustet zeitgleich, keine Wertung
+  if (result.placements.length === 0) return;
 
-  const winner = remaining[0];
-  // Bester Platz zuerst: der Sieger, danach die Ausgeschiedenen in
-  // umgekehrter Bust-Reihenfolge (zuletzt ausgeschieden = besserer Platz).
-  const placements = [{ id: winner.id, name: winner.name }, ...entry.eliminatedOrder.slice().reverse()];
+  const placements = result.placements;
   const placementNames = placements.map((p) => p.name);
 
   const priorRanks = {};
@@ -401,6 +506,27 @@ function maybeFinishRankedMatch(code, table) {
       newTier: tierForRating(updated.rating),
       ratingChange: updated.rating - prior.rating,
     });
+  });
+}
+
+// Wertet ein beendetes Casual-4-Match aus: keine Ratings betroffen, jeder
+// Client bekommt nur seinen Platz mitgeteilt.
+function maybeFinishCasualMatch(code, table) {
+  const entry = casualMatchRooms.get(code);
+  if (!entry) return;
+
+  const result = trackEliminations(table, entry);
+  if (!result.finished) {
+    if (result.changed) broadcastRoomState(code);
+    return;
+  }
+  casualMatchRooms.delete(code);
+  if (result.placements.length === 0) return;
+
+  result.placements.forEach((p, idx) => {
+    const clientSocket = io.sockets.sockets.get(p.id);
+    if (!clientSocket) return;
+    clientSocket.emit('casual-match-over', { place: idx + 1, totalPlayers: result.placements.length });
   });
 }
 

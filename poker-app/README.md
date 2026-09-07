@@ -170,6 +170,19 @@ Chip-Stände definiert.
   der `player_ranks`-Tabelle. Eine einfache Bestenliste
   (`get-leaderboard`) zeigt die Top 20 nach Rating. Identität ist wie
   beim Reconnect-Handling allein der Name, keine echte Authentifizierung.
+- **1v1v1v1 Casual** (Matchmaking in `server.js`, Warteschlange über
+  `join-casual-queue`): dieselbe Idee wie Ranked – automatisch zu viert
+  an einem neuen Tisch zusammenfinden, ohne Raum-Code zu teilen –, aber
+  ohne jeden Rating-Bezug. Die Warteschlange ist reines FIFO: sobald vier
+  Spieler warten, spielen die ersten vier zusammen (kein
+  Toleranz-Fenster nötig, da kein Rating verglichen wird). Fester
+  Tisch wie ein normaler Casual-Tisch (1000 Chips, feste Blinds 5/10,
+  kein Turnier-Zeitplan). Wie beim Ranked-Modus endet das Match, sobald
+  nur noch ein Spieler Chips übrig hat, und alle werden nach
+  Bust-Reihenfolge platziert (`casual-match-over`-Event mit `place`/
+  `totalPlayers`) – nur eben ohne jede Auswirkung auf Rang oder
+  Bestenliste. Die gemeinsame Bust-Erkennung für beide 4-Spieler-Modi
+  steckt in `trackEliminations()`.
 
 ## Mögliche nächste Schritte (für Claude Code)
 
