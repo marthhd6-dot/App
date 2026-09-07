@@ -201,9 +201,14 @@ function render(state) {
   startHandBtn.hidden = state.phase !== 'waiting' && state.phase !== 'showdown';
 
   if (state.lastHandResult) {
-    const names = state.lastHandResult.winners.map((w) => w.name).join(', ');
     const reason = state.lastHandResult.reason === 'fold' ? 'durch Fold der Gegner' : 'im Showdown';
-    handResultEl.textContent = `${names} gewinnt ${state.lastHandResult.potShare} Chips ${reason}.`;
+    const multiplePots = state.lastHandResult.pots.length > 1;
+    const potLines = state.lastHandResult.pots.map((pot, i) => {
+      const label = multiplePots ? `${i === 0 ? 'Hauptpot' : `Neben-Pot ${i}`}: ` : '';
+      const names = pot.winners.map((w) => w.name).join(', ');
+      return `${label}${names} gewinnt ${pot.potShare} Chips`;
+    });
+    handResultEl.textContent = `${potLines.join(' · ')} ${reason}.`;
     handResultEl.hidden = false;
   } else {
     handResultEl.hidden = true;

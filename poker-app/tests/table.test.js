@@ -4,6 +4,10 @@
 const assert = require('assert');
 const { Table } = require('../src/game/table');
 
+function card(rank, suit) {
+  return { rank, suit };
+}
+
 function run(name, fn) {
   try {
     fn();
@@ -106,7 +110,8 @@ run('Fold bis auf einen Spieler beendet die Hand sofort und zahlt den Pot aus', 
   assert.strictEqual(table.pot, 0);
   assert.strictEqual(b.chips, 1005); // 990 + Pot von 15
   assert.strictEqual(table.lastHandResult.reason, 'fold');
-  assert.strictEqual(table.lastHandResult.winners[0].id, b.id);
+  assert.strictEqual(table.lastHandResult.pots.length, 1);
+  assert.strictEqual(table.lastHandResult.pots[0].winners[0].id, b.id);
   assert.strictEqual(a.chips, 995); // hat nur den Small Blind verloren
 });
 
@@ -218,7 +223,8 @@ run('Kompletter Ablauf einer Hand bis zum Showdown erhält die Gesamtzahl der Ch
 
   assert.strictEqual(table.phase, 'showdown');
   assert.strictEqual(table.pot, 0);
-  assert.ok(result.winners.length >= 1);
+  assert.strictEqual(result.pots.length, 1);
+  assert.ok(result.pots[0].winners.length >= 1);
   assert.strictEqual(totalChips(table), startingTotal);
 });
 
@@ -277,6 +283,110 @@ run('getPublicState zeigt den disconnected-Status pro Spieler', () => {
   const b = state.players.find((p) => p.id === 'b');
   assert.strictEqual(a.disconnected, true);
   assert.strictEqual(b.disconnected, false);
+});
+
+run('Side Pot: Kurzer Stack gewinnt nur den Hauptpot, nicht den Neben-Pot der Tiefstapler', () => {
+  const table = new Table({ smallBlind: 5, bigBlind: 10 });
+  table.addPlayer('a', 'Alice', 1000);
+  table.addPlayer('b', 'Bob', 1000);
+  table.addPlayer('c', 'Carol', 30); // Kurzer Stack
+  table.startHand(); // Dealer=a, SB=b(5), BB=c(10)
+
+  table.raise('a', 100); // a raist auf 100
+  table.call('b'); // b callt auf 100
+  table.call('c'); // c kann nur mit den restlichen 20 all-in callen -> Gesamteinsatz 30
+
+  assert.strictEqual(table.players.find((p) => p.id === 'c').isAllIn, true);
+  assert.strictEqual(table.isBettingRoundComplete(), true);
+  assert.strictEqual(table.pot, 230); // 100 + 100 + 30
+
+  // a und b checken die restlichen Straßen durch (kein weiterer Einsatz)
+  table.dealFlop();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.dealTurn();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.dealRiver();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+
+  // Hände festlegen: Carol (AA) schlägt Alice (KK) schlägt Bob (QQ)
+  table.communityCards = [card(2, 'H'), card(7, 'D'), card(9, 'C'), card(3, 'S'), card(4, 'H')];
+  table.players.find((p) => p.id === 'a').holeCards = [card(13, 'S'), card(13, 'H')];
+  table.players.find((p) => p.id === 'b').holeCards = [card(12, 'S'), card(12, 'H')];
+  table.players.find((p) => p.id === 'c').holeCards = [card(14, 'S'), card(14, 'H')];
+
+  const result = table.showdown();
+
+  assert.strictEqual(result.pots.length, 2);
+  // Hauptpot (90 = 3 x 30): alle drei eligible, Carol gewinnt mit AA
+  assert.strictEqual(result.pots[0].amount, 90);
+  assert.deepStrictEqual(
+    result.pots[0].winners.map((w) => w.id),
+    ['c']
+  );
+  // Neben-Pot (140 = 2 x 70): nur a und b eligible, Alice gewinnt mit KK
+  assert.strictEqual(result.pots[1].amount, 140);
+  assert.deepStrictEqual(
+    result.pots[1].winners.map((w) => w.id),
+    ['a']
+  );
+
+  const [a, b, c] = table.players;
+  assert.strictEqual(c.chips, 90); // 0 + Hauptpot 90
+  assert.strictEqual(a.chips, 1040); // 900 + Neben-Pot 140
+  assert.strictEqual(b.chips, 900); // gewinnt nichts
+  assert.strictEqual(table.pot, 0);
+});
+
+run('Side Pot: Ein gefoldeter Spieler finanziert den Neben-Pot, kann ihn aber nicht gewinnen', () => {
+  const table = new Table({ smallBlind: 5, bigBlind: 10 });
+  table.addPlayer('a', 'Alice', 1000);
+  table.addPlayer('b', 'Bob', 1000);
+  table.addPlayer('c', 'Carol', 20); // Kurzer Stack
+  table.startHand(); // Dealer=a, SB=b(5), BB=c(10)
+
+  table.raise('a', 100);
+  table.call('b');
+  table.call('c'); // All-in für insgesamt 20
+
+  table.dealFlop();
+  table.fold(table.getCurrentPlayer().id); // Bob foldet postflop
+  table.check(table.getCurrentPlayer().id); // Alice checkt durch (niemand sonst kann handeln)
+  table.dealTurn();
+  table.check(table.getCurrentPlayer().id);
+  table.dealRiver();
+  table.check(table.getCurrentPlayer().id);
+
+  // Alice (22) schlägt Carol (nichts Besonderes) im umkämpften Hauptpot,
+  // den Neben-Pot gewinnt Alice ohnehin automatisch (einzige Berechtigte).
+  table.communityCards = [card(9, 'H'), card(7, 'D'), card(3, 'C'), card(6, 'S'), card(11, 'H')];
+  table.players.find((p) => p.id === 'a').holeCards = [card(14, 'S'), card(14, 'H')];
+  table.players.find((p) => p.id === 'c').holeCards = [card(2, 'S'), card(2, 'H')];
+
+  const result = table.showdown();
+
+  assert.strictEqual(result.pots.length, 2);
+  // Hauptpot (60 = 3 x 20): a und c eligible (b gefoldet), Alice gewinnt mit AA
+  assert.strictEqual(result.pots[0].amount, 60);
+  assert.deepStrictEqual(
+    result.pots[0].winners.map((w) => w.id),
+    ['a']
+  );
+  // Neben-Pot (160 = 2 x 80): nur Alice ist noch eligible (Bob gefoldet, Carol all-in
+  // unterhalb dieser Grenze) -> unumkämpfter Gewinn ohne Kartenvergleich nötig
+  assert.strictEqual(result.pots[1].amount, 160);
+  assert.deepStrictEqual(
+    result.pots[1].winners.map((w) => w.id),
+    ['a']
+  );
+
+  const [a, b, c] = table.players;
+  assert.strictEqual(a.chips, 1120); // 900 + 60 + 160
+  assert.strictEqual(b.chips, 900); // gefoldet, gewinnt nichts zurück
+  assert.strictEqual(c.chips, 0);
+  assert.strictEqual(table.pot, 0);
 });
 
 console.log('\nAlle Tests durchgelaufen.');
