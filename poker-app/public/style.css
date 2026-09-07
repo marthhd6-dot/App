@@ -173,6 +173,10 @@ button:not(:disabled):hover {
   opacity: 0.45;
 }
 
+.player-row.disconnected {
+  border-color: var(--danger);
+}
+
 .player-row.me .player-name {
   text-decoration: underline;
 }

@@ -1,9 +1,9 @@
 # Poker-App — Startgerüst
 
 Ein spielbares Online-Texas-Hold'em mit mehreren Spielern und mehreren
-gleichzeitigen Tischen: Kartenlogik, Wettrunden, Räume und ein einfaches
-Browser-Frontend sind fertig. Persistenz und Reconnect-Handling sind
-offen — das baust du mit Claude Code weiter aus.
+gleichzeitigen Tischen: Kartenlogik, Wettrunden, Räume, Reconnect-Handling
+und ein einfaches Browser-Frontend sind fertig. Persistenz und Side Pots
+sind offen — das baust du mit Claude Code weiter aus.
 
 ## Struktur
 
@@ -34,6 +34,9 @@ cd poker-app
 npm install
 npm test        # prüft Hand-Evaluator, Tisch-Logik und Raum-Verwaltung
 npm start        # startet den Server auf Port 3001, Frontend unter http://localhost:3001
+
+# Gnadenfrist fürs Reconnect-Handling überschreiben (Standard: 30000ms):
+RECONNECT_GRACE_MS=10000 npm start
 ```
 
 ## Was schon funktioniert
@@ -62,6 +65,16 @@ npm start        # startet den Server auf Port 3001, Frontend unter http://local
   bei. Jeder Raum hat einen komplett unabhängigen Tisch-Zustand; ein
   Socket kann nur einem Raum gleichzeitig angehören. Leere Räume werden
   beim Verlassen des letzten Spielers automatisch aufgeräumt.
+- **Reconnect-Handling**: Trennt sich ein Spieler (Netzwerk-Aussetzer,
+  Tab neu geladen), bleibt er 30 Sekunden lang mit Chips, Karten und
+  Sitzplatz am Tisch ("disconnected"-Badge für die anderen). Tritt er
+  innerhalb dieser Frist mit demselben Namen demselben Raum erneut bei
+  (`table.reconnectPlayer()`), bekommt er seinen Platz zurück. Das
+  Frontend merkt sich Raum-Code und Namen in `sessionStorage` und tritt
+  nach einem Verbindungsabbruch automatisch wieder bei. Bekannte
+  Vereinfachung: Die Wiedererkennung läuft allein über den Namen, es gibt
+  keine echte Authentifizierung – zwei Spieler mit demselben Namen im
+  selben Raum können sich gegenseitig den Platz "stehlen".
 
 ## Nächste Schritte (für Claude Code)
 
@@ -69,15 +82,13 @@ Am besten der Reihe nach, jeweils mit Tests:
 
 1. **Persistenz**: Chip-Stände über Sessions hinweg speichern
    (z. B. mit einer Datenbank wie Postgres oder Supabase).
-2. **Reconnect-Handling**: Was passiert, wenn ein Spieler mitten in
-   der Hand die Verbindung verliert?
-3. **Side Pots**: Aktuell gibt es nur einen gemeinsamen Pot; bei mehreren
+2. **Side Pots**: Aktuell gibt es nur einen gemeinsamen Pot; bei mehreren
    unterschiedlich hohen All-Ins wird (noch) nicht korrekt aufgeteilt.
 
 ## Guter erster Prompt für Claude Code
 
-> "Lies dir server.js und table.js durch. Baue Reconnect-Handling: Wenn
-> ein Spieler die Verbindung verliert und innerhalb einer kurzen Frist
-> erneut mit demselben Namen im selben Raum beitritt, soll er seinen
-> Platz und seine Chips zurückbekommen statt als neuer Spieler zu
-> gelten."
+> "Lies dir table.js und handEvaluator.js durch. Implementiere Side
+> Pots: Wenn mehrere Spieler mit unterschiedlich hohen Stacks all-in
+> gehen, muss der Pot in Haupt- und Neben-Pots aufgeteilt werden, auf
+> die jeweils nur die Spieler Anspruch haben, die genug Chips eingesetzt
+> haben, um dabei zu sein."
