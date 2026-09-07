@@ -21,14 +21,16 @@ poker-app/
 │   │   ├── handEvaluator.js  # Beste 5-Karten-Hand aus 7 Karten finden
 │   │   └── table.js          # Tisch-Zustand: Spieler, Phasen, Pot
 │   ├── rooms.js              # Verwaltet mehrere Tische über Raum-Codes
-│   ├── persistence.js        # Lädt/speichert Raum-Snapshots in SQLite
+│   ├── persistence.js        # Lädt/speichert Raum-Snapshots + Ränge in SQLite
+│   ├── ranking.js            # ELO-artige Rating-/Rang-Logik für 1v1 Ranked
 │   └── server.js             # Express + Socket.io Server, liefert public/ aus
-├── data/                     # Gespeicherte Chip-Stände (rooms.db, gitignored)
+├── data/                     # Gespeicherte Chip-Stände & Ränge (rooms.db, gitignored)
 └── tests/
     ├── handEvaluator.test.js
     ├── table.test.js
     ├── rooms.test.js
-    └── persistence.test.js
+    ├── persistence.test.js
+    └── ranking.test.js
 ```
 
 ## Setup
@@ -36,7 +38,7 @@ poker-app/
 ```bash
 cd poker-app
 npm install
-npm test        # prüft Hand-Evaluator, Tisch-, Raum- und Persistenz-Logik
+npm test        # prüft Hand-Evaluator, Tisch-, Raum-, Persistenz- und Rang-Logik
 npm start        # startet den Server auf Port 3001, Frontend unter http://localhost:3001
 
 # Gnadenfrist fürs Reconnect-Handling überschreiben (Standard: 30000ms):
@@ -134,11 +136,29 @@ Chip-Stände definiert.
   (`join-room` mit demselben Namen) an ihren Platz zurück. Bei SIGINT/
   SIGTERM (z. B. Ctrl+C oder ein Deploy-Neustart) wird zusätzlich ein
   letztes Mal explizit gespeichert.
+- **1v1 Ranked** (`ranking.js` + Matchmaking in `server.js`): Über
+  `join-ranked-queue` reiht sich ein Spieler in eine Warteschlange ein;
+  sobald zwei da sind, werden die ersten beiden automatisch in einem
+  neuen Raum mit kleinerem Startkapital (200 statt 1000 Chips)
+  zusammengelegt – kein manueller Raum-Code nötig. Bekannte
+  Vereinfachung: reines FIFO-Matchmaking, kein Rating-basiertes Pairing.
+  Ein Match endet, sobald ein Spieler nach einer Hand bei 0 Chips steht;
+  der Sieger nimmt den Gegner mit einem ELO-artigen System (K-Faktor 32,
+  Startrating 250) auseinander. Sechs Ränge von **Bronze** bis
+  **Champion** (Schwellenwerte in `RANK_TIERS`), Rating und
+  Sieg/Niederlage-Zähler liegen dauerhaft in der `player_ranks`-Tabelle.
+  Eine einfache Bestenliste (`get-leaderboard`) zeigt die Top 20 nach
+  Rating. Identität ist wie beim Reconnect-Handling allein der Name,
+  keine echte Authentifizierung.
 
 ## Mögliche nächste Schritte (für Claude Code)
 
 Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
 
+- **Rating-basiertes Matchmaking**: Aktuell werden beim Ranked-Modus
+  einfach die ersten zwei Spieler in der Warteschlange zusammengelegt.
+  Sinnvoller wäre es, ähnlich starke Ratings zu bevorzugen (mit
+  wachsendem Suchradius, je länger jemand wartet).
 - **Postgres/Supabase statt lokaler SQLite-Datei**: sinnvoll, sobald die
   App auf mehreren Server-Prozessen/Maschinen laufen soll (SQLite ist
   an eine einzelne Datei auf einer Maschine gebunden).
@@ -151,7 +171,7 @@ Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
 
 ## Guter erster Prompt für Claude Code
 
-> "Lies dir persistence.js durch. Ergänze eine hands-Tabelle, die nach
-> jedem Showdown das Ergebnis (Gewinner, Pot-Größe, Community Cards)
-> protokolliert, und eine Route/ein Socket-Event, über das ein Client
-> die letzten Hände seines Raums abrufen kann."
+> "Lies dir server.js und ranking.js durch. Ersetze das FIFO-Matchmaking
+> im Ranked-Modus durch ein rating-basiertes: bevorzuge Gegner mit
+> ähnlichem Rating, aber erweitere den akzeptierten Rating-Abstand mit
+> der Wartezeit, damit niemand ewig in der Warteschlange hängt."

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node tests/handEvaluator.test.js && node tests/table.test.js && node tests/rooms.test.js && node tests/persistence.test.js"
+    "test": "node tests/handEvaluator.test.js && node tests/table.test.js && node tests/rooms.test.js && node tests/persistence.test.js && node tests/ranking.test.js"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

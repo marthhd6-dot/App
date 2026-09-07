@@ -5,7 +5,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { loadSnapshot, saveSnapshot } = require('../src/persistence');
+const { loadSnapshot, saveSnapshot, getPlayerRank, savePlayerRank, getLeaderboard } = require('../src/persistence');
 
 function run(name, fn) {
   try {
@@ -73,6 +73,38 @@ run('saveSnapshot legt fehlende Verzeichnisse automatisch an', () => {
   const file = path.join(dir, 'nested', 'deeper', 'rooms.db');
   saveSnapshot(file, { X: { smallBlind: 5, bigBlind: 10, dealerIndex: 0, players: [] } });
   assert.strictEqual(fs.existsSync(file), true);
+});
+
+run('getPlayerRank gibt null zurück für einen unbekannten Spieler', () => {
+  const file = tempFilePath();
+  assert.strictEqual(getPlayerRank(file, 'Unbekannt'), null);
+});
+
+run('savePlayerRank + getPlayerRank: Round-Trip erhält Rating und Sieg/Niederlage-Zähler', () => {
+  const file = tempFilePath();
+  savePlayerRank(file, 'Alice', { rating: 1032, wins: 3, losses: 1 });
+  assert.deepStrictEqual(getPlayerRank(file, 'Alice'), { rating: 1032, wins: 3, losses: 1 });
+});
+
+run('savePlayerRank überschreibt einen vorhandenen Eintrag statt einen zweiten anzulegen', () => {
+  const file = tempFilePath();
+  savePlayerRank(file, 'Alice', { rating: 1000, wins: 1, losses: 0 });
+  savePlayerRank(file, 'Alice', { rating: 1032, wins: 2, losses: 0 });
+  assert.deepStrictEqual(getPlayerRank(file, 'Alice'), { rating: 1032, wins: 2, losses: 0 });
+});
+
+run('getLeaderboard sortiert absteigend nach Rating und begrenzt die Anzahl', () => {
+  const file = tempFilePath();
+  savePlayerRank(file, 'Niedrig', { rating: 300, wins: 0, losses: 5 });
+  savePlayerRank(file, 'Hoch', { rating: 2600, wins: 10, losses: 1 });
+  savePlayerRank(file, 'Mitte', { rating: 1200, wins: 5, losses: 5 });
+
+  const top2 = getLeaderboard(file, 2);
+  assert.strictEqual(top2.length, 2);
+  assert.deepStrictEqual(
+    top2.map((p) => p.name),
+    ['Hoch', 'Mitte']
+  );
 });
 
 console.log('\nAlle Tests durchgelaufen.');

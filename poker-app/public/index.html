@@ -9,9 +9,10 @@
   <body>
     <div id="join-screen" class="screen">
       <h1>Texas Hold'em</h1>
-      <p>Erstelle einen neuen Tisch oder tritt einem bestehenden per Code bei.</p>
+      <p>Erstelle einen neuen Tisch, tritt einem bestehenden per Code bei, oder spiele 1v1 Ranked.</p>
       <div id="join-error" class="error-banner" hidden></div>
       <input id="name-input" type="text" placeholder="Dein Name" maxlength="20" />
+      <div id="my-rank-label" class="rank-label" hidden></div>
 
       <div class="join-row">
         <button id="create-room-btn">Neuen Tisch erstellen</button>
@@ -20,6 +21,29 @@
         <input id="room-code-input" type="text" placeholder="Raum-Code" maxlength="4" />
         <button id="join-room-btn">Tisch beitreten</button>
       </div>
+
+      <hr class="join-divider" />
+
+      <div class="join-row">
+        <button id="ranked-queue-btn">1v1 Ranked spielen</button>
+        <button id="leaderboard-btn">Bestenliste</button>
+      </div>
+    </div>
+
+    <div id="queue-screen" class="screen" hidden>
+      <h1>Suche Gegner …</h1>
+      <p id="queue-rank-label" class="rank-label"></p>
+      <div class="join-row">
+        <button id="cancel-queue-btn">Abbrechen</button>
+      </div>
+    </div>
+
+    <div id="leaderboard-screen" class="screen" hidden>
+      <h1>Bestenliste</h1>
+      <div id="leaderboard-list" class="leaderboard-list"></div>
+      <div class="join-row">
+        <button id="leaderboard-close-btn">Zurück</button>
+      </div>
     </div>
 
     <div id="table-screen" class="screen" hidden>
@@ -27,10 +51,15 @@
         Verbindung unterbrochen – versuche erneut zu verbinden …
       </div>
       <div id="error-banner" class="error-banner" hidden></div>
+      <div id="ranked-match-over-banner" class="hand-result ranked-banner" hidden>
+        <span id="ranked-match-over-text"></span>
+        <button id="ranked-back-to-menu-btn">Neues Match suchen</button>
+      </div>
       <div id="hand-result" class="hand-result" hidden></div>
 
       <div class="table-header">
         <span id="room-code-label" class="room-code-label"></span>
+        <span id="ranked-badge" class="ranked-badge" hidden>1v1 RANKED</span>
         <span id="phase-label" class="phase-label"></span>
         <span id="pot-label" class="pot-label"></span>
         <span id="current-bet-label" class="current-bet-label"></span>
