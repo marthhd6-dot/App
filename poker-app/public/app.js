@@ -13,8 +13,12 @@ const PHASE_LABELS = {
   showdown: 'Showdown',
 };
 
+const SESSION_KEY = 'pokerSession'; // { code, name } des zuletzt beigetretenen Raums
+
 const socket = io();
 let mySocketId = null;
+let myName = '';
+let joinedRoomCode = null;
 
 const joinScreen = document.getElementById('join-screen');
 const tableScreen = document.getElementById('table-screen');
@@ -22,6 +26,7 @@ const nameInput = document.getElementById('name-input');
 const roomCodeInput = document.getElementById('room-code-input');
 const joinErrorEl = document.getElementById('join-error');
 const errorBanner = document.getElementById('error-banner');
+const reconnectBanner = document.getElementById('reconnect-banner');
 const handResultEl = document.getElementById('hand-result');
 
 const foldBtn = document.getElementById('fold-btn');
@@ -35,15 +40,46 @@ const startHandBtn = document.getElementById('start-hand-btn');
 
 socket.on('connect', () => {
   mySocketId = socket.id;
+  attemptAutoRejoin();
+});
+
+// Feuert, wenn die Verbindung abbricht (Netzwerk-Aussetzer, Server-Neustart
+// o. Ä.). Der Socket versucht danach automatisch, sich neu zu verbinden;
+// sobald 'connect' erneut feuert, holt attemptAutoRejoin() uns zurück in
+// den Raum, falls wir schon einem beigetreten waren.
+socket.on('disconnect', () => {
+  if (joinedRoomCode) {
+    reconnectBanner.hidden = false;
+  }
 });
 
 socket.on('state', render);
 
 socket.on('room-joined', ({ code }) => {
+  joinedRoomCode = code;
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code, name: myName }));
+  reconnectBanner.hidden = true;
   document.getElementById('room-code-label').textContent = `Raum: ${code}`;
   joinScreen.hidden = true;
   tableScreen.hidden = false;
 });
+
+// Nach jedem (Wieder-)Verbinden: Wenn wir laut sessionStorage schon in
+// einem Raum waren, automatisch mit demselben Namen erneut beitreten.
+// Innerhalb der Gnadenfrist des Servers bekommen wir dadurch nahtlos
+// unseren alten Platz samt Chips und Karten zurück.
+function attemptAutoRejoin() {
+  const saved = sessionStorage.getItem(SESSION_KEY);
+  if (!saved) return;
+  try {
+    const { code, name } = JSON.parse(saved);
+    if (!code) return;
+    myName = name || '';
+    socket.emit('join-room', { code, name: myName });
+  } catch {
+    sessionStorage.removeItem(SESSION_KEY);
+  }
+}
 
 let errorTimer = null;
 socket.on('error-message', (message) => {
@@ -59,7 +95,8 @@ socket.on('error-message', (message) => {
 });
 
 document.getElementById('create-room-btn').addEventListener('click', () => {
-  socket.emit('create-room', { name: nameInput.value.trim() });
+  myName = nameInput.value.trim();
+  socket.emit('create-room', { name: myName });
 });
 
 document.getElementById('join-room-btn').addEventListener('click', joinRoom);
@@ -71,7 +108,8 @@ roomCodeInput.addEventListener('keydown', (e) => {
 });
 
 function joinRoom() {
-  socket.emit('join-room', { code: roomCodeInput.value.trim(), name: nameInput.value.trim() });
+  myName = nameInput.value.trim();
+  socket.emit('join-room', { code: roomCodeInput.value.trim(), name: myName });
 }
 
 startHandBtn.addEventListener('click', () => socket.emit('start-hand'));
@@ -126,12 +164,14 @@ function render(state) {
     if (p.id === state.dealerPlayerId) badges.push('D');
     if (p.isAllIn) badges.push('ALL-IN');
     if (p.folded) badges.push('FOLD');
+    if (p.disconnected) badges.push('GETRENNT');
 
     const row = document.createElement('div');
     row.className =
       'player-row' +
       (p.id === state.actingPlayerId ? ' acting' : '') +
       (p.folded ? ' folded' : '') +
+      (p.disconnected ? ' disconnected' : '') +
       (p.id === mySocketId ? ' me' : '');
     row.innerHTML = `
       <span class="player-name">${escapeHtml(p.name)}${badges

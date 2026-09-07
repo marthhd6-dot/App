@@ -15,6 +15,15 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 const rooms = new RoomManager();
 
+// Wie lange ein getrennter Spieler seinen Platz behält, bevor er endgültig
+// entfernt wird. Läuft die Zeit ab, ohne dass sich jemand mit demselben
+// Namen erneut verbindet, verhält es sich wie ein sofortiges Verlassen.
+// Über RECONNECT_GRACE_MS überschreibbar (z. B. für Tests).
+const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 30_000;
+// key: `${roomCode}:${socketId}` -> Timeout-Handle für den ausstehenden
+// endgültigen Rauswurf dieses (getrennten) Spielers.
+const disconnectTimers = new Map();
+
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -41,6 +50,22 @@ io.on('connection', (socket) => {
       socket.emit('error-message', `Raum "${normalizedCode}" wurde nicht gefunden.`);
       return;
     }
+
+    // Reconnect-Versuch: Ein getrennter Spieler mit demselben Namen im
+    // selben Raum bekommt seinen Platz, seine Chips und seine Karten zurück,
+    // statt als neuer Spieler zu gelten.
+    const table = rooms.getTable(normalizedCode);
+    const trimmedName = String(name || '').trim();
+    const oldSocketId = trimmedName && table.reconnectPlayer(socket.id, trimmedName);
+    if (oldSocketId) {
+      roomCode = normalizedCode;
+      clearDisconnectTimer(roomCode, oldSocketId);
+      socket.join(roomCode);
+      socket.emit('room-joined', { code: roomCode });
+      broadcastRoomState(roomCode);
+      return;
+    }
+
     roomCode = normalizedCode;
     joinTable(socket, roomCode, name);
   });
@@ -74,14 +99,41 @@ io.on('connection', (socket) => {
     if (!roomCode) return;
     const table = rooms.getTable(roomCode);
     if (!table) return;
-    table.removePlayer(socket.id);
-    if (table.players.length === 0) {
-      rooms.removeRoom(roomCode);
-    } else {
-      broadcastRoomState(roomCode);
-    }
+
+    // Spieler bleibt für die Gnadenfrist am Tisch sitzen (Chips/Karten
+    // erhalten), damit ein Reconnect über join-room ihn zurückholen kann.
+    table.markDisconnected(socket.id);
+    broadcastRoomState(roomCode);
+
+    const code = roomCode;
+    const socketId = socket.id;
+    const timer = setTimeout(() => {
+      disconnectTimers.delete(timerKey(code, socketId));
+      const currentTable = rooms.getTable(code);
+      if (!currentTable) return;
+      currentTable.removePlayer(socketId);
+      if (currentTable.players.length === 0) {
+        rooms.removeRoom(code);
+      } else {
+        broadcastRoomState(code);
+      }
+    }, RECONNECT_GRACE_MS);
+    disconnectTimers.set(timerKey(code, socketId), timer);
   });
 });
+
+function timerKey(roomCode, socketId) {
+  return `${roomCode}:${socketId}`;
+}
+
+function clearDisconnectTimer(roomCode, socketId) {
+  const key = timerKey(roomCode, socketId);
+  const timer = disconnectTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    disconnectTimers.delete(key);
+  }
+}
 
 function joinTable(socket, code, name) {
   const table = rooms.getTable(code);

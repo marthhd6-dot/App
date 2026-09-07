@@ -13,7 +13,7 @@ const PHASES = ['waiting', 'preflop', 'flop', 'turn', 'river', 'showdown'];
 
 class Table {
   constructor({ smallBlind = 5, bigBlind = 10 } = {}) {
-    this.players = []; // { id, name, chips, holeCards, folded, isAllIn, bet, hasActed }
+    this.players = []; // { id, name, chips, holeCards, folded, isAllIn, bet, hasActed, disconnected }
     this.deck = [];
     this.communityCards = [];
     this.pot = 0;
@@ -39,11 +39,37 @@ class Table {
       isAllIn: false,
       bet: 0,
       hasActed: false,
+      disconnected: false,
     });
   }
 
   removePlayer(id) {
     this.players = this.players.filter((p) => p.id !== id);
+  }
+
+  // Markiert einen Spieler als getrennt, ohne ihn aus dem Tisch zu entfernen –
+  // Chips, Karten und Sitzplatz (Reihenfolge) bleiben erhalten, damit er
+  // innerhalb einer Gnadenfrist per reconnectPlayer() zurückkehren kann. Der
+  // Server entscheidet, wie lange diese Frist läuft, und ruft danach ggf.
+  // removePlayer() auf.
+  markDisconnected(id) {
+    const player = this.players.find((p) => p.id === id);
+    if (player) player.disconnected = true;
+  }
+
+  // Verbindet einen zuvor getrennten Spieler unter einer neuen ID wieder,
+  // sofern ein Spieler mit gleichem Namen aktuell als "disconnected" markiert
+  // ist. Gibt dessen alte ID zurück (z. B. um einen Timeout-Timer anhand
+  // dieser ID zu löschen) oder null, wenn kein passender Spieler gefunden
+  // wurde. Bekannte Vereinfachung: Die Wiedererkennung läuft allein über den
+  // Namen, es gibt keine echte Authentifizierung.
+  reconnectPlayer(newId, name) {
+    const player = this.players.find((p) => p.disconnected && p.name === name);
+    if (!player) return null;
+    const oldId = player.id;
+    player.id = newId;
+    player.disconnected = false;
+    return oldId;
   }
 
   startHand() {
@@ -370,6 +396,7 @@ class Table {
         bet: p.bet,
         folded: p.folded,
         isAllIn: p.isAllIn,
+        disconnected: p.disconnected,
         holeCards: p.id === forPlayerId ? p.holeCards : null,
       })),
     };

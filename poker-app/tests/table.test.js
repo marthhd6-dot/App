@@ -232,4 +232,51 @@ run('Dealer-Button rückt nach jeder Hand weiter', () => {
   assert.strictEqual(table.dealerIndex, 1);
 });
 
+run('markDisconnected entfernt den Spieler nicht, sondern markiert ihn nur', () => {
+  const table = makeTable(['a', 'b', 'c']);
+  table.startHand();
+
+  table.markDisconnected('b');
+
+  assert.strictEqual(table.players.length, 3);
+  const b = table.players.find((p) => p.id === 'b');
+  assert.strictEqual(b.disconnected, true);
+  assert.strictEqual(b.holeCards.length, 2); // Karten und Chips bleiben erhalten
+});
+
+run('reconnectPlayer verbindet einen getrennten Spieler unter neuer ID wieder', () => {
+  const table = makeTable(['a', 'b', 'c']);
+  table.startHand();
+  table.markDisconnected('b');
+
+  const oldId = table.reconnectPlayer('b-new-socket', 'Spieler-b');
+
+  assert.strictEqual(oldId, 'b');
+  assert.strictEqual(table.players.length, 3);
+  const reconnected = table.players.find((p) => p.name === 'Spieler-b');
+  assert.strictEqual(reconnected.id, 'b-new-socket');
+  assert.strictEqual(reconnected.disconnected, false);
+  assert.strictEqual(reconnected.holeCards.length, 2); // Hand bleibt erhalten
+});
+
+run('reconnectPlayer schlägt fehl, wenn kein getrennter Spieler mit diesem Namen existiert', () => {
+  const table = makeTable(['a', 'b']);
+  table.startHand();
+
+  assert.strictEqual(table.reconnectPlayer('neu', 'Spieler-b'), null); // b ist noch verbunden
+  assert.strictEqual(table.reconnectPlayer('neu', 'Unbekannt'), null); // Name existiert gar nicht
+});
+
+run('getPublicState zeigt den disconnected-Status pro Spieler', () => {
+  const table = makeTable(['a', 'b']);
+  table.startHand();
+  table.markDisconnected('a');
+
+  const state = table.getPublicState('b');
+  const a = state.players.find((p) => p.id === 'a');
+  const b = state.players.find((p) => p.id === 'b');
+  assert.strictEqual(a.disconnected, true);
+  assert.strictEqual(b.disconnected, false);
+});
+
 console.log('\nAlle Tests durchgelaufen.');
