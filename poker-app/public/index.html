@@ -263,6 +263,17 @@
       </div>
 
       <div class="action-bar">
+        <div id="bet-sizer" class="bet-sizer">
+          <div class="bet-sizer-quick">
+            <button id="quarter-pot-btn" type="button" class="btn btn-ghost btn-small">¼ Pot</button>
+            <button id="half-pot-btn" type="button" class="btn btn-ghost btn-small">½ Pot</button>
+            <button id="all-in-btn" type="button" class="btn btn-ghost btn-small btn-allin">All-In</button>
+          </div>
+          <div class="bet-sizer-slider-row">
+            <input id="bet-amount-slider" type="range" min="0" max="0" value="0" step="1" />
+            <span id="bet-amount-value" class="bet-amount-value">0</span>
+          </div>
+        </div>
         <button id="start-hand-btn" class="btn btn-primary">▶ Hand starten</button>
         <button id="fold-btn" class="btn btn-fold">Fold</button>
         <button id="check-btn" class="btn btn-neutral">Check</button>

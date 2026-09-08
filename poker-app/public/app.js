@@ -35,6 +35,8 @@ let queueType = null;
 let lastPhase = null; // für Deal-Animationen: erkennt den Beginn einer neuen Hand
 let communityDealtCount = 0;
 let prevState = null; // vorheriger state-Snapshot, für Aktions-Effekte (siehe detectAndShowActionFx)
+let wasMyTurn = false; // erkennt den Beginn meines Zugs, um den Bet-Schieberegler frisch auf das Minimum zu setzen
+let betSizerBounds = { min: 0, max: 0, pot: 0 }; // aktuell legale Bet-/Raise-Grenzen, siehe renderBetSizer()
 let isLoggedIn = false;
 let pendingRankPathView = false; // wartet der "Mein Rang"-Button auf die nächste rank-info-Antwort?
 let pendingBotsSetupView = false; // wartet der "Gegen Bots üben"-Button auf die nächste rank-info-Antwort?
@@ -96,6 +98,12 @@ const raiseBtn = document.getElementById('raise-btn');
 const betInput = document.getElementById('bet-input');
 const raiseInput = document.getElementById('raise-input');
 const startHandBtn = document.getElementById('start-hand-btn');
+const betSizerEl = document.getElementById('bet-sizer');
+const betAmountSlider = document.getElementById('bet-amount-slider');
+const betAmountValueEl = document.getElementById('bet-amount-value');
+const quarterPotBtn = document.getElementById('quarter-pot-btn');
+const halfPotBtn = document.getElementById('half-pot-btn');
+const allInBtn = document.getElementById('all-in-btn');
 
 socket.on('connect', () => {
   mySocketId = socket.id;
@@ -683,6 +691,91 @@ raiseBtn.addEventListener('click', () => {
   socket.emit('raise', { amount: Number(raiseInput.value) });
 });
 
+// Setzt Schieberegler, Live-Anzeige und das gerade aktive Betrag-Feld
+// (bet-input im Bet-Modus, sonst raise-input) synchron auf denselben,
+// auf die aktuell legalen Grenzen geklemmten Betrag – genutzt sowohl vom
+// Schieberegler selbst als auch von den ¼/½-Pot- und All-In-Knöpfen.
+function setBetSizerValue(amount) {
+  const { min, max } = betSizerBounds;
+  if (max <= 0) return;
+  const clamped = Math.min(max, Math.max(min, Math.round(amount)));
+  betAmountSlider.value = clamped;
+  betAmountValueEl.textContent = clamped;
+  const target = betInput.disabled ? raiseInput : betInput;
+  target.value = clamped;
+}
+
+betAmountSlider.addEventListener('input', () => setBetSizerValue(Number(betAmountSlider.value)));
+quarterPotBtn.addEventListener('click', () => setBetSizerValue(betSizerBounds.pot * 0.25));
+halfPotBtn.addEventListener('click', () => setBetSizerValue(betSizerBounds.pot * 0.5));
+allInBtn.addEventListener('click', () => setBetSizerValue(betSizerBounds.max));
+
+// Manuelle Eingabe in den bestehenden Zahlenfeldern hält den Schieberegler
+// synchron, damit beide Bedienwege (Regler vs. Zahl eintippen) konsistent
+// denselben Betrag zeigen.
+function syncSliderFromInput(inputEl) {
+  if (inputEl.disabled || betSizerBounds.max <= 0) return;
+  const val = Number(inputEl.value);
+  if (!Number.isFinite(val)) return;
+  const clamped = Math.min(betSizerBounds.max, Math.max(betSizerBounds.min, val));
+  betAmountSlider.value = clamped;
+  betAmountValueEl.textContent = inputEl.value;
+}
+betInput.addEventListener('input', () => syncSliderFromInput(betInput));
+raiseInput.addEventListener('input', () => syncSliderFromInput(raiseInput));
+
+// Berechnet die aktuell legalen Bet-/Raise-Grenzen (siehe placeBet()/
+// raise() in table.js für dieselbe Logik server-seitig, die hier nur zur
+// Anzeige gespiegelt wird – verbindlich validiert wird immer noch dort)
+// und hält Schieberegler + Schnellwahl-Knöpfe synchron dazu. Wird bei
+// jedem Rendern aufgerufen, auch wenn gerade nicht ich am Zug bin (dann
+// einfach deaktiviert).
+function renderBetSizer(state, me, canBet, canRaise) {
+  const active = (canBet || canRaise) && me;
+  if (!active) {
+    betSizerBounds = { min: 0, max: 0, pot: state.pot };
+    betAmountSlider.min = 0;
+    betAmountSlider.max = 0;
+    betAmountSlider.value = 0;
+    betAmountValueEl.textContent = '0';
+    betAmountSlider.disabled = true;
+    quarterPotBtn.disabled = true;
+    halfPotBtn.disabled = true;
+    allInBtn.disabled = true;
+    betSizerEl.classList.add('bet-sizer-disabled');
+    return;
+  }
+
+  let min;
+  let max;
+  if (canBet) {
+    max = me.chips;
+    min = Math.min(state.bigBlind || 1, max);
+  } else {
+    max = me.bet + me.chips;
+    min = Math.min(state.currentBet + (state.minRaise || state.bigBlind || 1), max);
+  }
+  min = Math.max(1, min);
+  betSizerBounds = { min, max, pot: state.pot };
+
+  betAmountSlider.min = min;
+  betAmountSlider.max = max;
+  betAmountSlider.disabled = false;
+  quarterPotBtn.disabled = false;
+  halfPotBtn.disabled = false;
+  allInBtn.disabled = false;
+  betSizerEl.classList.remove('bet-sizer-disabled');
+
+  // Zu Beginn meines Zugs auf das Minimum zurücksetzen statt einen
+  // Betrag aus einer ganz anderen Wettrunde/Hand stehen zu lassen;
+  // innerhalb desselben Zugs (z. B. nach einem Re-Render durch eine
+  // Chip-Flug-Animation) bleibt ein bereits gewählter Betrag erhalten.
+  const isMyTurn = state.actingPlayerId === mySocketId;
+  const justBecameMyTurn = isMyTurn && !wasMyTurn;
+  const current = justBecameMyTurn ? min : Number(betAmountSlider.value) || min;
+  setBetSizerValue(current);
+}
+
 function isRedSuit(suit) {
   return suit === 'H' || suit === 'D';
 }
@@ -1138,6 +1231,8 @@ function render(state) {
   betInput.disabled = betBtn.disabled;
   raiseBtn.disabled = !canAct || state.currentBet === 0;
   raiseInput.disabled = raiseBtn.disabled;
+  renderBetSizer(state, me, !betBtn.disabled, !raiseBtn.disabled);
+  wasMyTurn = isMyTurn;
 
   startHandBtn.hidden = state.phase !== 'waiting' && state.phase !== 'showdown';
 
