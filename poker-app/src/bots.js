@@ -102,6 +102,34 @@ function computeRaiseAmount(table, player) {
 // injizierbar (Standard Math.random), damit Tests deterministisch bleiben.
 // Gibt immer eine an der aktuellen Tisch-Situation legale Aktion zurück
 // ({ type: 'fold' | 'check' | 'call' } oder { type: 'bet' | 'raise', amount }).
+// Entscheidet, welche der (bis zu vier) noch ungenutzten Fähigkeiten-
+// Kategorien (siehe abilities.js) ein Bot in dieser Hand sofort einsetzen
+// soll. Wird einmal direkt nach dem Austeilen aufgerufen (siehe
+// triggerBotAbilitiesForNewHand() in server.js), nicht bei jedem Zug.
+//
+// Chip-Boost, Pot-Bonus und Spionage haben in diesem einfachen v1-Design
+// keinerlei Nachteil (reiner Bonus bzw. reine Zusatzinformation) – ein
+// rationaler Spieler setzt sie also immer sofort ein, das gilt für Bots
+// genauso wie für Menschen. Nur der Kartentausch ist eine echte
+// Ja/Nein-Entscheidung: die neue Karte ist zufällig, kann die Hand also
+// auch verschlechtern, daher tauscht der Bot nur bei einer erkennbar
+// schwachen Preflop-Hand.
+const CARD_SWAP_STRENGTH_THRESHOLD = 0.4;
+
+function decideAbilityActions(table, botId, tierName, rng = Math.random) {
+  const player = table.players.find((p) => p.id === botId);
+  if (!player || !player.abilities) return [];
+
+  const actions = [];
+  if (!player.abilities.resource.used) actions.push('resource');
+  if (!player.abilities.pot.used) actions.push('pot');
+  if (!player.abilities.intel.used) actions.push('intel');
+  if (!player.abilities.cards.used && preflopStrength(player.holeCards) < CARD_SWAP_STRENGTH_THRESHOLD) {
+    actions.push('cards');
+  }
+  return actions;
+}
+
 function decideBotAction(table, botId, tierName, rng = Math.random) {
   const profile = BOT_PROFILES[tierName] || BOT_PROFILES.Bronze;
   const player = table.players.find((p) => p.id === botId);
@@ -157,4 +185,5 @@ module.exports = {
   handStrength,
   requiredCallStrength,
   decideBotAction,
+  decideAbilityActions,
 };

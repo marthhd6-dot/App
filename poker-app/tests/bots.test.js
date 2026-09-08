@@ -9,6 +9,7 @@ const {
   handStrength,
   requiredCallStrength,
   decideBotAction,
+  decideAbilityActions,
 } = require('../src/bots');
 
 function run(name, fn) {
@@ -242,6 +243,60 @@ run('decideBotAction: gemischte Rang-Stufen am selben Tisch laufen ebenfalls ohn
     playFullHandWithBots(table, tierNames, rng);
     table.players = table.players.filter((p) => p.chips > 0);
   }
+});
+
+run('decideAbilityActions: leere Liste, solange der Bot noch keine Hand mitgespielt hat', () => {
+  const table = new Table({ smallBlind: 5, bigBlind: 10 });
+  table.addPlayer('bot', 'Bot', 500);
+  assert.deepStrictEqual(decideAbilityActions(table, 'bot', 'Bronze'), []);
+});
+
+run('decideAbilityActions: setzt Ressourcen/Pot/Info immer ein, Karten nur bei schwacher Preflop-Hand', () => {
+  const table = new Table({ smallBlind: 5, bigBlind: 10 });
+  table.addPlayer('bot', 'Bot', 500);
+  table.addPlayer('human', 'Mensch', 500);
+  table.startHand();
+
+  const player = table.players.find((p) => p.id === 'bot');
+  player.holeCards = [
+    { rank: 7, suit: 'S' },
+    { rank: 2, suit: 'H' },
+  ]; // klar schwache Preflop-Hand
+
+  const actions = decideAbilityActions(table, 'bot', 'Bronze');
+  assert.ok(actions.includes('resource'));
+  assert.ok(actions.includes('pot'));
+  assert.ok(actions.includes('intel'));
+  assert.ok(actions.includes('cards'));
+});
+
+run('decideAbilityActions: tauscht bei einer starken Preflop-Hand nicht die Karten', () => {
+  const table = new Table({ smallBlind: 5, bigBlind: 10 });
+  table.addPlayer('bot', 'Bot', 500);
+  table.addPlayer('human', 'Mensch', 500);
+  table.startHand();
+
+  const player = table.players.find((p) => p.id === 'bot');
+  player.holeCards = [
+    { rank: 14, suit: 'S' },
+    { rank: 14, suit: 'H' },
+  ]; // Pocket Aces
+
+  const actions = decideAbilityActions(table, 'bot', 'Bronze');
+  assert.ok(!actions.includes('cards'));
+});
+
+run('decideAbilityActions: bereits genutzte Kategorien werden nicht erneut vorgeschlagen', () => {
+  const table = new Table({ smallBlind: 5, bigBlind: 10 });
+  table.addPlayer('bot', 'Bot', 500);
+  table.addPlayer('human', 'Mensch', 500);
+  table.startHand();
+  table.useAbility('bot', 'resource');
+  table.useAbility('bot', 'intel');
+
+  const actions = decideAbilityActions(table, 'bot', 'Bronze');
+  assert.ok(!actions.includes('resource'));
+  assert.ok(!actions.includes('intel'));
 });
 
 console.log('\nAlle Tests durchgelaufen.');

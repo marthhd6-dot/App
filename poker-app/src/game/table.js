@@ -9,6 +9,12 @@
 
 const { createDeck, shuffle, draw } = require('./deck');
 const { determineWinners } = require('./handEvaluator');
+const {
+  assignAbilities,
+  describeAbilitiesForClient,
+  ABILITY_CHIP_BOOST_RATE,
+  ABILITY_POT_BONUS_RATE,
+} = require('./abilities');
 
 const PHASES = ['waiting', 'preflop', 'flop', 'turn', 'river', 'showdown'];
 
@@ -27,6 +33,7 @@ class Table {
     this.actingIndex = -1; // Index des Spielers, der am Zug ist (-1 = niemand/Runde fertig)
     this.lastHandResult = null;
     this._firstHandDealt = false;
+    this.spyReveals = []; // siehe _applySpy(), pro Hand neu befüllt in startHand()
   }
 
   addPlayer(id, name, chips = 1000) {
@@ -42,6 +49,7 @@ class Table {
       hasActed: false,
       disconnected: false,
       totalContributed: 0,
+      abilities: null, // erst ab der ersten Hand zugewiesen, siehe startHand()
     });
   }
 
@@ -90,7 +98,13 @@ class Table {
       p.bet = 0;
       p.hasActed = false;
       p.totalContributed = 0;
+      // Jede Hand neu: eine frische, ungenutzte Fähigkeit pro Kategorie
+      // (Karten/Wette-Pot/Info-Gegner/Ressourcen), siehe abilities.js.
+      p.abilities = assignAbilities();
     });
+    // Wer in dieser Hand wessen Karte "spioniert" hat (siehe useAbility()
+    // unten) – pro Hand neu, gilt nur bis zum nächsten startHand().
+    this.spyReveals = [];
 
     // Dealer-Button vor jeder Hand außer der ersten weiterrücken
     if (this._firstHandDealt) {
@@ -279,6 +293,101 @@ class Table {
     this._advanceActingIndex();
   }
 
+  // --- Fähigkeiten -----------------------------------------------------------
+  //
+  // Anders als fold/check/call/bet/raise ist useAbility() keine
+  // Wettrunden-Aktion: sie ist nicht an den Zug gebunden (jeder Spieler
+  // kann seine Fähigkeiten jederzeit während einer laufenden Hand einsetzen,
+  // unabhängig davon, wer gerade am Zug ist) und rührt actingIndex/
+  // hasActed nicht an.
+
+  // Setzt eine der vier Fähigkeiten-Kategorien dieses Spielers für die
+  // laufende Hand ein. Wirft, wenn keine Hand läuft, der Spieler bereits
+  // gefoldet hat, die Kategorie unbekannt ist oder ihr Slot in dieser Hand
+  // schon benutzt wurde.
+  useAbility(playerId, category) {
+    if (this.phase === 'waiting' || this.phase === 'showdown') {
+      throw new Error('Keine laufende Hand, um eine Fähigkeit einzusetzen.');
+    }
+    const player = this.players.find((p) => p.id === playerId);
+    if (!player) {
+      throw new Error(`Spieler ${playerId} sitzt nicht an diesem Tisch.`);
+    }
+    if (player.folded) {
+      throw new Error('Gefoldete Spieler können keine Fähigkeit mehr einsetzen.');
+    }
+    const slot = player.abilities && player.abilities[category];
+    if (!slot) {
+      throw new Error(`Unbekannte Fähigkeits-Kategorie "${category}".`);
+    }
+    if (slot.used) {
+      throw new Error('Diese Fähigkeit wurde in dieser Hand bereits eingesetzt.');
+    }
+
+    switch (slot.id) {
+      case 'cardSwap':
+        this._applyCardSwap(player);
+        break;
+      case 'chipBoost':
+        this._applyChipBoost(player);
+        break;
+      case 'potBonus':
+        // Wirkt erst beim Hand-Ende, siehe _applyPotBonusIfActive() weiter
+        // unten (in _checkWinByFold() und showdown() aufgerufen).
+        slot.active = true;
+        break;
+      case 'spy':
+        this._applySpy(player);
+        break;
+      default:
+        throw new Error(`Unbekannte Fähigkeit "${slot.id}".`);
+    }
+    slot.used = true;
+    return { ability: slot.id };
+  }
+
+  // Tauscht eine zufällige der beiden Hole Cards gegen eine neue vom Deck.
+  // Die alte Karte wird verworfen statt zurück ins Deck gemischt (bei einem
+  // 52-Karten-Deck und maximal 4 Spielern bleibt so oder so reichlich
+  // Reserve für Board + weitere Fähigkeiten-Einsätze in derselben Hand).
+  _applyCardSwap(player) {
+    const index = Math.random() < 0.5 ? 0 : 1;
+    const { drawn, remaining } = draw(this.deck, 1);
+    this.deck = remaining;
+    player.holeCards[index] = drawn[0];
+  }
+
+  // Schreibt sofort einen Chip-Bonus gut, finanziert vom "System", nicht von
+  // anderen Spielern – mindestens 1 Chip, damit die Fähigkeit auch bei
+  // einem sehr kleinen Stack spürbar etwas bringt.
+  _applyChipBoost(player) {
+    const bonus = Math.max(1, Math.round(player.chips * ABILITY_CHIP_BOOST_RATE));
+    player.chips += bonus;
+  }
+
+  // Deckt eine zufällige Hole Card eines zufälligen, noch nicht gefoldeten
+  // Gegners auf – nur für den einsetzenden Spieler sichtbar (siehe
+  // getPublicState() unten). Kein Effekt (aber auch kein Fehler), falls kein
+  // Gegner mehr im Spiel ist.
+  _applySpy(player) {
+    const opponents = this.players.filter((p) => p.id !== player.id && !p.folded);
+    if (opponents.length === 0) return;
+    const target = opponents[Math.floor(Math.random() * opponents.length)];
+    const cardIndex = Math.floor(Math.random() * target.holeCards.length);
+    this.spyReveals.push({ viewerId: player.id, targetId: target.id, cardIndex });
+  }
+
+  // Erhöht baseShare um ABILITY_POT_BONUS_RATE, falls der Spieler seinen
+  // Pot-Bonus-Slot in dieser Hand aktiviert hat (siehe useAbility() oben) –
+  // sonst unverändert. Wird sowohl bei einem Sieg durch Fold als auch beim
+  // echten Showdown auf den tatsächlichen Chip-Zuwachs angewendet.
+  _applyPotBonusIfActive(player, baseShare) {
+    if (player.abilities?.pot?.active) {
+      return Math.round(baseShare * (1 + ABILITY_POT_BONUS_RATE));
+    }
+    return baseShare;
+  }
+
   // --- Interne Helfer --------------------------------------------------------
 
   // Ein Bet oder Raise zwingt alle anderen noch spielenden Spieler erneut zum
@@ -310,14 +419,15 @@ class Table {
     const contenders = this.players.filter((p) => !p.folded);
     if (contenders.length !== 1) return false;
     const winner = contenders[0];
-    const potShare = this.pot;
+    const amount = this.pot;
+    const potShare = this._applyPotBonusIfActive(winner, amount);
     winner.chips += potShare;
     this.pot = 0;
     this.phase = 'showdown';
     this.actingIndex = -1;
     this.lastHandResult = {
       reason: 'fold',
-      pots: [{ amount: potShare, winners: [{ id: winner.id, name: winner.name }], potShare }],
+      pots: [{ amount, winners: [{ id: winner.id, name: winner.name }], potShare }],
     };
     return true;
   }
@@ -376,14 +486,21 @@ class Table {
       const eligiblePlayers = this.players.filter((p) => potLayer.eligiblePlayerIds.includes(p.id));
       const { winnerIndexes } = determineWinners(eligiblePlayers, this.communityCards);
       const winners = winnerIndexes.map((i) => eligiblePlayers[i]);
-      const share = Math.floor(potLayer.amount / winners.length);
+      const baseShare = Math.floor(potLayer.amount / winners.length);
       winners.forEach((w) => {
-        w.chips += share;
+        w.chips += this._applyPotBonusIfActive(w, baseShare);
       });
+      // Bei genau einem Gewinner (der weit überwiegende Fall) zeigt
+      // potShare den tatsächlich inkl. Pot-Bonus ausgezahlten Betrag. Bei
+      // einem seltenen Split-Pot mit mehreren Gewinnern bleibt potShare der
+      // reine Basis-Anteil (ein einzelner Anzeigewert für ggf. mehrere
+      // Namen, siehe potLines in app.js) – individuelle Pot-Boni fließen
+      // dort trotzdem korrekt in die tatsächlichen Chip-Stände ein.
+      const potShare = winners.length === 1 ? this._applyPotBonusIfActive(winners[0], baseShare) : baseShare;
       return {
         amount: potLayer.amount,
         winners: winners.map((w) => ({ id: w.id, name: w.name })),
-        potShare: share,
+        potShare,
       };
     });
 
@@ -466,6 +583,11 @@ class Table {
           p.id === forPlayerId ||
           extraVisibleIds.includes(p.id) ||
           (revealAtShowdown && !p.folded);
+        // Spionage (siehe _applySpy()): deckt für forPlayerId gezielt eine
+        // einzelne Hole Card eines Gegners auf, unabhängig von visible –
+        // nur relevant, wenn dessen Karten sonst verborgen blieben (visible
+        // zeigt ja bereits beide Karten).
+        const spied = !visible && this.spyReveals.find((s) => s.viewerId === forPlayerId && s.targetId === p.id);
         return {
           id: p.id,
           name: p.name,
@@ -475,6 +597,12 @@ class Table {
           isAllIn: p.isAllIn,
           disconnected: p.disconnected,
           holeCards: visible ? p.holeCards : null,
+          spiedCard: spied ? p.holeCards[spied.cardIndex] : null,
+          // Die eigenen Fähigkeits-Karten (siehe abilities.js) sind privat –
+          // andere Spieler bekommen hier null, nur forPlayerId sieht seine
+          // eigenen vier Kategorien samt Name/Icon/Beschreibung und
+          // used-Status.
+          abilities: p.id === forPlayerId ? describeAbilitiesForClient(p.abilities) : null,
         };
       }),
     };

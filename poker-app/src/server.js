@@ -86,7 +86,7 @@ const {
 } = require('./ranking');
 const { blindsForHandsPlayed } = require('./blinds');
 const { pickBotNames } = require('./botNames');
-const { BOT_TIER_NAMES, decideBotAction } = require('./bots');
+const { BOT_TIER_NAMES, decideBotAction, decideAbilityActions } = require('./bots');
 
 const app = express();
 const server = http.createServer(app);
@@ -662,6 +662,24 @@ io.on('connection', (socket) => {
       }
       table.startHand();
     });
+    // Nur wenn startHand() oben tatsächlich erfolgreich war (Phase ist dann
+    // 'preflop') – schlägt sie fehl (z. B. <2 Spieler), hat handleAction()
+    // den Fehler schon an den Client gemeldet, hier gibt es dann nichts zu
+    // tun. Eigener Schritt statt Teil von handleAction()'s Callback, weil
+    // Fähigkeiten pro Hand (nicht pro Aktion) ausgelöst werden.
+    const table = code && rooms.getTable(code);
+    if (table && table.phase === 'preflop') triggerBotAbilitiesForNewHand(code, table);
+  });
+
+  // Setzt eine der vier Fähigkeiten-Kategorien des Spielers für die laufende
+  // Hand ein (siehe Table.useAbility() in table.js). Anders als
+  // fold/check/call/bet/raise keine Wettrunden-Aktion: nicht an den Zug
+  // gebunden, jeder kann seine Fähigkeiten jederzeit während einer
+  // laufenden Hand einsetzen. handleAction() übernimmt trotzdem denselben
+  // Ablauf (Validierung, State-Broadcast, Persistenz), da useAbility() bei
+  // einem ungültigen Versuch ganz normal wirft.
+  socket.on('use-ability', ({ category } = {}) => {
+    handleAction(socket, (table) => table.useAbility(socket.id, category));
   });
 
   socket.on('fold', () => {
@@ -1392,6 +1410,38 @@ function maybeTriggerBotActions(code) {
 
     maybeTriggerBotActions(code); // ggf. ist gleich der nächste Bot dran
   }, botThinkDelayMs());
+}
+
+// Lässt jeden Bot am Tisch direkt nach dem Austeilen (siehe start-hand
+// weiter oben) einmalig entscheiden, welche seiner vier frischen
+// Fähigkeiten-Kategorien er sofort einsetzt (siehe decideAbilityActions()
+// in bots.js) – anders als maybeTriggerBotActions() also nicht an den Zug
+// gebunden, sondern einmal pro Hand für ALLE Bots am Tisch gleichzeitig.
+// Ein einzelner fehlgeschlagener Versuch (sollte dank decideAbilityActions()
+// nie vorkommen) wird übersprungen statt die restliche Hand zu blockieren.
+function triggerBotAbilitiesForNewHand(code, table) {
+  const entry = getMatchEntry(code);
+  if (!entry || !entry.bots || entry.bots.size === 0) return;
+
+  let changed = false;
+  for (const [botId, botInfo] of entry.bots) {
+    const player = table.players.find((p) => p.id === botId);
+    if (!player || !player.abilities) continue;
+    const actions = decideAbilityActions(table, botId, botInfo.tier);
+    for (const category of actions) {
+      try {
+        table.useAbility(botId, category);
+        changed = true;
+      } catch {
+        // Sollte dank decideAbilityActions() nie passieren – einfach
+        // überspringen, statt die restliche Hand zu blockieren.
+      }
+    }
+  }
+  if (changed) {
+    broadcastRoomState(code);
+    persist();
+  }
 }
 
 // Schickt jedem Socket im Raum seine eigene Sicht auf den Tisch (fremde
