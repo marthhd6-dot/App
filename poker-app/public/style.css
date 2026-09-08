@@ -775,6 +775,76 @@ button:disabled {
   margin-top: 2px;
 }
 
+/* Verdeckte Mini-Karten am Sitzplatz eines Gegners – zeigt nur "hält noch
+   Karten", nichts über den Inhalt. Leicht gegeneinander gekippt wie eine
+   in der Hand gehaltene, gefächerte Karte. */
+.seat-cards {
+  display: flex;
+  margin-top: 3px;
+}
+
+.mini-card-back {
+  display: block;
+  width: 14px;
+  height: 20px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--table-green-dark) 0 3px,
+    var(--table-green-mid) 3px 6px
+  );
+  border: 1px solid rgba(232, 191, 74, 0.55);
+  box-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.5);
+}
+
+.mini-card-back:first-child {
+  transform: rotate(-7deg);
+  margin-right: -4px;
+}
+
+.mini-card-back:last-child {
+  transform: rotate(7deg);
+}
+
+/* Eigene Deal-In-Varianten statt der gemeinsamen .card.deal-in-Animation:
+   die endet bei rotate(0) und würde sonst den gefächerten Kippwinkel oben
+   (:first-child/:last-child) im Moment des Austeilens kurzzeitig aufheben. */
+.mini-card-back:first-child.deal-in {
+  animation: deal-in-fan-left 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.mini-card-back:last-child.deal-in {
+  animation: deal-in-fan-right 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@keyframes deal-in-fan-left {
+  0% {
+    transform: translateY(-40px) scale(0.4) rotate(-12deg);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(4px) scale(1.05) rotate(-9deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(-7deg);
+  }
+}
+
+@keyframes deal-in-fan-right {
+  0% {
+    transform: translateY(-40px) scale(0.4) rotate(12deg);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(4px) scale(1.05) rotate(9deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(7deg);
+  }
+}
+
 .badge {
   display: inline-block;
   background: rgba(255, 255, 255, 0.15);
@@ -1284,6 +1354,10 @@ button:disabled {
   }
   .seat-chips {
     font-size: 0.66rem;
+  }
+  .mini-card-back {
+    width: 11px;
+    height: 16px;
   }
   .community-row .card {
     width: 34px;

@@ -117,9 +117,19 @@ Chip-Stände definiert.
   Spieler dran ist und die Aktion gerade gültig ist) und die
   Gewinner-Anzeige am Ende einer Hand. Optisch als ovaler Tisch mit
   Holz-Rail: Sitzplätze kreisförmig um den Tisch (eigener Platz immer
-  unten in der Mitte), animiertes Karten-Austeilen, ein pulsierender
-  Rahmen um den aktiven Spieler, Konfetti bei einem eigenen Sieg, und
-  eine identische Optik für Ranked-Warteschlange und Bestenliste.
+  unten in der Mitte), animiertes Karten-Austeilen (siehe unten), ein
+  pulsierender Rahmen um den aktiven Spieler, Konfetti bei einem eigenen
+  Sieg, und eine identische Optik für Ranked-Warteschlange und Bestenliste.
+- **Deal-Animationen** (`public/app.js`/`style.css`): Community Cards und
+  die eigenen Hole Cards fliegen beim Austeilen mit Stagger-Delay ein
+  (`.deal-in`, siehe `renderCommunityCards()`/`renderMyCards()`), erkannt
+  über `isNewHand` (Phase wechselt zu `preflop`). Zusätzlich zeigt
+  `renderSeats()` an jedem Sitzplatz eines Gegners, der noch im Spiel ist
+  und dessen Karten für mich nicht sichtbar sind, zwei kleine, gefächerte
+  verdeckte Mini-Karten (`.mini-card-back`) – sie fliegen beim Start einer
+  Hand reihum ein (zwei Runden mit `n` Sitzplätzen Versatz, wie
+  `Table.startHand()` intern austeilt), damit das Austeilen am ganzen Tisch
+  sichtbar ist statt nur bei der eigenen Hand.
 - **Mehrere Tische/Räume** (`rooms.js`): `create-room` legt einen neuen
   Tisch mit 4-stelligem Code an, `join-room` tritt einem bestehenden Raum
   bei. Jeder Raum hat einen komplett unabhängigen Tisch-Zustand; ein
