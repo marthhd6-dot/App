@@ -225,6 +225,23 @@ Chip-Stände definiert.
   wird nach wie vor ausschließlich server-seitig in `placeBet()`/`raise()`.
   Zu Beginn eines eigenen Zugs springt der Regler frisch auf das Minimum,
   statt einen Betrag aus einer ganz anderen Wettrunde stehen zu lassen.
+- **Größere, deutlicher lesbare Karten** (`style.css`): die eigenen Hole
+  Cards und die des Teammitglieds (`.my-card-row .card`, geteilte Klasse
+  für `#my-cards`/`#teammate-cards`) sind spürbar größer als Community
+  Cards (60×84 → 76×106 px), und auch die Basisgröße für Community Cards
+  sowie die beim Showdown aufgedeckten Gegner-Hände (`.card`, sowohl die
+  große Auflistung in `#showdown-reveal` als auch die kleinen gefächerten
+  Karten direkt am Sitzplatz, `.seat-cards .card`) wurde vergrößert.
+  Zusätzlich sind Eckindizes (Rang) und das große Symbol in der Mitte
+  (`.card-corner`/`.card-suit-big`) deutlich größer skaliert, damit Rang
+  und Farbe auch über den Tisch hinweg auf einen Blick eindeutig lesbar
+  sind – die Rang-Zahl/-Buchstabe selbst (`.card-rank`, eigene Klasse für
+  den ersten `<span>` in `.card-corner`) sitzt dabei nochmal deutlich
+  größer als das kleine Farbsymbol direkt daneben (`.card-suit-mini`), wie
+  auf einer echten Spielkarte. Eigene Mobile-Breakpoints
+  (`@media (max-width: 640px)`) skalieren
+  Community Cards und eigene Karten proportional zurück, damit auf
+  schmalen Bildschirmen nichts überläuft.
 - **Mehrere Tische/Räume** (`rooms.js`): `create-room` legt einen neuen
   Tisch mit 4-stelligem Code an, `join-room` tritt einem bestehenden Raum
   bei. Jeder Raum hat einen komplett unabhängigen Tisch-Zustand; ein

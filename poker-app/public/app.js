@@ -784,9 +784,9 @@ function cardOuterHtml(card) {
   const rank = RANK_LABELS[card.rank] || card.rank;
   const suit = SUIT_SYMBOLS[card.suit];
   return `<div class="card${isRedSuit(card.suit) ? ' red' : ''}">
-    <span class="card-corner card-corner-top"><span>${rank}</span><span class="card-suit-mini">${suit}</span></span>
+    <span class="card-corner card-corner-top"><span class="card-rank">${rank}</span><span class="card-suit-mini">${suit}</span></span>
     <span class="card-suit-big">${suit}</span>
-    <span class="card-corner card-corner-bottom"><span>${rank}</span><span class="card-suit-mini">${suit}</span></span>
+    <span class="card-corner card-corner-bottom"><span class="card-rank">${rank}</span><span class="card-suit-mini">${suit}</span></span>
   </div>`;
 }
 

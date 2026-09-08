@@ -868,10 +868,10 @@ button:disabled {
    Kartenrückseite, damit klar wird, gegen welche Hand man gewonnen/
    verloren hat. */
 .seat-cards .card {
-  width: 26px;
-  height: 36px;
+  width: 32px;
+  height: 44px;
   border-radius: 4px;
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   box-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.5);
 }
 
@@ -1114,7 +1114,7 @@ button:disabled {
   display: flex;
   gap: 8px;
   justify-content: center;
-  min-height: 64px;
+  min-height: 76px;
   margin-bottom: 20px;
   /* Tiefenwirkung für den rotateY-Flip in @keyframes deal-in */
   perspective: 600px;
@@ -1122,8 +1122,8 @@ button:disabled {
 
 .card {
   position: relative;
-  width: 46px;
-  height: 64px;
+  width: 54px;
+  height: 76px;
   background: linear-gradient(160deg, #ffffff, #eae7dd);
   color: #1a1a1a;
   border-radius: 8px;
@@ -1132,7 +1132,7 @@ button:disabled {
   justify-content: center;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15), 0 8px 16px -4px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
@@ -1142,25 +1142,34 @@ button:disabled {
 }
 
 /* Eckindizes (Rang + Symbol) oben links und gespiegelt unten rechts, wie
-   auf echten Spielkarten, plus ein großes Symbol mittig. */
+   auf echten Spielkarten, plus ein großes Symbol mittig. Größer und
+   kontrastreicher als früher (0.34em/1.55em), damit Rang und Farbe auch
+   auf einen Blick über den Tisch hinweg eindeutig lesbar sind. */
 .card-corner {
   position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
   line-height: 1;
-  font-size: 0.34em;
+  font-size: 0.48em;
 }
 
 .card-corner-top {
-  top: 5%;
+  top: 6%;
   left: 10%;
 }
 
 .card-corner-bottom {
-  bottom: 5%;
+  bottom: 6%;
   right: 10%;
   transform: rotate(180deg);
+}
+
+/* Der Rang (Zahl/Buchstabe) steht extra groß, deutlich größer als das
+   kleine Farbsymbol daneben (.card-suit-mini) – auf echten Spielkarten
+   ist die Zahl selbst das auffälligste Element der Eckindizes. */
+.card-rank {
+  font-size: 1.15em;
 }
 
 .card-suit-mini {
@@ -1169,8 +1178,9 @@ button:disabled {
 }
 
 .card-suit-big {
-  font-size: 1.55em;
-  opacity: 0.9;
+  font-size: 1.9em;
+  opacity: 0.95;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
 }
 
 .card.deal-in {
@@ -1220,9 +1230,9 @@ button:disabled {
 }
 
 .my-card-row .card {
-  width: 60px;
-  height: 84px;
-  font-size: 1.5rem;
+  width: 76px;
+  height: 106px;
+  font-size: 1.85rem;
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18), 0 14px 26px -6px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
@@ -1717,8 +1727,13 @@ button:disabled {
     height: 16px;
   }
   .community-row .card {
-    width: 34px;
-    height: 48px;
-    font-size: 0.9rem;
+    width: 40px;
+    height: 56px;
+    font-size: 1rem;
+  }
+  .my-card-row .card {
+    width: 60px;
+    height: 84px;
+    font-size: 1.5rem;
   }
 }
