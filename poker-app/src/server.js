@@ -27,9 +27,11 @@
 // Rating der Wartenden passenden Rang-Stufe auf (tierForRating()), damit
 // niemand unbegrenzt warten muss. Bots nehmen dabei wie echte Mit-/
 // Gegenspieler am Match teil (auch Ranked-Rating-Auswirkung für die
-// Menschen), haben aber selbst keinen dauerhaften Account – ihr Name macht
-// sie transparent erkennbar ("Gold-Bot 1" o. Ä.), ihr Rating wird nie
-// gespeichert. decideBotAction() (siehe bots.js) liefert ihre Züge, die
+// Menschen), haben aber selbst keinen dauerhaften Account. Ihr Name wird
+// zufällig aus einem Pool menschlich klingender Nutzernamen gewählt
+// (pickBotNames() in botNames.js), damit sie sich nicht schon am Namen von
+// echten Spielern unterscheiden; ihr Rating wird nie gespeichert.
+// decideBotAction() (siehe bots.js) liefert ihre Züge, die
 // nach jeder Aktion mit einer kurzen "Bedenkzeit" automatisch nachgezogen
 // werden (siehe maybeTriggerBotActions()).
 //
@@ -83,6 +85,7 @@ const {
   applyTeamMatchResult,
 } = require('./ranking');
 const { blindsForHandsPlayed } = require('./blinds');
+const { pickBotNames } = require('./botNames');
 const { BOT_TIER_NAMES, decideBotAction } = require('./bots');
 
 const app = express();
@@ -247,16 +250,17 @@ function maybeBackfillQueueWithBots(queue, groupSize) {
   const avgRating =
     humanEntries.reduce((sum, e) => sum + getOrCreateRank(e.name).rating, 0) / humanEntries.length;
 
-  const botEntries = [];
-  for (let i = 0; i < botsNeeded; i++) {
-    const tier = tierForRating(Math.round(avgRating));
-    botEntries.push({
-      id: nextBotId(),
-      name: botsNeeded > 1 ? `${tier}-Bot ${i + 1}` : `${tier}-Bot`,
-      rating: avgRating,
-      tier,
-    });
-  }
+  const tier = tierForRating(Math.round(avgRating));
+  const names = pickBotNames(
+    botsNeeded,
+    humanEntries.map((e) => e.name)
+  );
+  const botEntries = names.map((name) => ({
+    id: nextBotId(),
+    name,
+    rating: avgRating,
+    tier,
+  }));
   return [...humanEntries, ...botEntries];
 }
 
@@ -523,10 +527,10 @@ io.on('connection', (socket) => {
     markOnline(socket, trimmedName);
 
     const bots = new Map();
+    const botNames = pickBotNames(count, [trimmedName]);
     for (let i = 0; i < count; i++) {
       const botId = nextBotId();
-      const botName = count > 1 ? `${tierName}-Bot ${i + 1}` : `${tierName}-Bot`;
-      table.addPlayer(botId, botName);
+      table.addPlayer(botId, botNames[i]);
       bots.set(botId, { tier: tierName, rating: null });
     }
     botRooms.set(code, { bots, eliminatedOrder: [], handsPlayed: 0 });
