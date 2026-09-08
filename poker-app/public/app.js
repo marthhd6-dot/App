@@ -864,7 +864,11 @@ function render(state) {
 
   const isMyTurn = state.actingPlayerId === mySocketId;
   const canAct = isMyTurn && me && !me.folded;
-  const betsMatch = me ? me.bet === state.currentBet : false;
+  // ">=" statt "===": Postet ein kurzgestapelter Big Blind weniger als den
+  // vollen Big Blind (All-in-Blind), kann currentBet unter dem eigenen
+  // Einsatz liegen (siehe table.js check()) – dann ist Check weiterhin die
+  // richtige Aktion, nicht Call.
+  const betsMatch = me ? me.bet >= state.currentBet : false;
 
   foldBtn.disabled = !canAct;
   checkBtn.disabled = !canAct || !betsMatch;

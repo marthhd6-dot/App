@@ -90,7 +90,13 @@ Chip-Stände definiert.
 - Grundstruktur für einen Tisch mit mehreren Spielern
 - **Wettrunden-Logik** in `table.js`: `placeBet`, `raise`, `call`, `check`,
   `fold`, inklusive Zugreihenfolge, Big-Blind-Option, Mindest-Raise,
-  All-In-Behandlung und automatischem Rundenabschluss
+  All-In-Behandlung und automatischem Rundenabschluss. `check()` und
+  `isBettingRoundComplete()` vergleichen den eigenen Einsatz mit
+  `>=` statt `===` gegen `currentBet`: Postet ein kurzgestapelter Big
+  Blind weniger als den vollen Big Blind (All-in-Blind), kann `currentBet`
+  unter dem Einsatz des Small Blind liegen – der darf dann trotzdem
+  checken, statt in einer Sackgasse zu landen (weder exaktes `check()`
+  noch `call()` mit `owed > 0` wären sonst möglich gewesen).
 - **Side Pots**: Sind mehrere Spieler mit unterschiedlich hohen Stacks
   all-in, teilt `Table._computePots()` den Pot beim Showdown korrekt in
   Haupt- und Neben-Pots auf – jeder Layer ist nur unter den Spielern zu

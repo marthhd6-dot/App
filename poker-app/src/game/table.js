@@ -187,7 +187,14 @@ class Table {
 
   check(playerId) {
     const player = this._assertPlayersTurn(playerId);
-    if (player.bet !== this.currentBet) {
+    // "< " statt "!==": Ist der Big Blind kurzgestapelt und postet weniger
+    // als den vollen Big Blind (All-in-Blind), kann currentBet unter dem
+    // Einsatz des Small Blind liegen – der Small Blind hat dann bereits
+    // mehr eingesetzt, als aktuell gefordert ist, und darf trotzdem
+    // checken (nichts nachzuzahlen), statt in einer Sackgasse zu landen,
+    // in der weder check() (exakte Gleichheit) noch call() (owed > 0)
+    // erlaubt wären.
+    if (player.bet < this.currentBet) {
       throw new Error('Check nicht möglich, es liegt bereits ein Einsatz vor. Nutze call oder raise.');
     }
     player.hasActed = true;
@@ -328,13 +335,17 @@ class Table {
   }
 
   // Eine Wettrunde ist abgeschlossen, wenn jeder verbleibende Spieler entweder
-  // all-in ist oder (gehandelt hat UND den aktuellen Einsatz gematcht hat).
+  // all-in ist oder (gehandelt hat UND den aktuellen Einsatz mindestens
+  // gematcht hat). ">=" statt "===", damit ein Small Blind, der wegen eines
+  // kurzgestapelten Big-Blind-All-ins bereits mehr eingesetzt hat als
+  // currentBet, nach einem check() korrekt als "fertig" zählt (siehe
+  // check() weiter oben für dasselbe Prinzip).
   isBettingRoundComplete() {
     const contenders = this.players.filter((p) => !p.folded);
     if (contenders.length <= 1) return true;
     const toAct = contenders.filter((p) => !p.isAllIn);
     if (toAct.length === 0) return true;
-    return toAct.every((p) => p.hasActed && p.bet === this.currentBet);
+    return toAct.every((p) => p.hasActed && p.bet >= this.currentBet);
   }
 
   getCurrentPlayer() {
