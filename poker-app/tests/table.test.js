@@ -306,6 +306,15 @@ run('getPublicState zeigt den disconnected-Status pro Spieler', () => {
   assert.strictEqual(b.disconnected, false);
 });
 
+run('getPublicState liefert bigBlind und minRaise mit (für die Bet-Grenzen im Frontend)', () => {
+  const table = makeTable(['a', 'b'], { smallBlind: 5, bigBlind: 10 });
+  table.startHand();
+
+  const state = table.getPublicState('a');
+  assert.strictEqual(state.bigBlind, 10);
+  assert.strictEqual(state.minRaise, 10); // direkt nach den Blinds: minRaise = bigBlind
+});
+
 run('getPublicState: extraVisibleIds macht zusätzlich die Karten anderer Spieler sichtbar (z. B. Teammitglied)', () => {
   const table = makeTable(['a', 'b', 'c']);
   table.startHand();

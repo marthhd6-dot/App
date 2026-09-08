@@ -209,6 +209,22 @@ Chip-Stände definiert.
   `seatPositionForPlayer()`) berechnet die Kreisposition eines Sitzplatzes
   einmal zentral, damit sowohl `renderSeats()` als auch alle Effekt-
   Funktionen dieselbe Formel nutzen, statt sie zu duplizieren.
+- **Bet-Schieberegler mit ¼-/½-Pot- und All-In-Schnellwahl** (`#bet-sizer`
+  in `index.html`, `renderBetSizer()`/`setBetSizerValue()` in `app.js`):
+  Statt den Betrag nur eintippen zu können, lässt sich der Bet-/Raise-Betrag
+  jetzt auch per Regler ziehen oder über drei Schnellwahl-Knöpfe (¼ Pot,
+  ½ Pot, All-In) setzen – alle drei Bedienwege schreiben denselben Wert in
+  das jeweils aktive Betrag-Feld (`bet-input` im Bet-Modus, `raise-input`
+  im Raise-Modus; welches gerade aktiv ist, richtet sich wie zuvor nach
+  `state.currentBet`), sodass der bestehende "Bet"/"Raise"-Knopf zum
+  Abschicken weiterhin unverändert funktioniert. Die legalen Grenzen
+  (Mindesteinsatz = großer Blind bzw. Mindest-Raise-Schritt, Maximum = das
+  eigene Chip-Guthaben fürs All-In) berechnet `renderBetSizer()` aus
+  `state.bigBlind`/`state.minRaise` – zwei neue Felder, die `getPublicState()`
+  in `table.js` jetzt mitschickt, rein zur Anzeige; verbindlich validiert
+  wird nach wie vor ausschließlich server-seitig in `placeBet()`/`raise()`.
+  Zu Beginn eines eigenen Zugs springt der Regler frisch auf das Minimum,
+  statt einen Betrag aus einer ganz anderen Wettrunde stehen zu lassen.
 - **Mehrere Tische/Räume** (`rooms.js`): `create-room` legt einen neuen
   Tisch mit 4-stelligem Code an, `join-room` tritt einem bestehenden Raum
   bei. Jeder Raum hat einen komplett unabhängigen Tisch-Zustand; ein

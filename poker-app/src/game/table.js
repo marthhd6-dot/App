@@ -451,6 +451,13 @@ class Table {
       pot: this.pot,
       communityCards: this.communityCards,
       currentBet: this.currentBet,
+      // bigBlind/minRaise: nötig, damit das Frontend die legalen Grenzen für
+      // Bet/Raise kennt (Mindesteinsatz bzw. Mindest-Raise-Schritt) – für
+      // den Bet-Schieberegler samt Schnellwahl-Knöpfen (¼/½ Pot, All-In),
+      // siehe renderBetSizer() in app.js. Server-seitig bleibt placeBet()/
+      // raise() weiterhin die einzige verbindliche Validierung.
+      bigBlind: this.bigBlind,
+      minRaise: this.minRaise,
       actingPlayerId: this.getCurrentPlayer()?.id ?? null,
       dealerPlayerId: this.players[this.dealerIndex]?.id ?? null,
       lastHandResult: this.lastHandResult,

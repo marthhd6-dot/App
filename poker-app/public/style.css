@@ -1283,6 +1283,93 @@ button:disabled {
   gap: 6px;
 }
 
+/* Bet-Schieberegler + ¼/½-Pot-/All-In-Schnellwahl: eigene, volle Zeile
+   innerhalb der Aktions-Konsole (siehe .action-bar), damit der Regler
+   genug Breite zum Ziehen hat. flex-basis: 100% erzwingt den Umbruch vor
+   den übrigen Aktions-Knöpfen, unabhängig von der Fensterbreite. */
+.bet-sizer {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.bet-sizer-disabled {
+  opacity: 0.45;
+}
+
+.bet-sizer-quick {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-allin {
+  background: linear-gradient(135deg, #ff8a8a, var(--danger));
+  color: #2b0d0d;
+  box-shadow: 0 3px 0 #a23636, 0 8px 18px -6px rgba(255, 92, 92, 0.45);
+}
+
+.bet-sizer-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Eigener Chip-artiger Slider-"Daumen" statt des Browser-Standards, damit
+   der Regler zum Rest der Casino-Optik passt (Gold-Verlauf wie ein
+   Poker-Chip, siehe .chip-stack-mini). */
+#bet-amount-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  max-width: 360px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+#bet-amount-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--accent-bright), var(--accent) 75%);
+  border: 2px dashed rgba(255, 255, 255, 0.65);
+  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+#bet-amount-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--accent-bright), var(--accent) 75%);
+  border: 2px dashed rgba(255, 255, 255, 0.65);
+  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+#bet-amount-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+.bet-amount-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--accent-bright);
+  min-width: 48px;
+  text-align: left;
+}
+
 .bet-control input {
   width: 116px;
   padding: 10px 12px;
