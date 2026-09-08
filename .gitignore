@@ -8,3 +8,13 @@ poker-app/ios/App/build/
 poker-app/ios/App/DerivedData/
 poker-app/ios/**/*.xcuserstate
 poker-app/ios/**/xcuserdata/
+
+# Android-Projekt (Capacitor) – dieselbe Idee: nur generierte/lokale
+# Build-/IDE-Dateien, der eigene android/.gitignore deckt den Rest bereits
+# ab (build/, .gradle/, local.properties, kopierte Web-Assets …), diese
+# Zeilen sind zusätzliche Absicherung auf Repo-Ebene.
+poker-app/android/**/build/
+poker-app/android/.gradle/
+poker-app/android/local.properties
+poker-app/android/**/*.iml
+poker-app/android/.idea/

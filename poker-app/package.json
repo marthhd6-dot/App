@@ -11,9 +11,11 @@
     "start": "node src/server.js",
     "test": "node tests/handEvaluator.test.js && node tests/table.test.js && node tests/rooms.test.js && node tests/persistence.test.js && node tests/ranking.test.js && node tests/blinds.test.js && node tests/bots.test.js && node tests/botNames.test.js",
     "cap:sync": "cap sync",
-    "cap:open:ios": "cap open ios"
+    "cap:open:ios": "cap open ios",
+    "cap:open:android": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.1",
     "@capacitor/core": "^8.5.1",
     "@capacitor/ios": "^8.5.1",
     "better-sqlite3": "^13.0.3",

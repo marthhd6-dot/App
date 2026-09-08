@@ -13,6 +13,7 @@ poker-app/
 ├── package.json
 ├── capacitor.config.json     # Native-App-Konfiguration (siehe "Native App" unten)
 ├── ios/                      # Generiertes Xcode-Projekt (Capacitor), Bauen nur auf macOS
+├── android/                  # Generiertes Gradle-Projekt (Capacitor), Bauen via Android Studio/SDK
 ├── public/                   # Statisches Browser-Frontend (kein Build-Schritt)
 │   ├── index.html
 │   ├── style.css
@@ -90,19 +91,21 @@ Chip-Stände definiert.
   Directory `poker-app`, Build Command `npm ci`, Start Command
   `npm start`, dieselben Env-Vars wie oben von Hand setzen.
 
-## Native App (iOS, über Capacitor)
+## Native Apps (iOS + Android, über Capacitor)
 
 Die App ist im Kern weiterhin reines Server-gerendertes HTML/CSS/JS ohne
-Build-Schritt (siehe `public/`) – für den App Store braucht es trotzdem
-eine native Hülle. Dafür ist [Capacitor](https://capacitorjs.com/) bereits
-eingerichtet: `capacitor.config.json` (App-ID, App-Name, `webDir: public`)
-und ein generiertes Xcode-Projekt unter `ios/App/`. Capacitor packt dafür
-eine **lokale Kopie** von `public/` in die App (kein Server im
-App-Bundle – der bleibt separat gehostet, z. B. auf Render), das native
-Shell-Fenster lädt also `index.html` als Datei statt per HTTP.
+Build-Schritt (siehe `public/`) – für App Store/Play Store braucht es
+trotzdem eine native Hülle. Dafür ist [Capacitor](https://capacitorjs.com/)
+für beide Plattformen eingerichtet: `capacitor.config.json` (App-ID,
+App-Name, `webDir: public`), ein generiertes Xcode-Projekt unter `ios/App/`
+und ein generiertes Gradle-Projekt unter `android/`. Capacitor packt dafür
+eine **lokale Kopie** von `public/` in die jeweilige App (kein Server im
+App-Bundle – der bleibt separat gehostet, z. B. auf Render), die native
+Shell lädt `index.html` also als Datei statt per HTTP.
 
 Damit `socket.io` trotzdem den richtigen Server findet, unterscheidet
-`public/server-config.js` (vor `app.js` geladen) zwei Fälle:
+`public/server-config.js` (vor `app.js` geladen, plattformunabhängig für
+iOS und Android gleichermaßen) zwei Fälle:
 
 - **Normaler Browser-Betrieb** (lokal per `npm start` oder z. B. über
   Render): `window.POKER_SERVER_URL` bleibt leer, `io()` verbindet sich
@@ -120,22 +123,24 @@ Das `socket.io`-Client-Skript selbst liegt dafür als lokale Kopie unter
 `package.json` angleichen) statt wie vorher vom Server unter
 `/socket.io/socket.io.js` ausgeliefert zu werden – das funktioniert nur,
 solange ein Express-Server tatsächlich läuft, in der gebündelten
-Datei-Kopie der nativen App aber nicht.
-
-**Wichtig: Der Rest der iOS-Einrichtung braucht einen Mac mit Xcode.**
-Diese Session lief in einer Linux-Umgebung ohne Xcode/CocoaPods – das
-Xcode-Projekt selbst wurde bereits generiert (`npx cap add ios`) und
-lässt sich committen, aber Bauen/Signieren/Ausführen/Einreichen geht nur
-auf einem Mac:
+Datei-Kopie der nativen Apps aber nicht.
 
 ```bash
 cd poker-app
-npm install                # zieht auch @capacitor/core, @capacitor/cli, @capacitor/ios
-npm run cap:sync           # kopiert public/ erneut nach ios/App/App/public + synct Plugins
-npm run cap:open:ios       # öffnet ios/App/App.xcodeproj in Xcode
+npm install                 # zieht auch @capacitor/core, @capacitor/cli, @capacitor/ios, @capacitor/android
+npm run cap:sync            # kopiert public/ erneut in beide Plattform-Projekte + synct Plugins
 ```
 
-In Xcode dann:
+### iOS
+
+**Braucht einen Mac mit Xcode** – diese Session lief in einer
+Linux-Umgebung ohne Xcode/CocoaPods, das Xcode-Projekt selbst wurde aber
+bereits generiert (`npx cap add ios`) und lässt sich committen; Bauen/
+Signieren/Ausführen/Einreichen geht nur auf einem Mac:
+
+```bash
+npm run cap:open:ios        # öffnet ios/App/App.xcodeproj in Xcode
+```
 
 1. **Signing & Capabilities** → euer Apple-Developer-Team auswählen
    (Apple Developer Program, 99 $/Jahr, siehe
@@ -144,20 +149,52 @@ In Xcode dann:
    `App.xcworkspace` statt `App.xcodeproj` öffnen.
 3. App-Icons/Splash-Screen in `ios/App/App/Assets.xcassets` ersetzen
    (aktuell nur Platzhalter).
-4. `capacitor.config.json` → `appId` (`com.pokerapp.texasholdem`) auf die
-   echte, im eigenen Apple-Developer-Account registrierte Bundle-ID
-   ändern, falls abweichend.
-5. Auf Simulator/eigenem Gerät testen, dann über **TestFlight** verteilen,
+4. Auf Simulator/eigenem Gerät testen, dann über **TestFlight** verteilen,
    bevor ihr zur App-Review einreicht.
 
-**Zur Einordnung (Apple-Richtlinien für Poker/Glücksspiel-nahe Apps):**
-Auch ohne Echtgeld prüft Apple Poker-/Karten-Apps mit "Chips" strenger
-(Guideline 4.7 / 3.1.1). Wichtig für eine Freigabe ohne Glücksspiel-Lizenz:
-konsequent klarstellen, dass es **kein Echtgeld, keinen Chip-Kauf und
-keinen Cash-out** gibt (steht in der App bereits so in der
-Meta-Beschreibung), Altersfreigabe vermutlich 17+, und für den Multiplayer-
-Chat/die Namensvergabe eine Melde-/Blockier-Möglichkeit sowie eine
-Datenschutzerklärungs-URL in App Store Connect einplanen.
+### Android
+
+**Braucht Android Studio bzw. das Android SDK** – anders als iOS geht das
+auch unter Linux/Windows, nicht nur auf einem Mac. Diese Session konnte
+das Android-SDK aus dieser Sandbox heraus trotzdem nicht laden (Netzwerk-
+Zugriff auf `dl.google.com` ist hier gesperrt) – das Gradle-Projekt wurde
+deshalb nur generiert (`npx cap add android`) und statisch geprüft
+(`applicationId`/App-Name korrekt in `build.gradle`/`strings.xml`
+gesetzt), aber noch nie tatsächlich gebaut:
+
+```bash
+npm run cap:open:android    # öffnet android/ in Android Studio (falls installiert)
+# oder headless, sobald ANDROID_HOME/ANDROID_SDK_ROOT gesetzt ist:
+cd android && ./gradlew assembleDebug
+```
+
+1. Android Studio öffnet das Projekt und installiert fehlende SDK-Pakete
+   normalerweise automatisch (Prompt beim ersten Öffnen).
+2. App-Icons in `android/app/src/main/res/mipmap-*` ersetzen (aktuell nur
+   Platzhalter), Splash-Screen unter `android/app/src/main/res/drawable*`.
+3. Für den Play Store: einen Signing-Keystore erzeugen (`keytool`/Android
+   Studios eigener Assistent unter *Build → Generate Signed Bundle/APK*)
+   und **sicher aufbewahren** – ohne ihn lassen sich spätere Updates nicht
+   mehr signieren.
+4. Erst über einen **internen Test-Track** in der Google Play Console
+   verteilen, bevor ihr zur Produktions-Review einreicht.
+
+### Gemeinsame Punkte für beide Plattformen
+
+- `capacitor.config.json` → `appId` (`com.pokerapp.texasholdem`) ist ein
+  **Platzhalter** – vor der echten Einreichung auf die im eigenen Apple-/
+  Google-Developer-Account registrierte ID ändern (danach `npm run
+  cap:sync`, damit beide nativen Projekte den neuen Wert übernehmen).
+- **Zur Einordnung (Store-Richtlinien für Poker/Glücksspiel-nahe Apps):**
+  sowohl Apple als auch Google prüfen Poker-/Karten-Apps mit "Chips"
+  strenger, auch ohne Echtgeld (Apple: Guideline 4.7/3.1.1; Google Play:
+  Richtlinie zu Glücksspielen/simulierten Glücksspielen). Wichtig für eine
+  Freigabe ohne Glücksspiel-Lizenz: konsequent klarstellen, dass es
+  **kein Echtgeld, keinen Chip-Kauf und keinen Cash-out** gibt (steht in
+  der App bereits so in der Meta-Beschreibung), Altersfreigabe vermutlich
+  17+/PEGI 16-18, und für den Multiplayer-Chat/die Namensvergabe eine
+  Melde-/Blockier-Möglichkeit sowie eine Datenschutzerklärungs-URL in App
+  Store Connect bzw. der Play Console einplanen.
 
 ## Was schon funktioniert
 
