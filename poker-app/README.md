@@ -147,10 +147,9 @@ npm run cap:open:ios        # öffnet ios/App/App.xcodeproj in Xcode
    [developer.apple.com](https://developer.apple.com)).
 2. Falls CocoaPods-Plugins dazukommen: `cd ios/App && pod install`, danach
    `App.xcworkspace` statt `App.xcodeproj` öffnen.
-3. App-Icon ist bereits gesetzt (wilder, grinsender Chip, siehe
-   "App-Icons" unten) – nur der Splash-Screen in
-   `ios/App/App/Assets.xcassets/Splash.imageset` ist noch der
-   Capacitor-Platzhalter.
+3. App-Icon und Splash-Screen sind bereits gesetzt (wilder, grinsender
+   Chip, siehe "App-Icons" und "Splash-Screens" unten) – kein
+   Capacitor-Platzhalter mehr.
 4. Auf Simulator/eigenem Gerät testen, dann über **TestFlight** verteilen,
    bevor ihr zur App-Review einreicht.
 
@@ -172,9 +171,9 @@ cd android && ./gradlew assembleDebug
 
 1. Android Studio öffnet das Projekt und installiert fehlende SDK-Pakete
    normalerweise automatisch (Prompt beim ersten Öffnen).
-2. App-Icon ist bereits gesetzt (dasselbe Motiv wie iOS, siehe "App-Icons"
-   unten) – nur der Splash-Screen unter
-   `android/app/src/main/res/drawable*` ist noch der Capacitor-Platzhalter.
+2. App-Icon und Splash-Screen sind bereits gesetzt (dasselbe Motiv wie
+   iOS, siehe "App-Icons" und "Splash-Screens" unten) – kein
+   Capacitor-Platzhalter mehr.
 3. Für den Play Store: einen Signing-Keystore erzeugen (`keytool`/Android
    Studios eigener Assistent unter *Build → Generate Signed Bundle/APK*)
    und **sicher aufbewahren** – ohne ihn lassen sich spätere Updates nicht
@@ -217,10 +216,35 @@ deutlich verspielter/wilder als ein klassisches, seriöses Casino-Icon.
   `design/generate-app-icons.js` rendert beide SVGs per Playwright auf
   alle benötigten Pixelgrößen neu – nützlich, falls sich das Design mal
   ändern soll (Kommentar im Script erklärt Voraussetzungen/Aufruf).
-- Splash-Screens sind bewusst **nicht** mit angefasst (andere Bildmaße/
-  -logik, eigenständiger nächster Schritt) – aktuell noch der
-  Capacitor-Platzhalter in `ios/App/App/Assets.xcassets/Splash.imageset`
-  bzw. `android/app/src/main/res/drawable*/splash.png`.
+### Splash-Screens
+
+Echte Splash-Screens statt des weißen Capacitor-Platzhalters (kleines
+blaues "X"-Logo auf Weiß): derselbe Farbverlauf wie im App-Icon-Hintergrund
+(Orange-Rot) füllt den kompletten Bildschirm, mit dem grinsenden Chip-
+Maskottchen mittig darauf – bewusst ohne Text/Wortmarke, damit es bei
+jeder Bildschirmgröße (vom kleinsten Android-Legacy-Format 320×480 bis
+zum iOS-Quadrat 2732×2732) lesbar bleibt, analog zum ursprünglichen
+Capacitor-Platzhalter, der ebenfalls nur ein zentriertes Symbol ohne Text
+zeigt.
+
+Anders als die App-Icons (feste 1:1-Canvas) brauchen Splash-Screens viele
+verschiedene Seitenverhältnisse (Hoch-/Querformat, jede Android-
+Dichtestufe). Statt für jede Zielgröße eigene Transform-Berechnungen zu
+pflegen, bettet `design/generate-splash-screens.js` die Logo-Quelle
+(`design/app-splash-logo.svg` – derselbe Chip wie im App-Icon, aber
+unskaliert und ohne den Comic-Starburst-Hintergrund) pro Zielgröße als
+verschachtelten `<svg>`-Viewport mittig auf einen Farbverlaufs-
+Hintergrund, der die komplette Zielfläche füllt – das Logo bleibt dabei
+unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
+
+- **iOS**: ein einzelnes opakes 2732×2732-PNG (dieselbe Datei für alle
+  drei in `Contents.json` gelisteten Skalierungsstufen, wie schon beim
+  Capacitor-Platzhalter), unter
+  `ios/App/App/Assets.xcassets/Splash.imageset/`.
+- **Android**: 11 Dateien unter `android/app/src/main/res/drawable*/
+  splash.png` – je eine Hoch- und Querformat-Variante für jede
+  Dichtestufe (mdpi bis xxxhdpi) plus die dichte-unabhängige
+  `drawable/splash.png`.
 
 ### Gemeinsame Punkte für beide Plattformen
 
