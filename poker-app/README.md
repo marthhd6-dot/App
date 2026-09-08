@@ -235,7 +235,11 @@ Chip-Stände definiert.
   Zusätzlich sind Eckindizes (Rang) und das große Symbol in der Mitte
   (`.card-corner`/`.card-suit-big`) deutlich größer skaliert, damit Rang
   und Farbe auch über den Tisch hinweg auf einen Blick eindeutig lesbar
-  sind. Eigene Mobile-Breakpoints (`@media (max-width: 640px)`) skalieren
+  sind – die Rang-Zahl/-Buchstabe selbst (`.card-rank`, eigene Klasse für
+  den ersten `<span>` in `.card-corner`) sitzt dabei nochmal deutlich
+  größer als das kleine Farbsymbol direkt daneben (`.card-suit-mini`), wie
+  auf einer echten Spielkarte. Eigene Mobile-Breakpoints
+  (`@media (max-width: 640px)`) skalieren
   Community Cards und eigene Karten proportional zurück, damit auf
   schmalen Bildschirmen nichts überläuft.
 - **Mehrere Tische/Räume** (`rooms.js`): `create-room` legt einen neuen

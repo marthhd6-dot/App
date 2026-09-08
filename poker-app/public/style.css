@@ -1151,7 +1151,7 @@ button:disabled {
   flex-direction: column;
   align-items: center;
   line-height: 1;
-  font-size: 0.42em;
+  font-size: 0.48em;
 }
 
 .card-corner-top {
@@ -1165,8 +1165,15 @@ button:disabled {
   transform: rotate(180deg);
 }
 
+/* Der Rang (Zahl/Buchstabe) steht extra groß, deutlich größer als das
+   kleine Farbsymbol daneben (.card-suit-mini) – auf echten Spielkarten
+   ist die Zahl selbst das auffälligste Element der Eckindizes. */
+.card-rank {
+  font-size: 1.15em;
+}
+
 .card-suit-mini {
-  font-size: 0.9em;
+  font-size: 0.85em;
   margin-top: 1px;
 }
 
