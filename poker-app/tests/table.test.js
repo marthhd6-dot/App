@@ -320,6 +320,63 @@ run('getPublicState: extraVisibleIds macht zusätzlich die Karten anderer Spiele
   assert.strictEqual(withExtra.players.find((p) => p.id === 'c').holeCards, null); // nicht in extraVisibleIds
 });
 
+run('getPublicState: bei einem echten Showdown sieht JEDER die Karten aller nicht gefoldeten Spieler', () => {
+  const table = makeTable(['a', 'b']);
+  table.startHand();
+  table.call('a');
+  table.check('b');
+  table.dealFlop();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.dealTurn();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.dealRiver();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.showdown();
+
+  // "b" schaut sich den State an -> sieht jetzt auch die Karten von "a",
+  // obwohl "a" sie nicht selbst ist und "a" nicht in extraVisibleIds steht.
+  const state = table.getPublicState('b');
+  assert.strictEqual(state.players.find((p) => p.id === 'a').holeCards.length, 2);
+  assert.strictEqual(state.players.find((p) => p.id === 'b').holeCards.length, 2);
+});
+
+run('getPublicState: bei einem Sieg durch Fold bleiben die Karten der Gegner verborgen (keine Hände verglichen)', () => {
+  const table = makeTable(['a', 'b']);
+  table.startHand();
+  table.fold('a');
+
+  assert.strictEqual(table.phase, 'showdown');
+  assert.strictEqual(table.lastHandResult.reason, 'fold');
+
+  const state = table.getPublicState('b');
+  assert.strictEqual(state.players.find((p) => p.id === 'a').holeCards, null);
+});
+
+run('getPublicState: gefoldete Spieler zeigen ihre Karten auch bei einem echten Showdown nicht', () => {
+  const table = makeTable(['a', 'b', 'c']);
+  table.startHand();
+  table.call('a'); // Dealer/UTG callt auf Big Blind
+  table.call('b'); // Small Blind callt nach
+  table.fold('c'); // Big Blind legt trotzdem ab, a und b spielen bis zum Showdown weiter
+  table.dealFlop();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.dealTurn();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.dealRiver();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.showdown();
+
+  const state = table.getPublicState('a');
+  assert.strictEqual(state.players.find((p) => p.id === 'c').holeCards, null);
+  assert.strictEqual(state.players.find((p) => p.id === 'b').holeCards.length, 2);
+});
+
 run('Side Pot: Kurzer Stack gewinnt nur den Hauptpot, nicht den Neben-Pot der Tiefstapler', () => {
   const table = new Table({ smallBlind: 5, bigBlind: 10 });
   table.addPlayer('a', 'Alice', 1000);

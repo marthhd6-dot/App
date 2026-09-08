@@ -806,6 +806,28 @@ button:disabled {
   transform: rotate(7deg);
 }
 
+/* Aufgedeckte Mini-Karten am Sitzplatz bei einem echten Showdown (siehe
+   revealedCardsHtml in app.js) – dieselbe gefächerte Optik wie die
+   verdeckten Rückseiten oben, aber mit sichtbarem Rang/Symbol statt der
+   Kartenrückseite, damit klar wird, gegen welche Hand man gewonnen/
+   verloren hat. */
+.seat-cards .card {
+  width: 26px;
+  height: 36px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  box-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.5);
+}
+
+.seat-cards .card:first-child {
+  transform: rotate(-7deg);
+  margin-right: -4px;
+}
+
+.seat-cards .card:last-child {
+  transform: rotate(7deg);
+}
+
 /* Eigene Deal-In-Varianten statt der gemeinsamen .card.deal-in-Animation:
    die endet bei rotate(0) und würde sonst den gefächerten Kippwinkel oben
    (:first-child/:last-child) im Moment des Austeilens kurzzeitig aufheben. */
@@ -1146,6 +1168,40 @@ button:disabled {
   height: 84px;
   font-size: 1.5rem;
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18), 0 14px 26px -6px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+/* Aufgedeckte Gegner-Hände bei einem echten Showdown (siehe
+   showdownOpponents in app.js): eine Karten-Gruppe pro Gegner, mit Namen
+   darüber, damit klar wird, gegen welche Hand man gewonnen/verloren hat.
+   Mehrere Gegner (1v1v1v1) reihen sich nebeneinander auf und brechen bei
+   schmaler Breite um. */
+.showdown-reveal h2 {
+  color: var(--info);
+}
+
+.showdown-reveal-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+}
+
+.showdown-reveal-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.showdown-reveal-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.showdown-reveal-cards {
+  margin-bottom: 0;
+  min-height: 0;
 }
 
 /* --- Action-Leiste ---------------------------------------------------------- */
