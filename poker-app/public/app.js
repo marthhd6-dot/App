@@ -415,6 +415,21 @@ document.getElementById('ranked-back-to-menu-btn').addEventListener('click', () 
   location.reload();
 });
 
+// Verlässt den Tisch jederzeit während des Spiels (nicht nur nach
+// Matchende) und kehrt zum Hauptmenü zurück. Wie beim "Neues Match
+// suchen"-Button oben: sessionStorage.SESSION_KEY löschen (verhindert den
+// automatischen Wieder-Beitritt in attemptAutoRejoin() beim nächsten
+// 'connect') und die Seite neu laden – der alte Socket trennt sich dabei,
+// der Server behandelt das serverseitig wie jeden anderen
+// Verbindungsabbruch (Gnadenfrist, danach Entfernen vom Tisch, siehe
+// README "Reconnect-Handling").
+document.getElementById('leave-table-btn').addEventListener('click', () => {
+  const confirmed = window.confirm('Tisch wirklich verlassen und zum Hauptmenü zurückkehren?');
+  if (!confirmed) return;
+  sessionStorage.removeItem(SESSION_KEY);
+  location.reload();
+});
+
 // --- Gegen Bots üben -------------------------------------------------------
 
 document.getElementById('bots-setup-btn').addEventListener('click', () => {

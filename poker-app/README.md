@@ -186,6 +186,15 @@ Chip-Stände definiert.
   Vereinfachung: Die Wiedererkennung läuft allein über den Namen, es gibt
   keine echte Authentifizierung – zwei Spieler mit demselben Namen im
   selben Raum können sich gegenseitig den Platz "stehlen".
+- **"Zurück zum Hauptmenü"** (`#leave-table-btn` im Tisch-Header): lässt
+  den Tisch jederzeit verlassen, nicht nur nach Matchende (dafür gibt es
+  bereits `#ranked-back-to-menu-btn` im Sieg/Niederlage-Banner). Nutzt
+  denselben Mechanismus: `sessionStorage`-Eintrag löschen (verhindert den
+  automatischen Wieder-Beitritt beim nächsten Verbindungsaufbau) und die
+  Seite neu laden. Serverseitig kein eigener "Leave"-Socket-Event nötig –
+  der getrennte Socket wird wie jeder andere Verbindungsabbruch behandelt
+  (siehe Reconnect-Handling oben: Gnadenfrist, danach Entfernen vom
+  Tisch). Ein Bestätigungsdialog verhindert versehentliches Verlassen.
 - **Persistenz** (`persistence.js`): Name, Chips, Blinds und
   Dealer-Position pro Raum werden nach jeder Aktion in einer SQLite-Datei
   gespeichert (via `better-sqlite3`, Standard: `data/rooms.db`,
