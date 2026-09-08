@@ -332,11 +332,18 @@ h2 {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .account-bar #name-input {
   width: auto;
   flex: 1;
+  /* Ohne min-width:0 behält ein <input> als Flex-Kind seine intrinsische
+     Mindestbreite (browserabhängig oft 170-200px) und lässt sich trotz
+     flex:1 nicht unter diese schrumpfen – auf sehr schmalen Bildschirmen
+     (≤360px) drängte das den Account-Button rechts über den Bildschirmrand
+     hinaus (horizontales Overflow). */
+  min-width: 0;
 }
 
 .account-bar input:disabled {
@@ -2189,5 +2196,48 @@ button:disabled {
   }
   .ability-card-name {
     font-size: 0.66rem;
+  }
+}
+
+/* Sehr schmale Handys (~360px und darunter, z. B. iPhone SE 1./ältere
+   kompakte Android-Geräte): Vier 76px-Karten + Lücken passen hier nicht
+   mehr in eine Zeile, .ability-row (display:flex; flex-wrap:wrap) bricht
+   dann unschön 3+1 um. Ein festes 2x2-Raster sieht auf dieser Breite
+   deutlich ausgeglichener aus als ein einzelnes Karten-Waisenkind in der
+   zweiten Zeile – und bleibt dabei komfortabel groß genug zum Antippen. */
+@media (max-width: 374px) {
+  .ability-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 300px;
+    margin: 12px auto 0;
+    gap: 8px;
+  }
+  .ability-card {
+    width: auto;
+  }
+}
+
+/* Bei genau 4 Spielern am Tisch (1v1v1v1, egal ob Ranked/Casual/gegen
+   Bots) sitzen zwei Gegner exakt West (180°) und Ost (0°), siehe
+   seatPositionByOrderedIndex() in app.js – ihre Sitzplätze liegen also auf
+   derselben vertikalen Mitte wie die Community Cards. Per Geometrie-Check
+   (Bounding-Box-Überlappung) verifiziert: Auf Bildschirmen bis ~430px
+   Breite (deckt auch die größten aktuellen Phones wie iPhone Pro Max ab)
+   überlappen die West/Ost-Sitzplätze sonst sichtbar die 5 Community
+   Cards, weil das absolut positionierte, zentrierte .community-row-Element
+   in einer Zeile breiter ist als die schmale Lücke zwischen den beiden
+   Sitzplätzen. Ab ~450px reicht die Lücke wieder aus. Fix: Community
+   Cards hier bewusst schmaler und zweizeilig (3+2) statt einzeilig. */
+@media (max-width: 440px) {
+  .community-row {
+    flex-wrap: wrap;
+    max-width: 150px;
+    gap: 5px;
+  }
+  .community-row .card {
+    width: 32px;
+    height: 45px;
+    font-size: 0.78rem;
   }
 }
