@@ -34,6 +34,7 @@ let isVsBots = false;
 let queueType = null;
 let lastPhase = null; // für Deal-Animationen: erkennt den Beginn einer neuen Hand
 let communityDealtCount = 0;
+let prevState = null; // vorheriger state-Snapshot, für Aktions-Effekte (siehe detectAndShowActionFx)
 let isLoggedIn = false;
 let pendingRankPathView = false; // wartet der "Mein Rang"-Button auf die nächste rank-info-Antwort?
 let pendingBotsSetupView = false; // wartet der "Gegen Bots üben"-Button auf die nächste rank-info-Antwort?
@@ -122,6 +123,7 @@ socket.on('room-joined', ({ code, ranked, casual4, rankedTeam, casualTeam, vsBot
   isVsBots = Boolean(vsBots);
   lastPhase = null;
   communityDealtCount = 0;
+  prevState = null;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code, name: myName }));
   reconnectBanner.hidden = true;
   rankedMatchOverBanner.hidden = true;
@@ -722,6 +724,34 @@ function avatarColorFor(name) {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
+// Kreisposition (in % der Tisch-Breite/-Höhe) für den orderedIndex-ten
+// Sitzplatz von insgesamt n – dieselbe Formel, die renderSeats() für die
+// eigentlichen Sitzplatz-Elemente nutzt. Ausgelagert, damit auch die
+// Effekt-Ebene (Aktions-Sprechblasen, Chip-Flug, Dealer-Button) Positionen
+// berechnen kann, ohne die DOM-Elemente von renderSeats() abzufragen (die
+// bei jedem State-Update komplett neu aufgebaut werden, siehe dort).
+function seatPositionByOrderedIndex(orderedIndex, n) {
+  const isNarrow = window.innerWidth <= 640;
+  const rx = isNarrow ? 39 : 44;
+  const ry = isNarrow ? 37 : 40;
+  const angleRad = ((90 + (360 / n) * orderedIndex) * Math.PI) / 180;
+  return { left: 50 + rx * Math.cos(angleRad), top: 50 + ry * Math.sin(angleRad) };
+}
+
+// Wie seatPositionByOrderedIndex, aber anhand einer Spieler-ID statt eines
+// bereits bekannten Index – berücksichtigt dieselbe "eigener Platz unten
+// in der Mitte"-Sortierung wie renderSeats(). Gibt null zurück, wenn der
+// Spieler nicht (mehr) am Tisch sitzt.
+function seatPositionForPlayer(state, playerId) {
+  const n = state.players.length;
+  const idx = state.players.findIndex((p) => p.id === playerId);
+  if (n === 0 || idx === -1) return null;
+  const myIndex = state.players.findIndex((p) => p.id === mySocketId);
+  const startIndex = myIndex === -1 ? 0 : myIndex;
+  const orderedIndex = (idx - startIndex + n) % n;
+  return seatPositionByOrderedIndex(orderedIndex, n);
+}
+
 // Ordnet alle Spieler als "Sitzplätze" kreisförmig um den ovalen Tisch an –
 // der eigene Platz liegt dabei immer unten in der Mitte. winnerIds enthält
 // die Spieler, die die zuletzt gezeigte Hand gewonnen haben (leer, solange
@@ -744,22 +774,12 @@ function renderSeats(state, winnerIds, animateDeal) {
     ordered.push(state.players[(startIndex + i) % n]);
   }
 
-  // Auf schmalen Bildschirmen ist rund um den Tisch weniger Platz bis zum
-  // Viewport-Rand, deshalb dort einen etwas engeren Radius verwenden – sonst
-  // würden Sitzplätze am linken/rechten Rand über den Bildschirmrand hinausragen.
-  const isNarrow = window.innerWidth <= 640;
-  const rx = isNarrow ? 39 : 44; // Radius in % der Tisch-Breite
-  const ry = isNarrow ? 37 : 40; // Radius in % der Tisch-Höhe
-
   ordered.forEach((p, i) => {
-    const angleRad = ((90 + (360 / n) * i) * Math.PI) / 180; // Start unten in der Mitte
-    const left = 50 + rx * Math.cos(angleRad);
-    const top = 50 + ry * Math.sin(angleRad);
+    const { left, top } = seatPositionByOrderedIndex(i, n);
 
     const team = state.teams ? state.teams[p.id] : undefined;
     const badges = [];
     if (team !== undefined) badges.push({ label: `TEAM ${team + 1}`, cls: `badge-team-${team}` });
-    if (p.id === state.dealerPlayerId) badges.push({ label: 'D', cls: 'badge-dealer' });
     if (p.isAllIn) badges.push({ label: 'ALL-IN', cls: 'badge-allin' });
     if (p.folded) badges.push({ label: 'FOLD', cls: 'badge-fold' });
     if (p.disconnected) badges.push({ label: 'GETRENNT', cls: 'badge-disconnected' });
@@ -775,6 +795,16 @@ function renderSeats(state, winnerIds, animateDeal) {
       (team !== undefined ? ` team-${team}` : '');
     seat.style.left = `${left}%`;
     seat.style.top = `${top}%`;
+
+    // "Denkt nach …"-Punkte statt (bzw. zusätzlich zum) pulsierenden Rahmen:
+    // im Bot-Übungsmodus (isVsBots) ist jeder andere Spieler als ich selbst
+    // garantiert ein Bot (siehe play-vs-bots in server.js – genau ein
+    // Mensch pro Bot-Raum), daher genügt dieser rein clientseitige Check,
+    // ohne dass der Server ein eigenes isBot-Flag mitschicken müsste.
+    const isThinkingBot = isVsBots && p.id !== mySocketId && p.id === state.actingPlayerId;
+    const thinkingHtml = isThinkingBot
+      ? '<div class="thinking-dots"><span></span><span></span><span></span></div>'
+      : '';
 
     // Verdeckte Mini-Karten: nur für Gegner, die noch im Spiel sind und
     // deren Hole Cards für mich nicht sichtbar sind (p.holeCards === null –
@@ -807,10 +837,132 @@ function renderSeats(state, winnerIds, animateDeal) {
         </div>
       </div>
       ${hiddenCardsHtml}
+      ${thinkingHtml}
       <div class="seat-bet">${p.bet > 0 ? `<span class="chip-icon"></span>Einsatz: ${p.bet}` : ''}</div>
       <div class="seat-badges">${badges.map((b) => `<span class="badge ${b.cls}">${b.label}</span>`).join('')}</div>
     `;
     container.appendChild(seat);
+  });
+
+  updateDealerButton(state);
+}
+
+// Aktualisiert den gleitenden Dealer-Button (siehe #dealer-button in
+// index.html): ein einziges persistentes Element, das per CSS-transition
+// sichtbar zum neuen Dealer-Sitzplatz hinübergleitet, statt bei jedem
+// Rundenwechsel als neues Badge hart zu erscheinen.
+function updateDealerButton(state) {
+  const btn = document.getElementById('dealer-button');
+  const pos = state.dealerPlayerId ? seatPositionForPlayer(state, state.dealerPlayerId) : null;
+  if (!pos) {
+    btn.hidden = true;
+    return;
+  }
+  btn.hidden = false;
+  btn.style.left = `${pos.left}%`;
+  btn.style.top = `${pos.top}%`;
+}
+
+// --- Effekt-Ebene: Aktions-Sprechblasen, Chip-Flug, Fold-Wegschieben -------
+// Eigenständige DOM-Elemente in #fx-layer statt in #players-list, damit sie
+// ein Neu-Rendern des Tisches überleben (renderSeats() leert #players-list
+// bei jedem State-Update, siehe dort) und ihre eigene, kurze Animation zu
+// Ende spielen können, bevor sie sich selbst wieder entfernen.
+
+const POT_POSITION = { left: 50, top: 26 }; // deckt sich mit .pot-display (top: 26%)
+
+function spawnChipFly(fromPos, toPos) {
+  const layer = document.getElementById('fx-layer');
+  const chip = document.createElement('div');
+  chip.className = 'chip-fly';
+  chip.style.left = `${fromPos.left}%`;
+  chip.style.top = `${fromPos.top}%`;
+  layer.appendChild(chip);
+  // Doppeltes rAF: erzwingt, dass die Startposition erst gemalt wird, bevor
+  // die Zielwerte gesetzt werden – sonst überspringt der Browser die
+  // CSS-transition und der Chip "springt" direkt ans Ziel statt zu fliegen.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      chip.style.left = `${toPos.left}%`;
+      chip.style.top = `${toPos.top}%`;
+      chip.style.opacity = '0.2';
+    });
+  });
+  setTimeout(() => chip.remove(), 650);
+}
+
+function showActionBubble(pos, text) {
+  const layer = document.getElementById('fx-layer');
+  const bubble = document.createElement('div');
+  bubble.className = 'action-bubble';
+  bubble.style.left = `${pos.left}%`;
+  bubble.style.top = `${pos.top}%`;
+  bubble.textContent = text;
+  layer.appendChild(bubble);
+  setTimeout(() => bubble.remove(), 1500);
+}
+
+function spawnFoldCards(pos) {
+  const layer = document.getElementById('fx-layer');
+  [0, 1].forEach((i) => {
+    const card = document.createElement('div');
+    card.className = 'fold-fx-card';
+    card.style.left = `${pos.left}%`;
+    card.style.top = `${pos.top}%`;
+    card.style.animationDelay = `${i * 0.05}s`;
+    layer.appendChild(card);
+    setTimeout(() => card.remove(), 700);
+  });
+}
+
+// Vergleicht den neuen state mit dem vorherigen Snapshot (prev) und löst
+// passende Effekte aus: Aktions-Sprechblase + Chip-Flug bei Bet/Call/Raise,
+// Sprechblase bei Check, Sprechblase + Wegschieb-Effekt bei Fold. Nur
+// innerhalb derselben Straße relevant (state.phase === prev.phase) – bei
+// einem Straßenwechsel (Flop/Turn/River) setzt der Server alle Einsätze
+// zurück, das wäre sonst fälschlich als "alle haben gleichzeitig gecheckt"
+// zu lesen.
+function detectAndShowActionFx(state, prev) {
+  if (!prev || state.phase !== prev.phase) return;
+
+  state.players.forEach((p) => {
+    const before = prev.players.find((pp) => pp.id === p.id);
+    if (!before) return;
+    const pos = seatPositionForPlayer(state, p.id);
+    if (!pos) return;
+
+    if (p.folded && !before.folded) {
+      showActionBubble(pos, 'Fold');
+      spawnFoldCards(pos);
+      return;
+    }
+    if (p.bet > before.bet) {
+      if (prev.currentBet === 0) {
+        showActionBubble(pos, `Bet ${p.bet}`);
+      } else if (p.bet > prev.currentBet) {
+        showActionBubble(pos, `Raise ${p.bet}`);
+      } else {
+        showActionBubble(pos, 'Call');
+      }
+      spawnChipFly(pos, POT_POSITION);
+      return;
+    }
+    if (!p.folded && !before.folded && p.bet === before.bet && prev.actingPlayerId === p.id && state.actingPlayerId !== p.id) {
+      showActionBubble(pos, 'Check');
+    }
+  });
+}
+
+// Chips fliegen sichtbar vom Pot zu jedem Gewinner zurück, sobald ein
+// Showdown/Fold-Sieg gerade eben aufgelöst wurde (siehe Aufrufstelle in
+// render() – nur wenn lastHandResult neu hinzugekommen ist, nicht bei
+// jedem weiteren Rendern, solange der Gewinn-Banner noch angezeigt wird).
+function spawnPotPayout(state) {
+  state.lastHandResult.pots.forEach((pot) => {
+    pot.winners.forEach((w) => {
+      const pos = seatPositionForPlayer(state, w.id);
+      if (pos) spawnChipFly(POT_POSITION, pos);
+    });
   });
 }
 
@@ -860,6 +1012,16 @@ function render(state) {
   document.getElementById('current-bet-label').textContent =
     state.currentBet > 0 ? `Aktueller Einsatz: ${state.currentBet}` : '';
 
+  // Vor dem eigentlichen Rendern: Aktions-Sprechblasen/Chip-Flug/Fold-Effekt
+  // anhand des Unterschieds zum vorherigen State auslösen (siehe
+  // detectAndShowActionFx – vergleicht gegen prevState, das erst ganz am
+  // Ende dieser Funktion überschrieben wird).
+  detectAndShowActionFx(state, prevState);
+  // Ein Showdown/Fold-Sieg ist gerade eben aufgelöst worden (lastHandResult
+  // war vorher noch nicht gesetzt) -> Pot fliegt zu den Gewinnern zurück.
+  const justResolved = state.lastHandResult && (!prevState || !prevState.lastHandResult);
+  if (justResolved) spawnPotPayout(state);
+
   const isNewHand = state.phase === 'preflop' && lastPhase !== 'preflop';
   if (isNewHand) communityDealtCount = 0;
 
@@ -884,6 +1046,17 @@ function render(state) {
     teammateHandEl.hidden = false;
   } else {
     teammateHandEl.hidden = true;
+  }
+
+  // Kurzes Aufleuchten der Community Cards nach einem echten Showdown
+  // (nicht bei einem reinen Fold-Sieg, da dort keine Hände verglichen
+  // wurden) – zusätzlich die eigenen Karten, falls ich selbst gewonnen
+  // habe. Nutzt dieselbe Glow-Animation wie der Gewinner-Sitzplatz.
+  if (justResolved && state.lastHandResult.reason === 'showdown') {
+    document.querySelectorAll('#community-cards .card').forEach((el) => el.classList.add('glow'));
+    if (winnerIds.has(mySocketId)) {
+      document.querySelectorAll('#my-cards .card').forEach((el) => el.classList.add('glow'));
+    }
   }
 
   lastPhase = state.phase;
@@ -923,4 +1096,6 @@ function render(state) {
   } else {
     handResultEl.hidden = true;
   }
+
+  prevState = state;
 }

@@ -845,6 +845,157 @@ button:disabled {
   }
 }
 
+/* --- Effekt-Ebene über dem Tisch (Chip-Flug, Aktions-Sprechblasen,
+   Fold-Wegschieben) ---------------------------------------------------------
+   Eigenständige, von renderSeats() unabhängige DOM-Elemente, die sich
+   selbst nach ihrer Animation entfernen – dadurch überleben sie ein
+   Neu-Rendern des Tisches (renderSeats() leert #players-list bei jedem
+   State-Update), statt sofort mit abgerissen zu werden. */
+.fx-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.chip-fly {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 35% 30%, var(--accent-bright), #a3801f 75%);
+  border: 1.5px dashed rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.6);
+  transition: left 0.5s cubic-bezier(0.3, 0.6, 0.3, 1), top 0.5s cubic-bezier(0.3, 0.6, 0.3, 1),
+    opacity 0.5s ease;
+}
+
+.action-bubble {
+  position: absolute;
+  transform: translate(-50%, -160%);
+  background: rgba(8, 20, 15, 0.92);
+  border: 1px solid rgba(232, 191, 74, 0.4);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.6);
+  animation: action-bubble-pop 1.5s ease both;
+}
+
+@keyframes action-bubble-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -140%) scale(0.7);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -170%) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -170%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -185%) scale(0.95);
+  }
+}
+
+.fold-fx-card {
+  position: absolute;
+  width: 13px;
+  height: 18px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(45deg, var(--table-green-dark) 0 3px, var(--table-green-mid) 3px 6px);
+  border: 1px solid rgba(232, 191, 74, 0.4);
+  transform: translate(-50%, -50%);
+  animation: fold-away 0.55s ease both;
+}
+
+@keyframes fold-away {
+  0% {
+    transform: translate(-50%, -50%) scale(1) rotate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) translateY(24px) scale(0.5) rotate(20deg);
+    opacity: 0;
+  }
+}
+
+/* Gleitender Dealer-Button: ein einziges persistentes Element statt eines
+   pro Sitzplatz neu erzeugten Badges, damit er zwischen zwei Sitzplätzen
+   sichtbar hinübergleiten kann (transition auf left/top), statt bei jedem
+   Rundenwechsel hart zu "springen". */
+.dealer-button {
+  position: absolute;
+  z-index: 6;
+  transform: translate(-50%, calc(-50% + 40px));
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.68rem;
+  background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+  color: #21201a;
+  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.6);
+  transition: left 0.5s ease, top 0.5s ease;
+}
+
+/* "Denkt nach …"-Indikator für Bots (siehe isVsBots in app.js) – nur für
+   Gegner-Bots, nicht für einen wartenden Menschen, dessen Zug schon durch
+   den pulsierenden .seat.acting-Rahmen erkennbar ist. */
+.thinking-dots {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.thinking-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  animation: thinking-dot-pulse 1s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes thinking-dot-pulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+/* Kurzes Aufleuchten der entscheidenden Karten nach einem Showdown (siehe
+   render() in app.js) – nutzt dieselbe Glow-Animation wie der Gewinner-
+   Sitzplatz (winner-glow), damit es optisch zusammengehört. */
+.card.glow {
+  animation: winner-glow 1.4s ease-in-out 2;
+}
+
 .badge {
   display: inline-block;
   background: rgba(255, 255, 255, 0.15);
@@ -853,11 +1004,6 @@ button:disabled {
   font-weight: 700;
   padding: 1px 5px;
   letter-spacing: 0.03em;
-}
-
-.badge-dealer {
-  background: linear-gradient(180deg, var(--accent-bright), var(--accent));
-  color: #21201a;
 }
 
 .badge-allin {
@@ -892,6 +1038,8 @@ button:disabled {
   justify-content: center;
   min-height: 64px;
   margin-bottom: 20px;
+  /* Tiefenwirkung für den rotateY-Flip in @keyframes deal-in */
+  perspective: 600px;
 }
 
 .card {
@@ -951,17 +1099,20 @@ button:disabled {
   animation: deal-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
 
+/* rotateY simuliert das Umdrehen von verdeckt zu aufgedeckt, zusätzlich
+   zum bisherigen Einfliegen/Skalieren – siehe .card-row's perspective
+   oben, ohne die diese Rotation flach und ohne Tiefenwirkung aussähe. */
 @keyframes deal-in {
   0% {
-    transform: translateY(-40px) scale(0.4) rotate(-12deg);
+    transform: translateY(-40px) scale(0.4) rotate(-12deg) rotateY(180deg);
     opacity: 0;
   }
-  70% {
-    transform: translateY(4px) scale(1.05) rotate(2deg);
+  60% {
+    transform: translateY(4px) scale(1.05) rotate(2deg) rotateY(0deg);
     opacity: 1;
   }
   100% {
-    transform: translateY(0) scale(1) rotate(0);
+    transform: translateY(0) scale(1) rotate(0) rotateY(0deg);
   }
 }
 
