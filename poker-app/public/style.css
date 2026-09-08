@@ -109,24 +109,24 @@ h2 {
   z-index: 1;
 }
 
-#join-screen,
-#queue-screen,
-#leaderboard-screen {
-  max-width: 460px;
-  margin: 0 auto;
-  text-align: center;
-}
-
 #table-screen {
   max-width: 900px;
   margin: 0 auto;
 }
 
+/* max-width + margin: 0 auto zentrieren jedes .panel innerhalb seines
+   (immer volle Breite einnehmenden) .screen-Elternteils selbst – vorher war
+   das nur für drei einzelne Screen-IDs per Hand nachgezogen, wodurch z. B.
+   #bots-screen und #rank-screen still am linken Rand hängen blieben statt
+   zentriert zu sein. */
 .panel {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 20px;
   padding: 32px 28px;
+  max-width: 460px;
+  margin: 0 auto;
+  text-align: center;
   backdrop-filter: blur(14px);
   box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
 }
@@ -266,10 +266,78 @@ h2 {
   letter-spacing: 0.03em;
 }
 
-.join-divider {
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  margin: 22px auto 18px;
+/* --- Hauptmenü-Lobby ------------------------------------------------------
+   Statt einer einzelnen langen Knopf-Liste gruppiert die Lobby die
+   Spielmodi in klar beschriftete Abschnitte, wie die Kategorien einer
+   echten Casino-Lobby (Poker-Pit, Automaten, Turnierbereich …): jede
+   Kategorie hat eine eigene Farbe, die sich konsequent durch Sektions-Label,
+   Knöpfe und später auch die Badges am Tisch zieht (siehe .btn-mode-*/
+   .*-badge weiter unten) – Gold ist damit exklusiv für Ranked reserviert,
+   statt wie zuvor mehrere Knöpfe gleichzeitig gold-ähnlich aufblitzen zu
+   lassen. */
+.lobby-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lobby-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.lobby-section-label-ranked {
+  color: var(--accent-bright);
+}
+
+.lobby-section-label-casual {
+  color: #8ff0c0;
+}
+
+.lobby-section-label-practice {
+  color: var(--info);
+}
+
+.lobby-chip-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.lobby-chip-dot-table {
+  background: radial-gradient(circle at 35% 30%, #e8e4d8, #9a9484 75%);
+}
+
+.lobby-chip-dot-ranked {
+  background: radial-gradient(circle at 35% 30%, var(--accent-bright), var(--accent) 75%);
+}
+
+.lobby-chip-dot-casual {
+  background: radial-gradient(circle at 35% 30%, #8ff0c0, var(--success) 75%);
+}
+
+.lobby-chip-dot-practice {
+  background: radial-gradient(circle at 35% 30%, #cfe0ff, var(--info) 75%);
+}
+
+.lobby-footer {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: center;
 }
 
 .rank-label {
@@ -330,28 +398,29 @@ button:disabled {
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
-.btn-ranked {
-  background: linear-gradient(135deg, #d9a6ff, var(--accent-bright));
-  box-shadow: 0 3px 0 #8a5fb0, 0 10px 22px -8px rgba(217, 166, 255, 0.55);
+/* Ein Knopf-Stil pro Modus-KATEGORIE statt pro einzelnem Modus: 1v1v1v1 und
+   2v2 derselben Kategorie sehen jetzt bewusst gleich aus (Unterschied steht
+   im Text), damit Farbe eindeutig "Ranked"/"Casual"/"Üben" bedeutet statt
+   fünf beliebig unterschiedlicher Verläufe nebeneinander um Aufmerksamkeit
+   zu konkurrieren. Dieselben drei Farben ziehen sich weiter zu den
+   Tisch-Badges (.ranked-badge etc. weiter unten). */
+.btn-mode {
+  width: 100%;
 }
 
-.btn-casual4 {
-  background: linear-gradient(135deg, #6fb4ff, #6de3ac);
-  box-shadow: 0 3px 0 #2a6f8a, 0 10px 22px -8px rgba(111, 180, 255, 0.5);
+.btn-mode-ranked {
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent));
+  box-shadow: 0 3px 0 #a3801f, 0 10px 22px -8px rgba(232, 191, 74, 0.55);
 }
 
-.btn-ranked-team {
-  background: linear-gradient(135deg, #ffb46b, #ff8a8a);
-  box-shadow: 0 3px 0 #a3501a, 0 10px 22px -8px rgba(255, 138, 138, 0.5);
+.btn-mode-casual {
+  background: linear-gradient(135deg, #8ff0c0, var(--success));
+  color: #0a2417;
+  box-shadow: 0 3px 0 #1f8a5c, 0 10px 22px -8px rgba(53, 214, 138, 0.5);
 }
 
-.btn-casual-team {
-  background: linear-gradient(135deg, #7fe0e0, #6de3ac);
-  box-shadow: 0 3px 0 #1f7a6f, 0 10px 22px -8px rgba(127, 224, 224, 0.5);
-}
-
-.btn-bots {
-  background: linear-gradient(135deg, #b8c4d9, #6fb4ff);
+.btn-mode-practice {
+  background: linear-gradient(135deg, #cfe0ff, var(--info));
   color: #10192b;
   box-shadow: 0 3px 0 #34506e, 0 10px 22px -8px rgba(111, 180, 255, 0.5);
 }
@@ -467,6 +536,10 @@ button:disabled {
 
 /* --- Table header --------------------------------------------------------- */
 
+/* Info-Leiste über dem Tisch bekommt eine eigene, dezente Fläche statt
+   lose auf dem Seitenhintergrund zu schweben – wie ein Namensschild/eine
+   Infotafel über einem echten Casino-Tisch, die Raum-Code, Modus und
+   Spielstand-Infos als zusammengehörige Einheit lesbar macht. */
 .table-header {
   display: flex;
   gap: 14px;
@@ -474,6 +547,10 @@ button:disabled {
   justify-content: center;
   margin-bottom: 18px;
   flex-wrap: wrap;
+  background: rgba(0, 0, 0, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 10px 16px;
 }
 
 .room-code-label {
@@ -496,9 +573,15 @@ button:disabled {
   font-size: 0.9rem;
 }
 
-.ranked-badge {
-  background: linear-gradient(135deg, #d9a6ff, var(--accent-bright));
-  color: #21201a;
+/* Dieselbe Farb-Kategorie wie in der Lobby (siehe .btn-mode-* weiter oben):
+   Ranked-Badges immer gold, Casual-Badges immer grün, Bot-Badge immer blau –
+   egal ob 1v1v1v1 oder 2v2, damit die Kategorie am Tisch auf den ersten
+   Blick genauso erkennbar ist wie schon beim Modus-Auswählen im Menü. */
+.ranked-badge,
+.ranked-team-badge,
+.casual4-badge,
+.casual-team-badge,
+.bots-badge {
   font-family: var(--font-display);
   font-size: 0.72rem;
   font-weight: 800;
@@ -507,48 +590,21 @@ button:disabled {
   border-radius: 999px;
 }
 
-.casual4-badge {
-  background: linear-gradient(135deg, #6fb4ff, #6de3ac);
-  color: #0c2016;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  padding: 4px 10px;
-  border-radius: 999px;
-}
-
+.ranked-badge,
 .ranked-team-badge {
-  background: linear-gradient(135deg, #ffb46b, #ff8a8a);
-  color: #2b0d0d;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  padding: 4px 10px;
-  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent));
+  color: #21201a;
 }
 
+.casual4-badge,
 .casual-team-badge {
-  background: linear-gradient(135deg, #7fe0e0, #6de3ac);
-  color: #0c2016;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  padding: 4px 10px;
-  border-radius: 999px;
+  background: linear-gradient(135deg, #8ff0c0, var(--success));
+  color: #0a2417;
 }
 
 .bots-badge {
-  background: linear-gradient(135deg, #b8c4d9, #6fb4ff);
+  background: linear-gradient(135deg, #cfe0ff, var(--info));
   color: #10192b;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  padding: 4px 10px;
-  border-radius: 999px;
 }
 
 /* --- Table felt ------------------------------------------------------------ */
@@ -1206,6 +1262,9 @@ button:disabled {
 
 /* --- Action-Leiste ---------------------------------------------------------- */
 
+/* Eigene "Konsolen"-Fläche unter dem Tisch statt frei schwebender Knöpfe –
+   wie das Bedienpult an einem echten Casino-Tisch, das Fold/Check/Call/
+   Bet/Raise sichtbar als zusammengehörige Einheit gruppiert. */
 .action-bar {
   display: flex;
   gap: 10px;
@@ -1213,6 +1272,10 @@ button:disabled {
   justify-content: center;
   align-items: center;
   margin-top: 22px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 14px 16px;
 }
 
 .bet-control {

@@ -71,7 +71,7 @@
     </div>
 
     <div id="join-screen" class="screen">
-      <div class="panel">
+      <div class="panel lobby-panel">
         <div class="brand">
           <span class="brand-chip">♠</span>
           <h1>Texas Hold'em</h1>
@@ -89,44 +89,58 @@
         </div>
         <div id="my-rank-label" class="rank-label" hidden></div>
 
-        <div class="join-row">
-          <button id="create-room-btn" class="btn btn-primary">Neuen Tisch erstellen</button>
-        </div>
-        <div class="join-row">
-          <input id="room-code-input" type="text" placeholder="Raum-Code" maxlength="4" />
-          <button id="join-room-btn" class="btn btn-ghost">Tisch beitreten</button>
-        </div>
-
-        <hr class="join-divider" />
-
-        <div class="join-row">
-          <button id="ranked-queue-btn" class="btn btn-ranked">🏆 1v1v1v1 Ranked spielen</button>
-          <button id="leaderboard-btn" class="btn btn-ghost">Bestenliste</button>
-        </div>
-        <div class="join-row">
-          <button id="casual4-queue-btn" class="btn btn-casual4">🎲 1v1v1v1 Casual spielen</button>
+        <div class="lobby-section">
+          <div class="lobby-section-label">
+            <span class="lobby-chip-dot lobby-chip-dot-table"></span>Eigener Tisch
+          </div>
+          <div class="join-row">
+            <button id="create-room-btn" class="btn btn-ghost">Neuen Tisch erstellen</button>
+          </div>
+          <div class="join-row">
+            <input id="room-code-input" type="text" placeholder="Raum-Code" maxlength="4" />
+            <button id="join-room-btn" class="btn btn-ghost">Tisch beitreten</button>
+          </div>
         </div>
 
-        <hr class="join-divider" />
-
-        <div class="join-row">
-          <button id="ranked-team-queue-btn" class="btn btn-ranked-team">⚔️ 2v2 Ranked spielen</button>
+        <div class="lobby-section">
+          <div class="lobby-section-label lobby-section-label-ranked">
+            <span class="lobby-chip-dot lobby-chip-dot-ranked"></span>Ranked · zählt für deinen Rang
+          </div>
+          <div class="join-row">
+            <button id="ranked-queue-btn" class="btn btn-mode btn-mode-ranked">🏆 1v1v1v1 spielen</button>
+          </div>
+          <div class="join-row">
+            <button id="ranked-team-queue-btn" class="btn btn-mode btn-mode-ranked">🏆 2v2 spielen</button>
+          </div>
+          <div class="join-row">
+            <button id="leaderboard-btn" class="btn btn-ghost btn-small">Bestenliste</button>
+            <button id="rank-path-btn" class="btn btn-ghost btn-small">📈 Mein Rang</button>
+          </div>
         </div>
-        <div class="join-row">
-          <button id="casual-team-queue-btn" class="btn btn-casual-team">👥 2v2 Casual spielen</button>
+
+        <div class="lobby-section">
+          <div class="lobby-section-label lobby-section-label-casual">
+            <span class="lobby-chip-dot lobby-chip-dot-casual"></span>Casual · zum Spaß, ohne Rang-Bezug
+          </div>
+          <div class="join-row">
+            <button id="casual4-queue-btn" class="btn btn-mode btn-mode-casual">🎲 1v1v1v1 spielen</button>
+          </div>
+          <div class="join-row">
+            <button id="casual-team-queue-btn" class="btn btn-mode btn-mode-casual">🎲 2v2 spielen</button>
+          </div>
         </div>
 
-        <hr class="join-divider" />
-
-        <div class="join-row">
-          <button id="bots-setup-btn" class="btn btn-bots">🤖 Gegen Bots üben</button>
+        <div class="lobby-section">
+          <div class="lobby-section-label lobby-section-label-practice">
+            <span class="lobby-chip-dot lobby-chip-dot-practice"></span>Üben
+          </div>
+          <div class="join-row">
+            <button id="bots-setup-btn" class="btn btn-mode btn-mode-practice">🤖 Gegen Bots üben</button>
+          </div>
         </div>
 
-        <hr class="join-divider" />
-
-        <div class="join-row">
-          <button id="friends-btn" class="btn btn-ghost">👥 Freunde</button>
-          <button id="rank-path-btn" class="btn btn-ghost">📈 Mein Rang</button>
+        <div class="lobby-footer">
+          <button id="friends-btn" class="btn btn-ghost btn-small">👥 Freunde</button>
         </div>
       </div>
     </div>
