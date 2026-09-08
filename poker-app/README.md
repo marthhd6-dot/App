@@ -124,6 +124,25 @@ Chip-Stände definiert.
   unten in der Mitte), animiertes Karten-Austeilen (siehe unten), ein
   pulsierender Rahmen um den aktiven Spieler, Konfetti bei einem eigenen
   Sieg, und eine identische Optik für Ranked-Warteschlange und Bestenliste.
+- **Casino-Lobby-Menü statt loser Knopf-Liste** (`public/index.html`/
+  `style.css`): Das Hauptmenü gruppiert die Spielmodi in klar beschriftete
+  Abschnitte ("Eigener Tisch", "Ranked", "Casual", "Üben") mit
+  Sektions-Label und farbigem Chip-Punkt (`.lobby-section`,
+  `.lobby-chip-dot-*`) – wie die Kategorien einer echten Casino-Lobby. Eine
+  einzige Farbe pro KATEGORIE statt pro einzelnem Modus: Gold ist exklusiv
+  für Ranked reserviert (`.btn-mode-ranked`, egal ob 1v1v1v1 oder 2v2),
+  Grün für Casual (`.btn-mode-casual`), Blau-Grau für den Übungsmodus
+  (`.btn-mode-practice`) – derselbe Farbcode zieht sich weiter zu den
+  Tisch-Badges (`.ranked-badge`/`.ranked-team-badge` usw.), damit die
+  Kategorie am Tisch genauso erkennbar bleibt wie im Menü. Zusätzlich
+  bekommen Tisch-Kopfzeile (`.table-header`) und Aktions-Leiste
+  (`.action-bar`) eine eigene, dezente Hintergrund-Fläche statt lose auf dem
+  Seitenhintergrund zu schweben – wie eine Infotafel bzw. ein Bedienpult an
+  einem echten Casino-Tisch. Nebenbei behoben: `#bots-screen` und
+  `#rank-screen` hingen zuvor am linken Rand statt zentriert zu sein, weil
+  die alte Zentrierung nur für drei einzelne Screen-IDs per Hand nachgezogen
+  war – jetzt zentriert sich jedes `.panel` einheitlich über `margin: 0
+  auto`.
 - **Deal-Animationen** (`public/app.js`/`style.css`): Community Cards und
   die eigenen Hole Cards fliegen beim Austeilen mit Stagger-Delay ein
   (`.deal-in`, siehe `renderCommunityCards()`/`renderMyCards()`), erkannt
