@@ -23,7 +23,9 @@ poker-app/
 │   ├── rooms.js              # Verwaltet mehrere Tische über Raum-Codes
 │   ├── persistence.js        # Lädt/speichert Raum-Snapshots + Ränge in SQLite
 │   ├── ranking.js            # ELO-artige Rating-/Rang-Logik für 1v1v1v1 Ranked
-│   ├── blinds.js              # Turnier-Blind-Zeitplan für Ranked-Matches
+│   ├── blinds.js             # Turnier-Blind-Zeitplan für alle Modi
+│   ├── bots.js                # Heuristische Bot-KI (Entscheidungen pro Rang-Stufe)
+│   ├── botNames.js           # Pool menschlich klingender Bot-Nutzernamen
 │   └── server.js             # Express + Socket.io Server, liefert public/ aus
 ├── data/                     # Gespeicherte Chip-Stände & Ränge (rooms.db, gitignored)
 └── tests/
@@ -32,7 +34,9 @@ poker-app/
     ├── rooms.test.js
     ├── persistence.test.js
     ├── ranking.test.js
-    └── blinds.test.js
+    ├── blinds.test.js
+    ├── bots.test.js
+    └── botNames.test.js
 ```
 
 ## Setup
@@ -282,8 +286,13 @@ Chip-Stände definiert.
   Entscheidung, damit sich ein aufgefülltes Match nicht anders anfühlt als
   ein echtes. Die Bots selbst haben aber keinen dauerhaften Account: ihr
   Rating für die ELO-Rechnung ist nur für dieses eine Match gültig und wird
-  nie in `player_ranks`/der Bestenliste gespeichert; ihr Name (z. B.
-  "Gold-Bot 2") macht sie trotzdem transparent als Bot erkennbar. Dieselbe
+  nie in `player_ranks`/der Bestenliste gespeichert. Ihr Name kommt aus
+  einem Pool menschlich klingender Nutzernamen (`pickBotNames()` in
+  `botNames.js`, zufällig gewählt und ohne Überschneidung mit den
+  Namen der echten Spieler am Tisch), statt sie über ein erkennbares Schema
+  wie "Gold-Bot 2" zu verraten – erkennbar bleiben sie serverseitig trotzdem
+  über die `bots`-Map jedes Raums bzw. `state.botIds` im Client (z. B. für
+  die "Denkt nach …"-Anzeige). Dieselbe
   Bot-Infrastruktur (`decideBotAction()` aus `bots.js`,
   `maybeTriggerBotActions()` für die automatischen Züge inkl. Bedenkzeit)
   wird auch vom expliziten "Gegen Bots üben"-Modus genutzt –
