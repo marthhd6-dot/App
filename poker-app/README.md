@@ -11,10 +11,14 @@ mit Claude Code weiter aus.
 ```
 poker-app/
 ├── package.json
+├── capacitor.config.json     # Native-App-Konfiguration (siehe "Native App" unten)
+├── ios/                      # Generiertes Xcode-Projekt (Capacitor), Bauen nur auf macOS
 ├── public/                   # Statisches Browser-Frontend (kein Build-Schritt)
 │   ├── index.html
 │   ├── style.css
-│   └── app.js
+│   ├── app.js
+│   ├── server-config.js      # Server-URL-Routing Browser vs. native App
+│   └── vendor/socket.io.min.js
 ├── src/
 │   ├── game/
 │   │   ├── deck.js           # Deck erzeugen, mischen, ziehen
@@ -85,6 +89,75 @@ Chip-Stände definiert.
 - Ohne Blueprint geht es auch manuell: **New → Web Service**, Root
   Directory `poker-app`, Build Command `npm ci`, Start Command
   `npm start`, dieselben Env-Vars wie oben von Hand setzen.
+
+## Native App (iOS, über Capacitor)
+
+Die App ist im Kern weiterhin reines Server-gerendertes HTML/CSS/JS ohne
+Build-Schritt (siehe `public/`) – für den App Store braucht es trotzdem
+eine native Hülle. Dafür ist [Capacitor](https://capacitorjs.com/) bereits
+eingerichtet: `capacitor.config.json` (App-ID, App-Name, `webDir: public`)
+und ein generiertes Xcode-Projekt unter `ios/App/`. Capacitor packt dafür
+eine **lokale Kopie** von `public/` in die App (kein Server im
+App-Bundle – der bleibt separat gehostet, z. B. auf Render), das native
+Shell-Fenster lädt also `index.html` als Datei statt per HTTP.
+
+Damit `socket.io` trotzdem den richtigen Server findet, unterscheidet
+`public/server-config.js` (vor `app.js` geladen) zwei Fälle:
+
+- **Normaler Browser-Betrieb** (lokal per `npm start` oder z. B. über
+  Render): `window.POKER_SERVER_URL` bleibt leer, `io()` verbindet sich
+  wie bisher automatisch mit dem eigenen Origin – unverändertes Verhalten.
+- **Native App**: erkannt über `window.Capacitor.isNativePlatform()` (von
+  der Capacitor-Laufzeit automatisch bereitgestellt, kein zusätzliches
+  `<script>`-Tag nötig) – dann wird explizit die in `server-config.js`
+  hinterlegte `NATIVE_SERVER_URL` angesprochen (Standard: die aktuelle
+  Render-URL aus `public/sitemap.xml`). **Bei einem Domain-/Server-Wechsel
+  muss dieser Wert manuell angepasst werden.**
+
+Das `socket.io`-Client-Skript selbst liegt dafür als lokale Kopie unter
+`public/vendor/socket.io.min.js` (kopiert aus
+`node_modules/socket.io/client-dist/`, Version an den Server in
+`package.json` angleichen) statt wie vorher vom Server unter
+`/socket.io/socket.io.js` ausgeliefert zu werden – das funktioniert nur,
+solange ein Express-Server tatsächlich läuft, in der gebündelten
+Datei-Kopie der nativen App aber nicht.
+
+**Wichtig: Der Rest der iOS-Einrichtung braucht einen Mac mit Xcode.**
+Diese Session lief in einer Linux-Umgebung ohne Xcode/CocoaPods – das
+Xcode-Projekt selbst wurde bereits generiert (`npx cap add ios`) und
+lässt sich committen, aber Bauen/Signieren/Ausführen/Einreichen geht nur
+auf einem Mac:
+
+```bash
+cd poker-app
+npm install                # zieht auch @capacitor/core, @capacitor/cli, @capacitor/ios
+npm run cap:sync           # kopiert public/ erneut nach ios/App/App/public + synct Plugins
+npm run cap:open:ios       # öffnet ios/App/App.xcodeproj in Xcode
+```
+
+In Xcode dann:
+
+1. **Signing & Capabilities** → euer Apple-Developer-Team auswählen
+   (Apple Developer Program, 99 $/Jahr, siehe
+   [developer.apple.com](https://developer.apple.com)).
+2. Falls CocoaPods-Plugins dazukommen: `cd ios/App && pod install`, danach
+   `App.xcworkspace` statt `App.xcodeproj` öffnen.
+3. App-Icons/Splash-Screen in `ios/App/App/Assets.xcassets` ersetzen
+   (aktuell nur Platzhalter).
+4. `capacitor.config.json` → `appId` (`com.pokerapp.texasholdem`) auf die
+   echte, im eigenen Apple-Developer-Account registrierte Bundle-ID
+   ändern, falls abweichend.
+5. Auf Simulator/eigenem Gerät testen, dann über **TestFlight** verteilen,
+   bevor ihr zur App-Review einreicht.
+
+**Zur Einordnung (Apple-Richtlinien für Poker/Glücksspiel-nahe Apps):**
+Auch ohne Echtgeld prüft Apple Poker-/Karten-Apps mit "Chips" strenger
+(Guideline 4.7 / 3.1.1). Wichtig für eine Freigabe ohne Glücksspiel-Lizenz:
+konsequent klarstellen, dass es **kein Echtgeld, keinen Chip-Kauf und
+keinen Cash-out** gibt (steht in der App bereits so in der
+Meta-Beschreibung), Altersfreigabe vermutlich 17+, und für den Multiplayer-
+Chat/die Namensvergabe eine Melde-/Blockier-Möglichkeit sowie eine
+Datenschutzerklärungs-URL in App Store Connect einplanen.
 
 ## Was schon funktioniert
 
