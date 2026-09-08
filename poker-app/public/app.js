@@ -726,7 +726,11 @@ function avatarColorFor(name) {
 // der eigene Platz liegt dabei immer unten in der Mitte. winnerIds enthält
 // die Spieler, die die zuletzt gezeigte Hand gewonnen haben (leer, solange
 // keine Hand beendet ist), damit ihr Sitzplatz golden hervorgehoben wird.
-function renderSeats(state, winnerIds) {
+// animateDeal: true unmittelbar beim Start einer neuen Hand (siehe
+// isNewHand in render()) – lässt die verdeckten Mini-Karten der Gegner
+// reihum "eingeteilt" wirken (Stagger-Delay nach Sitzplatz-Reihenfolge),
+// statt bei jedem State-Update neu einzufliegen.
+function renderSeats(state, winnerIds, animateDeal) {
   const container = document.getElementById('players-list');
   container.innerHTML = '';
 
@@ -772,6 +776,27 @@ function renderSeats(state, winnerIds) {
     seat.style.left = `${left}%`;
     seat.style.top = `${top}%`;
 
+    // Verdeckte Mini-Karten: nur für Gegner, die noch im Spiel sind und
+    // deren Hole Cards für mich nicht sichtbar sind (p.holeCards === null –
+    // bei mir selbst bzw. im 2v2-Casual-Teammitglied stehen die echten,
+    // großen Karten schon weiter unten, daher hier keine Dopplung). Zeigt
+    // rein optisch "diese Spieler halten noch Karten", ohne irgendetwas
+    // über deren Inhalt zu verraten.
+    const showHiddenCards = state.phase !== 'waiting' && !p.folded && p.holeCards === null;
+    const dealClass = animateDeal ? ' deal-in' : '';
+    // Wie am echten Tisch: erst geht eine Karte reihum an jeden Spieler,
+    // dann die zweite Runde (siehe Table.startHand() in table.js) – daher
+    // die zweite Mini-Karte um n Sitzplätze verzögert statt gleichzeitig
+    // mit der ersten.
+    const delay1 = animateDeal ? `style="animation-delay:${i * 0.06}s"` : '';
+    const delay2 = animateDeal ? `style="animation-delay:${(n + i) * 0.06}s"` : '';
+    const hiddenCardsHtml = showHiddenCards
+      ? `<div class="seat-cards">
+          <span class="mini-card-back${dealClass}" ${delay1}></span>
+          <span class="mini-card-back${dealClass}" ${delay2}></span>
+        </div>`
+      : '';
+
     const initial = (p.name[0] || '?').toUpperCase();
     seat.innerHTML = `
       <div class="seat-pod">
@@ -781,6 +806,7 @@ function renderSeats(state, winnerIds) {
           <span class="seat-chips">${p.chips} Chips</span>
         </div>
       </div>
+      ${hiddenCardsHtml}
       <div class="seat-bet">${p.bet > 0 ? `<span class="chip-icon"></span>Einsatz: ${p.bet}` : ''}</div>
       <div class="seat-badges">${badges.map((b) => `<span class="badge ${b.cls}">${b.label}</span>`).join('')}</div>
     `;
@@ -843,7 +869,7 @@ function render(state) {
   const winnerIds = new Set(
     state.lastHandResult ? state.lastHandResult.pots.flatMap((pot) => pot.winners.map((w) => w.id)) : []
   );
-  renderSeats(state, winnerIds);
+  renderSeats(state, winnerIds, isNewHand);
 
   const me = state.players.find((p) => p.id === mySocketId);
   renderMyCards((me && me.holeCards) || [], isNewHand);
