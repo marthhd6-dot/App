@@ -268,6 +268,26 @@ Chip-Stände definiert.
   eine Liste weiterer Spieler-IDs entgegen, deren Karten ebenfalls sichtbar
   sein sollen, befüllt von `broadcastRoomState()` anhand der Team-Zuordnung
   des jeweiligen Casual-2v2-Raums.
+- **Bot-Auffüllung in allen vier Matchmaking-Modi** (`maybeBackfillQueueWithBots()`
+  in `server.js`): Findet sich innerhalb von `BOT_BACKFILL_DELAY_MS`
+  (Standard 15s, überschreibbar) keine volle Menschen-Gruppe, werden die
+  restlichen Plätze mit Bots aufgefüllt – deren Rang-Stufe leitet sich aus
+  dem durchschnittlichen Rating der wartenden Spieler ab (`tierForRating()`
+  in `ranking.js`), damit sie fair zur Warteschlange passen (auch bei
+  Casual, obwohl das gespeicherte Rating dort sonst keine Rolle spielt).
+  Bots nehmen wie echte Mit-/Gegenspieler am Match teil, inklusive
+  normaler Rating-Auswirkung für die Menschen in den Ranked-Modi
+  (`maybeFinishRankedMatch()`/`maybeFinishRankedTeamMatch()`) – bewusste
+  Entscheidung, damit sich ein aufgefülltes Match nicht anders anfühlt als
+  ein echtes. Die Bots selbst haben aber keinen dauerhaften Account: ihr
+  Rating für die ELO-Rechnung ist nur für dieses eine Match gültig und wird
+  nie in `player_ranks`/der Bestenliste gespeichert; ihr Name (z. B.
+  "Gold-Bot 2") macht sie trotzdem transparent als Bot erkennbar. Dieselbe
+  Bot-Infrastruktur (`decideBotAction()` aus `bots.js`,
+  `maybeTriggerBotActions()` für die automatischen Züge inkl. Bedenkzeit)
+  wird auch vom expliziten "Gegen Bots üben"-Modus genutzt –
+  `getMatchEntry()` findet dafür den passenden Raum-Eintrag unabhängig vom
+  konkreten Modus.
 - **Freundesliste** (`public/app.js` + Präsenz in `server.js`): Die Liste
   selbst (nur Namen) liegt rein im `localStorage` des Browsers – Freunde
   sind unabhängig davon, ob einer der beiden einen Account hat (s. u.).

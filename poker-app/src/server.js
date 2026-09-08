@@ -21,11 +21,22 @@
 //   – und als Besonderheit sieht jeder Spieler zusätzlich die Hole Cards
 //   seines Teammitglieds (siehe extraVisibleIds in broadcastRoomState()).
 //
-// Gegen Bots üben (play-vs-bots): startet sofort (kein Matchmaking) einen
-// eigenen Raum mit 1-3 Bot-Gegnern einer wählbaren Rang-Stufe. Bots haben
-// keinen echten Socket – ihre Züge kommen aus decideBotAction() (siehe
-// bots.js) und werden nach jeder Aktion automatisch nachgezogen (siehe
-// maybeTriggerBotActions()). Rein zum Üben, kein Rating-Bezug.
+// Bot-Auffüllung in allen vier Modi: Findet sich innerhalb von
+// BOT_BACKFILL_DELAY_MS (Standard 15s) keine volle Menschen-Gruppe, füllt
+// maybeBackfillQueueWithBots() die restlichen Plätze mit Bots einer zum
+// Rating der Wartenden passenden Rang-Stufe auf (tierForRating()), damit
+// niemand unbegrenzt warten muss. Bots nehmen dabei wie echte Mit-/
+// Gegenspieler am Match teil (auch Ranked-Rating-Auswirkung für die
+// Menschen), haben aber selbst keinen dauerhaften Account – ihr Name macht
+// sie transparent erkennbar ("Gold-Bot 1" o. Ä.), ihr Rating wird nie
+// gespeichert. decideBotAction() (siehe bots.js) liefert ihre Züge, die
+// nach jeder Aktion mit einer kurzen "Bedenkzeit" automatisch nachgezogen
+// werden (siehe maybeTriggerBotActions()).
+//
+// Gegen Bots üben (play-vs-bots): eigener, expliziter Modus – startet
+// sofort (kein Matchmaking) einen Raum mit 1-3 selbst gewählten
+// Bot-Gegnern, rein zum Üben, kein Rating-Bezug. Nutzt dieselbe
+// Bot-Infrastruktur wie die automatische Auffüllung oben.
 //
 // Freundesliste: Die Liste selbst liegt nur im Browser (localStorage) des
 // jeweiligen Spielers – der Server speichert keine Freundschaften, sondern
@@ -159,11 +170,20 @@ const casualTeamQueue = [];
 const casualTeamRooms = new Map();
 
 // Übungs-Räume gegen Bots (siehe play-vs-bots weiter unten): code -> {
-// bots: Map(botId -> Rang-Stufe), eliminatedOrder }. eliminatedOrder wird
-// von der bereits für Ranked/Casual genutzten trackEliminations()
+// bots: Map(botId -> { tier, rating }), eliminatedOrder }. Dieselbe Form
+// von "bots" wird auch von rankedRooms/casualMatchRooms/rankedTeamRooms/
+// casualTeamRooms genutzt, sobald deren Warteschlange nicht rechtzeitig
+// voll wurde und mit Bots aufgefüllt werden musste (siehe
+// maybeBackfillQueueWithBots()) – so kann maybeTriggerBotActions() für
+// jeden Raumtyp einheitlich prüfen, ob und welche Bots dort sitzen, ohne
+// den Raumtyp selbst zu kennen (siehe getMatchEntry()). rating ist bei
+// reinen Übungs-Bots ungenutzt (null), bei aufgefüllten Ranked-Bots das
+// beim Auffüllen zugewiesene, rein für die ELO-Berechnung dieses einen
+// Matches gültige Rating (siehe maybeFinishRankedMatch()). eliminatedOrder
+// wird von der bereits für Ranked/Casual genutzten trackEliminations()
 // wiederverwendet, um Bust-Reihenfolge und Match-Ende einheitlich zu
-// behandeln. Bots haben keinen echten Socket – nur der menschliche Spieler
-// bekommt Ergebnisse gemeldet (siehe maybeFinishBotMatch()). Bot-Räume
+// behandeln. Bots haben keinen echten Socket – nur menschliche Spieler
+// bekommen Ergebnisse gemeldet. Reine Übungs-Räume (aus play-vs-bots)
 // werden bewusst NICHT persistiert (siehe persist()): nach einem
 // Server-Neustart gäbe es sonst einen "verwaisten", nie wieder
 // verbindbaren Bot-Platzhalter am Tisch. Für eine reine Übungsrunde ist
@@ -185,6 +205,57 @@ const BOT_THINK_DELAY_MAX_MS = Number(process.env.BOT_THINK_DELAY_MAX_MS) || 180
 
 function botThinkDelayMs() {
   return BOT_THINK_DELAY_MIN_MS + Math.random() * (BOT_THINK_DELAY_MAX_MS - BOT_THINK_DELAY_MIN_MS);
+}
+
+// Wie lange eine Ranked/Casual-Warteschlange (auch 2v2) auf echte
+// Mitspieler wartet, bevor die restlichen Plätze mit Bots aufgefüllt
+// werden, damit niemand unbegrenzt warten muss. Über
+// BOT_BACKFILL_DELAY_MS überschreibbar (z. B. für Tests).
+const BOT_BACKFILL_DELAY_MS = Number(process.env.BOT_BACKFILL_DELAY_MS) || 15_000;
+
+// Liefert die Spieler-ID eines Warteschlangen-/Team-Eintrags: bei einem
+// echten Spieler die Socket-ID, bei einem Auffüll-Bot (kein Socket) die
+// beim Erzeugen vergebene Bot-ID (siehe maybeBackfillQueueWithBots()).
+function entryId(entry) {
+  return entry.socket ? entry.socket.id : entry.id;
+}
+
+// Sobald der am längsten wartende Eintrag einer Warteschlange
+// BOT_BACKFILL_DELAY_MS überschritten hat, ohne dass eine volle Gruppe
+// echter Spieler zusammenkam, wird der Rest der Gruppe mit Bots
+// aufgefüllt (deren Rang-Stufe sich am Rating der wartenden Spieler
+// orientiert, siehe tierForRating()), damit das Match trotzdem starten
+// kann. Gibt die vollständige Gruppe zurück (Menschen zuerst, dann die
+// neu erzeugten Bot-Einträge) und leert dabei die übergebene queue, oder
+// gibt null zurück, wenn (noch) kein Backfill nötig ist.
+function maybeBackfillQueueWithBots(queue, groupSize) {
+  if (queue.length === 0) return null;
+  const oldest = queue[0];
+  if (Date.now() - oldest.joinedAt < BOT_BACKFILL_DELAY_MS) return null;
+
+  const humanEntries = queue.splice(0, queue.length);
+  const botsNeeded = groupSize - humanEntries.length;
+  if (botsNeeded <= 0) return humanEntries;
+
+  // Durchschnittliches Rating der Wartenden bestimmt die Bot-Stärke –
+  // unabhängig davon, ob die Warteschlange selbst Ratings kennt (Ranked)
+  // oder nicht (Casual): dort wird das gespeicherte Rating jedes Namens
+  // nachgeschlagen, obwohl es fürs eigentliche Matchmaking irrelevant ist,
+  // rein um die Bots realistisch passend zu besetzen.
+  const avgRating =
+    humanEntries.reduce((sum, e) => sum + getOrCreateRank(e.name).rating, 0) / humanEntries.length;
+
+  const botEntries = [];
+  for (let i = 0; i < botsNeeded; i++) {
+    const tier = tierForRating(Math.round(avgRating));
+    botEntries.push({
+      id: nextBotId(),
+      name: botsNeeded > 1 ? `${tier}-Bot ${i + 1}` : `${tier}-Bot`,
+      rating: avgRating,
+      tier,
+    });
+  }
+  return [...humanEntries, ...botEntries];
 }
 
 function getOrCreateRank(name) {
@@ -454,7 +525,7 @@ io.on('connection', (socket) => {
       const botId = nextBotId();
       const botName = count > 1 ? `${tierName}-Bot ${i + 1}` : `${tierName}-Bot`;
       table.addPlayer(botId, botName);
-      bots.set(botId, tierName);
+      bots.set(botId, { tier: tierName, rating: null });
     }
     botRooms.set(code, { bots, eliminatedOrder: [] });
 
@@ -633,12 +704,18 @@ io.on('connection', (socket) => {
       const currentTable = rooms.getTable(roomCode);
       if (!currentTable) return;
       currentTable.removePlayer(socket.id);
-      // In einem Bot-Raum bleiben Bots nach einem Verlassen des Menschen
-      // für immer sitzen (sie haben keinen eigenen Reconnect) – ohne diese
-      // Prüfung würde players.length nie 0 erreichen und der Raum bliebe
-      // dauerhaft (unbespielt) im Speicher hängen.
-      const botEntry = botRooms.get(roomCode);
-      const onlyBotsLeft = botEntry && currentTable.players.every((p) => botEntry.bots.has(p.id));
+      // Bots bleiben nach einem Verlassen des letzten Menschen für immer
+      // sitzen (sie haben keinen eigenen Reconnect) – ohne diese Prüfung
+      // würde players.length nie 0 erreichen und der Raum bliebe dauerhaft
+      // (unbespielt) im Speicher hängen. Gilt für jeden Raumtyp, der Bots
+      // enthalten kann (reine Bot-Übung wie auch mit Bots aufgefüllte
+      // Ranked/Casual-Matches, siehe getMatchEntry()).
+      const matchEntry = getMatchEntry(roomCode);
+      const onlyBotsLeft =
+        matchEntry &&
+        matchEntry.bots &&
+        currentTable.players.length > 0 &&
+        currentTable.players.every((p) => matchEntry.bots.has(p.id));
       if (currentTable.players.length === 0 || onlyBotsLeft) {
         rooms.removeRoom(roomCode);
         rankedRooms.delete(roomCode);
@@ -654,6 +731,21 @@ io.on('connection', (socket) => {
     disconnectTimers.set(timerKey(roomCode, socket.id), timer);
   });
 });
+
+// Liefert den Matchmaking-Eintrag eines Raums, unabhängig davon, aus
+// welchem der fünf Modi (Ranked/Casual/2v2 Ranked/2v2 Casual/Bot-Übung) er
+// stammt – nützlich für Code wie maybeTriggerBotActions() oder die
+// Aufräum-Logik beim Verbindungsabbruch, der/die den Raumtyp selbst nicht
+// kennen muss, nur ob (und welche) Bots darin sitzen (siehe .bots).
+function getMatchEntry(code) {
+  return (
+    rankedRooms.get(code) ||
+    casualMatchRooms.get(code) ||
+    rankedTeamRooms.get(code) ||
+    casualTeamRooms.get(code) ||
+    botRooms.get(code)
+  );
+}
 
 // Liefert die Badge-/Team-Infos für room-joined, je nachdem aus welchem
 // Matchmaking-Modus (falls überhaupt) der Raum stammt.
@@ -711,32 +803,48 @@ function joinTable(socket, code, name) {
 // mehr gefunden werden. Wird nach jedem neuen Beitritt sofort aufgerufen
 // und zusätzlich periodisch (siehe MATCHMAKING_INTERVAL_MS), damit auch
 // wartende Spieler von der mit der Zeit wachsenden Toleranz profitieren.
+// Findet sich auch nach BOT_BACKFILL_DELAY_MS noch keine volle
+// Menschen-Gruppe, füllt maybeBackfillQueueWithBots() den Rest mit Bots
+// auf, damit niemand unbegrenzt warten muss.
 function runMatchmakingPass() {
   const group = findMatchmakingGroup(rankedQueue, RANKED_GROUP_SIZE);
-  if (!group) return;
-  // Absteigend entfernen, damit die kleineren Indizes beim Entfernen
-  // größerer Indizes gültig bleiben.
-  const entries = [...group]
-    .sort((a, b) => b - a)
-    .map((idx) => rankedQueue.splice(idx, 1)[0])
-    .reverse();
-  startRankedMatch(entries);
-  runMatchmakingPass(); // in der restlichen Warteschlange könnten weitere Gruppen stecken
+  if (group) {
+    // Absteigend entfernen, damit die kleineren Indizes beim Entfernen
+    // größerer Indizes gültig bleiben.
+    const entries = [...group]
+      .sort((a, b) => b - a)
+      .map((idx) => rankedQueue.splice(idx, 1)[0])
+      .reverse();
+    startRankedMatch(entries);
+    runMatchmakingPass(); // in der restlichen Warteschlange könnten weitere Gruppen stecken
+    return;
+  }
+  const backfilled = maybeBackfillQueueWithBots(rankedQueue, RANKED_GROUP_SIZE);
+  if (backfilled) startRankedMatch(backfilled);
 }
 setInterval(runMatchmakingPass, MATCHMAKING_INTERVAL_MS);
 
 // Legt für eine Gruppe wartender Spieler einen neuen Raum an, setzt ein
 // kleineres Ranked-Startkapital und markiert den Raum für die
-// Bust-Erkennung nach jeder Hand (siehe maybeFinishRankedMatch).
+// Bust-Erkennung nach jeder Hand (siehe maybeFinishRankedMatch). entries
+// kann Bot-Einträge enthalten (siehe maybeBackfillQueueWithBots()) – die
+// haben keinen Socket, nehmen aber sonst wie echte Spieler am Match teil
+// (inkl. normaler Rating-Auswirkung für die Menschen, siehe
+// maybeFinishRankedMatch()).
 function startRankedMatch(entries) {
   const code = rooms.createRoom();
-  rankedRooms.set(code, { eliminatedOrder: [], handsPlayed: 0 });
+  const bots = new Map();
+  entries.forEach((e) => {
+    if (!e.socket) bots.set(e.id, { tier: e.tier, rating: e.rating });
+  });
+  rankedRooms.set(code, { eliminatedOrder: [], handsPlayed: 0, bots });
   const table = rooms.getTable(code);
   for (const entry of entries) {
-    table.addPlayer(entry.socket.id, entry.name, RANKED_STARTING_CHIPS);
+    table.addPlayer(entryId(entry), entry.name, RANKED_STARTING_CHIPS);
   }
 
   for (const entry of entries) {
+    if (!entry.socket) continue; // Bots haben keinen Socket zum Beitreten/Benachrichtigen
     entry.socket.data.roomCode = code;
     entry.socket.join(code);
     entry.socket.emit('room-joined', {
@@ -751,28 +859,40 @@ function startRankedMatch(entries) {
 }
 
 // Legt reine FIFO-Gruppen von CASUAL_GROUP_SIZE wartenden Spielern an,
-// solange genug in der Warteschlange stehen – kein Rating-Bezug, daher
-// keine Toleranz und kein periodischer Timer nötig wie beim Ranked-Modus.
+// solange genug in der Warteschlange stehen – kein Rating-Bezug für die
+// Gruppierung selbst, daher keine Toleranz wie beim Ranked-Modus. Läuft
+// zusätzlich periodisch (siehe MATCHMAKING_INTERVAL_MS), damit auch eine
+// nicht ganz volle Warteschlange nach BOT_BACKFILL_DELAY_MS mit Bots
+// aufgefüllt wird, statt nur bei neuen Beitritten geprüft zu werden.
 function runCasualMatchmakingPass() {
   while (casualQueue.length >= CASUAL_GROUP_SIZE) {
     const entries = casualQueue.splice(0, CASUAL_GROUP_SIZE);
     startCasualMatch(entries);
   }
+  const backfilled = maybeBackfillQueueWithBots(casualQueue, CASUAL_GROUP_SIZE);
+  if (backfilled) startCasualMatch(backfilled);
 }
+setInterval(runCasualMatchmakingPass, MATCHMAKING_INTERVAL_MS);
 
 // Legt für eine Gruppe wartender Spieler einen neuen Casual-Raum mit dem
 // üblichen Startkapital und festen Blinds an (kein Turnier-Zeitplan) und
 // markiert ihn für die Bust-Erkennung nach jeder Hand (siehe
-// maybeFinishCasualMatch).
+// maybeFinishCasualMatch). entries kann Bot-Einträge enthalten (siehe
+// maybeBackfillQueueWithBots()).
 function startCasualMatch(entries) {
   const code = rooms.createRoom();
-  casualMatchRooms.set(code, { eliminatedOrder: [] });
+  const bots = new Map();
+  entries.forEach((e) => {
+    if (!e.socket) bots.set(e.id, { tier: e.tier, rating: e.rating });
+  });
+  casualMatchRooms.set(code, { eliminatedOrder: [], bots });
   const table = rooms.getTable(code);
   for (const entry of entries) {
-    table.addPlayer(entry.socket.id, entry.name);
+    table.addPlayer(entryId(entry), entry.name);
   }
 
   for (const entry of entries) {
+    if (!entry.socket) continue;
     entry.socket.data.roomCode = code;
     entry.socket.join(code);
     entry.socket.emit('room-joined', {
@@ -790,17 +910,26 @@ function startCasualMatch(entries) {
 // Sucht per findMatchmakingGroup() so lange nach passenden 4er-Gruppen für
 // 2v2 Ranked, bis keine mehr gefunden werden – analog zu
 // runMatchmakingPass(), nur dass die Gruppe danach zusätzlich in zwei
-// Teams aufgeteilt wird (siehe balanceIntoTeams()).
+// Teams aufgeteilt wird (siehe balanceIntoTeams()). Wie beim 1v1v1v1-
+// Ranked-Modus füllt maybeBackfillQueueWithBots() nach BOT_BACKFILL_DELAY_MS
+// mit Bots auf, falls keine volle Menschen-Gruppe zusammenkam.
 function runRankedTeamMatchmakingPass() {
   const group = findMatchmakingGroup(rankedTeamQueue, TEAM_GROUP_SIZE);
-  if (!group) return;
-  const entries = [...group]
-    .sort((a, b) => b - a)
-    .map((idx) => rankedTeamQueue.splice(idx, 1)[0])
-    .reverse();
-  const [teamA, teamB] = balanceIntoTeams(entries);
-  startRankedTeamMatch(teamA, teamB);
-  runRankedTeamMatchmakingPass();
+  if (group) {
+    const entries = [...group]
+      .sort((a, b) => b - a)
+      .map((idx) => rankedTeamQueue.splice(idx, 1)[0])
+      .reverse();
+    const [teamA, teamB] = balanceIntoTeams(entries);
+    startRankedTeamMatch(teamA, teamB);
+    runRankedTeamMatchmakingPass();
+    return;
+  }
+  const backfilled = maybeBackfillQueueWithBots(rankedTeamQueue, TEAM_GROUP_SIZE);
+  if (backfilled) {
+    const [teamA, teamB] = balanceIntoTeams(backfilled);
+    startRankedTeamMatch(teamA, teamB);
+  }
 }
 setInterval(runRankedTeamMatchmakingPass, MATCHMAKING_INTERVAL_MS);
 
@@ -819,10 +948,12 @@ function balanceIntoTeams(entries) {
 // Legt für zwei Teams einen neuen 2v2-Ranked-Raum an (Startkapital wie
 // Ranked, Turnier-Blind-Zeitplan über handsPlayed) und merkt sich die
 // Team-Zuordnung für die Bust-Erkennung (siehe maybeFinishRankedTeamMatch).
+// teamA/teamB können Bot-Einträge enthalten (siehe
+// maybeBackfillQueueWithBots()).
 function startRankedTeamMatch(teamA, teamB) {
   const code = rooms.createRoom();
-  const { teams, members } = buildTeamAssignment(teamA, teamB);
-  rankedTeamRooms.set(code, { teams, members, handsPlayed: 0 });
+  const { teams, members, bots } = buildTeamAssignment(teamA, teamB);
+  rankedTeamRooms.set(code, { teams, members, handsPlayed: 0, bots });
   const table = rooms.getTable(code);
   for (const entry of members) {
     table.addPlayer(entry.id, entry.name, RANKED_STARTING_CHIPS);
@@ -832,20 +963,27 @@ function startRankedTeamMatch(teamA, teamB) {
 
 // Legt reine FIFO-2v2-Casual-Gruppen an, solange genug Spieler warten –
 // wie runCasualMatchmakingPass(), zusätzlich in zwei Teams aufgeteilt.
+// Läuft zusätzlich periodisch (siehe MATCHMAKING_INTERVAL_MS), damit auch
+// eine nicht ganz volle Warteschlange nach BOT_BACKFILL_DELAY_MS mit Bots
+// aufgefüllt wird, statt nur bei neuen Beitritten geprüft zu werden.
 function runCasualTeamMatchmakingPass() {
   while (casualTeamQueue.length >= TEAM_GROUP_SIZE) {
     const entries = casualTeamQueue.splice(0, TEAM_GROUP_SIZE);
     startCasualTeamMatch([entries[0], entries[1]], [entries[2], entries[3]]);
   }
+  const backfilled = maybeBackfillQueueWithBots(casualTeamQueue, TEAM_GROUP_SIZE);
+  if (backfilled) startCasualTeamMatch([backfilled[0], backfilled[1]], [backfilled[2], backfilled[3]]);
 }
+setInterval(runCasualTeamMatchmakingPass, MATCHMAKING_INTERVAL_MS);
 
 // Legt für zwei Teams einen neuen 2v2-Casual-Raum an (übliches
 // Startkapital, feste Blinds). broadcastRoomState() zeigt jedem Spieler
-// dieses Raums zusätzlich die Hole Cards seines Teammitglieds.
+// dieses Raums zusätzlich die Hole Cards seines Teammitglieds (auch die
+// eines Bot-Teammitglieds).
 function startCasualTeamMatch(teamA, teamB) {
   const code = rooms.createRoom();
-  const { teams, members } = buildTeamAssignment(teamA, teamB);
-  casualTeamRooms.set(code, { teams, members });
+  const { teams, members, bots } = buildTeamAssignment(teamA, teamB);
+  casualTeamRooms.set(code, { teams, members, bots });
   const table = rooms.getTable(code);
   for (const entry of members) {
     table.addPlayer(entry.id, entry.name);
@@ -853,26 +991,32 @@ function startCasualTeamMatch(teamA, teamB) {
   joinTeamMatchRoom(code, teamA, teamB, teams, members, { casualTeam: true });
 }
 
-// Baut aus zwei Team-Arrays (je [{ socket, name, ... }, ...]) die von
-// rankedTeamRooms/casualTeamRooms benötigten Strukturen: teams ordnet jede
-// Socket-ID ihrem Team-Index zu, members ist die flache Liste aller
-// Mitglieder mit { id, name, team }.
+// Baut aus zwei Team-Arrays (je [{ socket, name, ... } oder Bot-Eintrag,
+// ...]) die von rankedTeamRooms/casualTeamRooms benötigten Strukturen:
+// teams ordnet jede Spieler-ID (entryId()) ihrem Team-Index zu, members
+// ist die flache Liste aller Mitglieder mit { id, name, team }, bots die
+// Teilmenge davon, die keinen Socket hat (siehe entryId()).
 function buildTeamAssignment(teamA, teamB) {
   const teams = {};
   const members = [];
+  const bots = new Map();
   [teamA, teamB].forEach((team, teamIdx) => {
     team.forEach((entry) => {
-      teams[entry.socket.id] = teamIdx;
-      members.push({ id: entry.socket.id, name: entry.name, team: teamIdx });
+      const id = entryId(entry);
+      teams[id] = teamIdx;
+      members.push({ id, name: entry.name, team: teamIdx });
+      if (!entry.socket) bots.set(id, { tier: entry.tier, rating: entry.rating });
     });
   });
-  return { teams, members };
+  return { teams, members, bots };
 }
 
 // Gemeinsamer Beitritts-Schritt für 2v2-Räume: jeden Spieler dem Socket.io-
-// Raum hinzufügen und mit seiner Team-Zugehörigkeit benachrichtigen.
+// Raum hinzufügen und mit seiner Team-Zugehörigkeit benachrichtigen. Bots
+// haben keinen Socket und werden übersprungen.
 function joinTeamMatchRoom(code, teamA, teamB, teams, members, modeFlags) {
   for (const entry of [...teamA, ...teamB]) {
+    if (!entry.socket) continue;
     const teamIdx = teams[entry.socket.id];
     const teammateNames = members.filter((m) => m.team === teamIdx && m.id !== entry.socket.id).map((m) => m.name);
     entry.socket.data.roomCode = code;
@@ -898,18 +1042,26 @@ function handleAction(socket, action) {
     action(table);
     advancePhaseIfRoundComplete(table);
     broadcastRoomState(roomCode);
-    if (table.phase === 'showdown') {
-      if (rankedRooms.has(roomCode)) maybeFinishRankedMatch(roomCode, table);
-      else if (casualMatchRooms.has(roomCode)) maybeFinishCasualMatch(roomCode, table);
-      else if (rankedTeamRooms.has(roomCode)) maybeFinishRankedTeamMatch(roomCode, table);
-      else if (casualTeamRooms.has(roomCode)) maybeFinishCasualTeamMatch(roomCode, table);
-      else if (botRooms.has(roomCode)) maybeFinishBotMatch(roomCode, table);
-    }
+    dispatchMatchFinishIfShowdown(roomCode, table);
     persist(); // einfach gehalten: nach jeder Aktion speichern statt nur nach Handende
     maybeTriggerBotActions(roomCode);
   } catch (err) {
     socket.emit('error-message', err.message);
   }
+}
+
+// Prüft nach einer Aktion (menschlich oder Bot), ob die Hand gerade am
+// Showdown angekommen ist, und ruft dafür den zum Raumtyp passenden
+// maybeFinish*Match()-Handler auf. Geteilt zwischen handleAction() (nach
+// einer menschlichen Aktion) und maybeTriggerBotActions() (nach einem
+// Bot-Zug), damit diese Fallunterscheidung nicht doppelt gepflegt wird.
+function dispatchMatchFinishIfShowdown(code, table) {
+  if (table.phase !== 'showdown') return;
+  if (rankedRooms.has(code)) maybeFinishRankedMatch(code, table);
+  else if (casualMatchRooms.has(code)) maybeFinishCasualMatch(code, table);
+  else if (rankedTeamRooms.has(code)) maybeFinishRankedTeamMatch(code, table);
+  else if (casualTeamRooms.has(code)) maybeFinishCasualTeamMatch(code, table);
+  else if (botRooms.has(code)) maybeFinishBotMatch(code, table);
 }
 
 // Wird nach jeder Aktion aufgerufen. Solange die aktuelle Wettrunde fertig
@@ -964,6 +1116,15 @@ function trackEliminations(table, matchEntry) {
 // ranking.js) und benachrichtigt jeden Client mit seinem Platz und neuen
 // Rang. Der Raum bleibt danach bestehen (die Spieler sehen die letzte
 // Hand noch), zählt aber nicht mehr als Ranked.
+//
+// Musste die Warteschlange mit Bots aufgefüllt werden (siehe
+// maybeBackfillQueueWithBots()), zählen Siege/Niederlagen gegen sie für
+// die menschlichen Spieler ganz normal fürs Rating (bewusste Entscheidung
+// – fühlt sich so am meisten wie ein echtes Match an). Die Bots selbst
+// haben aber keinen dauerhaften Account: ihr Rating für die ELO-Rechnung
+// ist das beim Auffüllen zugewiesene (siehe entry.bots), rein für dieses
+// eine Match gültig und wird nie in player_ranks/der Bestenliste
+// gespeichert.
 function maybeFinishRankedMatch(code, table) {
   const entry = rankedRooms.get(code);
   if (!entry) return;
@@ -981,9 +1142,10 @@ function maybeFinishRankedMatch(code, table) {
 
   const priorRanks = {};
   const ratings = {};
-  for (const name of placementNames) {
-    priorRanks[name] = getOrCreateRank(name);
-    ratings[name] = priorRanks[name].rating;
+  for (const p of placements) {
+    const botInfo = entry.bots.get(p.id);
+    priorRanks[p.name] = botInfo ? { rating: botInfo.rating, wins: 0, losses: 0 } : getOrCreateRank(p.name);
+    ratings[p.name] = priorRanks[p.name].rating;
   }
 
   const results = applyMultiwayMatchResult(placementNames, ratings);
@@ -991,11 +1153,13 @@ function maybeFinishRankedMatch(code, table) {
   placements.forEach((p, idx) => {
     const prior = priorRanks[p.name];
     const updated = results[p.name];
-    savePlayerRank(DATA_FILE, p.name, {
-      rating: updated.rating,
-      wins: prior.wins + updated.wins,
-      losses: prior.losses + updated.losses,
-    });
+    if (!entry.bots.has(p.id)) {
+      savePlayerRank(DATA_FILE, p.name, {
+        rating: updated.rating,
+        wins: prior.wins + updated.wins,
+        losses: prior.losses + updated.losses,
+      });
+    }
 
     const clientSocket = io.sockets.sockets.get(p.id);
     if (!clientSocket) return;
@@ -1059,7 +1223,10 @@ function trackTeamEliminations(table, matchEntry) {
 // teambasiert (siehe applyTeamMatchResult in ranking.js – jedes Mitglied
 // des Sieger-Teams gilt als Sieger gegen jedes Mitglied des
 // Verlierer-Teams) und benachrichtigt jeden Client, ob sein Team gewonnen
-// hat und mit seinem neuen Rang.
+// hat und mit seinem neuen Rang. Bot-Mitglieder (siehe entry.bots) zählen
+// für die menschlichen Mitspieler normal fürs Rating, bekommen aber selbst
+// kein dauerhaft gespeichertes Rating (siehe maybeFinishRankedMatch für
+// dieselbe Begründung).
 function maybeFinishRankedTeamMatch(code, table) {
   const entry = rankedTeamRooms.get(code);
   if (!entry) return;
@@ -1077,9 +1244,10 @@ function maybeFinishRankedTeamMatch(code, table) {
 
   const priorRanks = {};
   const ratings = {};
-  for (const name of [...winnerNames, ...loserNames]) {
-    priorRanks[name] = getOrCreateRank(name);
-    ratings[name] = priorRanks[name].rating;
+  for (const member of entry.members) {
+    const botInfo = entry.bots.get(member.id);
+    priorRanks[member.name] = botInfo ? { rating: botInfo.rating, wins: 0, losses: 0 } : getOrCreateRank(member.name);
+    ratings[member.name] = priorRanks[member.name].rating;
   }
 
   const results = applyTeamMatchResult(winnerNames, loserNames, ratings);
@@ -1087,11 +1255,13 @@ function maybeFinishRankedTeamMatch(code, table) {
   entry.members.forEach((member) => {
     const prior = priorRanks[member.name];
     const updated = results[member.name];
-    savePlayerRank(DATA_FILE, member.name, {
-      rating: updated.rating,
-      wins: prior.wins + updated.wins,
-      losses: prior.losses + updated.losses,
-    });
+    if (!entry.bots.has(member.id)) {
+      savePlayerRank(DATA_FILE, member.name, {
+        rating: updated.rating,
+        wins: prior.wins + updated.wins,
+        losses: prior.losses + updated.losses,
+      });
+    }
 
     const clientSocket = io.sockets.sockets.get(member.id);
     if (!clientSocket) return;
@@ -1179,8 +1349,8 @@ function applyBotDecision(table, botId, decision) {
 // sich erst mit dem tatsächlichen Zug). Rekursion ist unproblematisch, da
 // eine Hand nur endlich viele Aktionen hat.
 function maybeTriggerBotActions(code) {
-  const entry = botRooms.get(code);
-  if (!entry) return;
+  const entry = getMatchEntry(code);
+  if (!entry || !entry.bots || entry.bots.size === 0) return;
   const table = rooms.getTable(code);
   if (!table) return;
 
@@ -1189,16 +1359,16 @@ function maybeTriggerBotActions(code) {
 
   setTimeout(() => {
     // Zustand nach der Verzögerung erneut prüfen: Raum/Tisch könnten in der
-    // Zwischenzeit verschwunden sein (z. B. der Mensch hat den Raum
+    // Zwischenzeit verschwunden sein (z. B. der letzte Mensch hat den Raum
     // verlassen und die Gnadenfrist ist abgelaufen).
     const stillTable = rooms.getTable(code);
-    const stillEntry = botRooms.get(code);
-    if (!stillTable || !stillEntry) return;
+    const stillEntry = getMatchEntry(code);
+    if (!stillTable || !stillEntry || !stillEntry.bots) return;
     const stillCurrent = stillTable.getCurrentPlayer();
     if (!stillCurrent || !stillEntry.bots.has(stillCurrent.id)) return;
 
-    const tierName = stillEntry.bots.get(stillCurrent.id);
-    const decision = decideBotAction(stillTable, stillCurrent.id, tierName);
+    const tier = stillEntry.bots.get(stillCurrent.id).tier;
+    const decision = decideBotAction(stillTable, stillCurrent.id, tier);
     try {
       applyBotDecision(stillTable, stillCurrent.id, decision);
     } catch (err) {
@@ -1209,10 +1379,7 @@ function maybeTriggerBotActions(code) {
     }
     advancePhaseIfRoundComplete(stillTable);
     broadcastRoomState(code);
-
-    if (stillTable.phase === 'showdown') {
-      maybeFinishBotMatch(code, stillTable);
-    }
+    dispatchMatchFinishIfShowdown(code, stillTable);
     persist();
 
     maybeTriggerBotActions(code); // ggf. ist gleich der nächste Bot dran
@@ -1230,6 +1397,14 @@ function broadcastRoomState(code) {
   if (!table) return;
   const casualTeamEntry = casualTeamRooms.get(code);
   const teamEntry = rankedTeamRooms.get(code) || casualTeamEntry;
+  // Welche Sitzplätze Bots sind (egal aus welchem Modus, siehe
+  // getMatchEntry()) – das Frontend nutzt das für den "Denkt nach …"-
+  // Indikator an JEDEM Bot-Sitzplatz, nicht nur im reinen Übungsmodus
+  // (dort waren vorher alle Gegner automatisch Bots, siehe isVsBots in
+  // app.js; jetzt können auch Ranked/Casual-Matches einzelne Bot-
+  // Mitspieler/-Gegner neben echten Menschen enthalten).
+  const matchEntry = getMatchEntry(code);
+  const botIds = matchEntry && matchEntry.bots ? [...matchEntry.bots.keys()] : [];
   const socketsInRoom = io.sockets.adapter.rooms.get(code);
   if (!socketsInRoom) return;
   for (const socketId of socketsInRoom) {
@@ -1244,6 +1419,7 @@ function broadcastRoomState(code) {
     }
     const state = table.getPublicState(socketId, extraVisibleIds);
     if (teamEntry) state.teams = teamEntry.teams;
+    if (botIds.length > 0) state.botIds = botIds;
     clientSocket.emit('state', state);
   }
 }

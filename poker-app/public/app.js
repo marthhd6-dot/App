@@ -812,11 +812,10 @@ function renderSeats(state, winnerIds, animateDeal) {
     seat.style.top = `${top}%`;
 
     // "Denkt nach …"-Punkte statt (bzw. zusätzlich zum) pulsierenden Rahmen:
-    // im Bot-Übungsmodus (isVsBots) ist jeder andere Spieler als ich selbst
-    // garantiert ein Bot (siehe play-vs-bots in server.js – genau ein
-    // Mensch pro Bot-Raum), daher genügt dieser rein clientseitige Check,
-    // ohne dass der Server ein eigenes isBot-Flag mitschicken müsste.
-    const isThinkingBot = isVsBots && p.id !== mySocketId && p.id === state.actingPlayerId;
+    // state.botIds listet jeden Bot-Sitzplatz dieses Raums (egal ob reiner
+    // Übungsmodus oder ein mit Bots aufgefülltes Ranked/Casual-Match, siehe
+    // broadcastRoomState() in server.js).
+    const isThinkingBot = Array.isArray(state.botIds) && state.botIds.includes(p.id) && p.id === state.actingPlayerId;
     const thinkingHtml = isThinkingBot
       ? '<div class="thinking-dots"><span></span><span></span><span></span></div>'
       : '';
