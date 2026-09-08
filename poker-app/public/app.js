@@ -780,19 +780,19 @@ function isRedSuit(suit) {
   return suit === 'H' || suit === 'D';
 }
 
-function cardOuterHtml(card) {
+function cardOuterHtml(card, extraClass = '') {
   const rank = RANK_LABELS[card.rank] || card.rank;
   const suit = SUIT_SYMBOLS[card.suit];
-  return `<div class="card${isRedSuit(card.suit) ? ' red' : ''}">
+  return `<div class="card${isRedSuit(card.suit) ? ' red' : ''}${extraClass}">
     <span class="card-corner card-corner-top"><span class="card-rank">${rank}</span><span class="card-suit-mini">${suit}</span></span>
     <span class="card-suit-big">${suit}</span>
     <span class="card-corner card-corner-bottom"><span class="card-rank">${rank}</span><span class="card-suit-mini">${suit}</span></span>
   </div>`;
 }
 
-function renderCard(card) {
+function renderCard(card, extraClass = '') {
   const wrapper = document.createElement('div');
-  wrapper.innerHTML = cardOuterHtml(card).trim();
+  wrapper.innerHTML = cardOuterHtml(card, extraClass).trim();
   return wrapper.firstElementChild;
 }
 
@@ -872,8 +872,12 @@ function seatPositionForPlayer(state, playerId) {
 // animateDeal: true unmittelbar beim Start einer neuen Hand (siehe
 // isNewHand in render()) – lässt die verdeckten Mini-Karten der Gegner
 // reihum "eingeteilt" wirken (Stagger-Delay nach Sitzplatz-Reihenfolge),
-// statt bei jedem State-Update neu einzufliegen.
-function renderSeats(state, winnerIds, animateDeal) {
+// statt bei jedem State-Update neu einzufliegen. justRevealed: true genau
+// in dem Render-Durchlauf, in dem ein echter Showdown gerade aufgelöst
+// wurde (siehe justResolved in render()) – lässt die frisch aufgedeckten
+// Gegner-Mini-Karten am Sitzplatz einmalig "umkippen" (siehe .reveal-flip),
+// statt einfach kommentarlos zu erscheinen.
+function renderSeats(state, winnerIds, animateDeal, justRevealed) {
   const container = document.getElementById('players-list');
   container.innerHTML = '';
 
@@ -944,9 +948,10 @@ function renderSeats(state, winnerIds, animateDeal) {
     // mit (statt null), damit sichtbar wird, gegen welche Hand man
     // gewonnen/verloren hat – wie am echten Tisch. Bei mir selbst nicht
     // nötig, die großen Karten stehen schon in #my-cards.
+    const revealFlipClass = justRevealed ? ' reveal-flip' : '';
     const revealedCardsHtml =
       state.phase === 'showdown' && p.id !== mySocketId && p.holeCards
-        ? `<div class="seat-cards">${p.holeCards.map(cardOuterHtml).join('')}</div>`
+        ? `<div class="seat-cards">${p.holeCards.map((c) => cardOuterHtml(c, revealFlipClass)).join('')}</div>`
         : '';
 
     const initial = (p.name[0] || '?').toUpperCase();
@@ -1100,6 +1105,13 @@ function animatePotTo(target) {
     potLabel.textContent = `Pot: ${displayedPot}`;
     return;
   }
+  // Kurzer Glow-Puls um den Betrag herum, sobald sich der Pot tatsächlich
+  // ändert – Klasse neu setzen (mit erzwungenem Reflow dazwischen), damit
+  // die Animation bei schnell aufeinanderfolgenden Änderungen jedes Mal von
+  // vorn beginnt statt nur einmal zu spielen.
+  potLabel.classList.remove('pot-pulse');
+  void potLabel.offsetWidth;
+  potLabel.classList.add('pot-pulse');
   cancelAnimationFrame(potAnimationFrame);
   const start = displayedPot;
   const startTime = performance.now();
@@ -1154,7 +1166,7 @@ function render(state) {
   const winnerIds = new Set(
     state.lastHandResult ? state.lastHandResult.pots.flatMap((pot) => pot.winners.map((w) => w.id)) : []
   );
-  renderSeats(state, winnerIds, isNewHand);
+  renderSeats(state, winnerIds, isNewHand, justResolved);
 
   const me = state.players.find((p) => p.id === mySocketId);
   renderMyCards((me && me.holeCards) || [], isNewHand);
@@ -1193,7 +1205,7 @@ function render(state) {
       nameEl.textContent = p.name;
       const cardRow = document.createElement('div');
       cardRow.className = 'card-row showdown-reveal-cards';
-      p.holeCards.forEach((c) => cardRow.appendChild(renderCard(c)));
+      p.holeCards.forEach((c) => cardRow.appendChild(renderCard(c, justResolved ? ' reveal-flip' : '')));
       entry.appendChild(nameEl);
       entry.appendChild(cardRow);
       showdownRevealListEl.appendChild(entry);
