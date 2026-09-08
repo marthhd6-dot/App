@@ -95,6 +95,110 @@ h2 {
   }
 }
 
+/* Vignette: dunkelt die Bildschirmränder/-ecken sanft ab, damit der Blick
+   zur Mitte hin geführt wird (siehe Post-Processing-Punkt der Anfrage) –
+   ein einzelner radial-gradient über der ganzen Seite, keine echte
+   Nachbearbeitung nötig. */
+.bg-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 42%, transparent 45%, rgba(0, 0, 0, 0.4) 100%);
+}
+
+/* Wenige, langsam nach oben treibende, unscharfe Lichtpunkte für eine
+   dezente Staub-/Bokeh-Atmosphäre statt einer reinen Flachfarbe im
+   Hintergrund. Rein CSS (kein Partikelsystem, keine JS-Kosten pro Frame) –
+   sechs feste Elemente statt eines generischen Systems, damit die Kosten
+   fix und vorhersehbar bleiben. animation-duration erbt bei
+   prefers-reduced-motion automatisch die globale 0.001ms-Regel oben. */
+.dust-particles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.dust-mote {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 70%);
+  filter: blur(1px);
+  opacity: 0;
+  animation: dust-drift linear infinite;
+}
+
+.dust-mote-1 {
+  width: 4px;
+  height: 4px;
+  left: 12%;
+  top: 70%;
+  animation-duration: 16s;
+  animation-delay: 0s;
+}
+.dust-mote-2 {
+  width: 3px;
+  height: 3px;
+  left: 28%;
+  top: 85%;
+  animation-duration: 19s;
+  animation-delay: 3s;
+}
+.dust-mote-3 {
+  width: 5px;
+  height: 5px;
+  left: 48%;
+  top: 92%;
+  animation-duration: 15s;
+  animation-delay: 6s;
+}
+.dust-mote-4 {
+  width: 3px;
+  height: 3px;
+  left: 65%;
+  top: 78%;
+  animation-duration: 21s;
+  animation-delay: 1.5s;
+}
+.dust-mote-5 {
+  width: 4px;
+  height: 4px;
+  left: 80%;
+  top: 88%;
+  animation-duration: 17s;
+  animation-delay: 4.5s;
+}
+.dust-mote-6 {
+  width: 3px;
+  height: 3px;
+  left: 92%;
+  top: 65%;
+  animation-duration: 20s;
+  animation-delay: 8s;
+}
+
+@keyframes dust-drift {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.32;
+  }
+  90% {
+    opacity: 0;
+  }
+  100% {
+    transform: translate(30px, -140vh);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;
@@ -356,6 +460,10 @@ h2 {
 
 /* --- Buttons ------------------------------------------------------------ */
 
+/* "Materialgefühl" statt Flat-Design: ein Lichtsaum oben (inset) simuliert
+   eine gewölbte, glänzende Knopf-Oberfläche; :active tauscht ihn gegen
+   einen inneren Schatten, als würde der Knopf sichtbar eingedrückt statt
+   sich nur zu verschieben. */
 .btn,
 button {
   font-family: var(--font-display);
@@ -367,7 +475,7 @@ button {
   cursor: pointer;
   color: #1b1a15;
   background: linear-gradient(180deg, var(--accent-bright), var(--accent));
-  box-shadow: 0 3px 0 #a3801f, 0 8px 18px -6px rgba(232, 191, 74, 0.5);
+  box-shadow: 0 3px 0 #a3801f, 0 8px 18px -6px rgba(232, 191, 74, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease, opacity 0.12s ease;
 }
 
@@ -380,7 +488,7 @@ button:not(:disabled):hover {
 .btn:not(:disabled):active,
 button:not(:disabled):active {
   transform: translateY(1px);
-  box-shadow: 0 1px 0 #a3801f, 0 4px 10px -4px rgba(232, 191, 74, 0.5);
+  box-shadow: 0 1px 0 #a3801f, 0 4px 10px -4px rgba(232, 191, 74, 0.5), inset 0 2px 4px rgba(0, 0, 0, 0.25);
 }
 
 .btn:disabled,
@@ -395,7 +503,11 @@ button:disabled {
 .btn-ghost {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.btn-ghost:not(:disabled):active {
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Ein Knopf-Stil pro Modus-KATEGORIE statt pro einzelnem Modus: 1v1v1v1 und
@@ -624,22 +736,76 @@ button:disabled {
   margin: 0 auto 28px;
 }
 
+/* Weicher, breiter Schlagschatten des ganzen Tisches auf den Hintergrund –
+   simuliert, dass der Tisch als physisches Objekt vor dem Raum "schwebt",
+   statt nahtlos mit dem Hintergrund zu verschmelzen. Eigenes, unten
+   verschobenes und gestauchtes Element statt eines simplen box-shadow auf
+   .felt-surface, damit der Schatten sichtbar breiter/weicher als der Tisch
+   selbst ausläuft. */
+.table-drop-shadow {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: -8%;
+  top: 6%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 60%, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.28) 55%, transparent 78%);
+  filter: blur(18px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Simuliertes Spotlicht von oben (erste, hellste Gradient-Ebene, malt
+   zuoberst) plus eine leicht konkave "Schüssel"-Wirkung durch asymmetrische
+   Inset-Schatten: heller Anriss oben (Licht trifft den inneren Filzrand),
+   dunklerer Verlauf unten (Rand liegt im eigenen Schatten) – zusammen mit
+   der Holzkante ergibt das eine echte 3D-Tiefenwirkung statt einer reinen
+   Draufsicht, ganz ohne die Sitzplatz-Positionsberechnung (Prozent-
+   Koordinaten in renderSeats()) durch eine echte Rotation zu verkomplizieren. */
 .felt-surface {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 32%, var(--table-green) 0%, var(--table-green-mid) 52%, var(--table-green-dark) 100%);
+  background: radial-gradient(ellipse 60% 40% at 50% 18%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 62%),
+    radial-gradient(ellipse at 50% 32%, var(--table-green) 0%, var(--table-green-mid) 52%, var(--table-green-dark) 100%);
   border: 13px solid var(--wood);
-  box-shadow: 0 0 0 4px #1a1009, 0 28px 60px -12px rgba(0, 0, 0, 0.65), 0 -50px 120px -40px rgba(232, 191, 74, 0.22),
-    inset 0 0 70px rgba(0, 0, 0, 0.5), inset 0 0 0 2px rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 18px 30px -14px rgba(255, 255, 255, 0.22), inset 0 -24px 38px -14px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.06), inset 0 0 70px rgba(0, 0, 0, 0.5), 0 0 0 4px #1a1009,
+    0 28px 60px -12px rgba(0, 0, 0, 0.65), 0 -50px 120px -40px rgba(232, 191, 74, 0.22);
   overflow: hidden;
 }
 
 .felt-rail {
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 46px),
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 46px);
+  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.045) 0 2px, transparent 2px 22px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.045) 0 2px, transparent 2px 22px),
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 22px);
+  pointer-events: none;
+}
+
+/* Dünner, umlaufender Glanzring über der Holzkante: ein conic-gradient mit
+   Hell-/Dunkel-Sektoren (Licht von oben, Schatten unten) simuliert die
+   Rundung/Prägung der Kante, per mask auf exakt die Breite des Holzrands
+   (13px, siehe .felt-surface border) zugeschnitten. Ohne mask-Unterstützung
+   bleibt die massive Holzfarbe der Kante unverändert sichtbar – rein
+   additive, degradationssichere Verbesserung. */
+.felt-rail-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 210deg,
+    rgba(255, 255, 255, 0.32) 0deg,
+    rgba(255, 255, 255, 0.04) 70deg,
+    rgba(0, 0, 0, 0.4) 165deg,
+    rgba(0, 0, 0, 0.08) 260deg,
+    rgba(255, 255, 255, 0.32) 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 13px), #000 calc(100% - 13px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 13px), #000 calc(100% - 13px));
+  mix-blend-mode: overlay;
   pointer-events: none;
 }
 
@@ -655,14 +821,21 @@ button:disabled {
   z-index: 2;
 }
 
+/* Poker-Chip-Optik statt reiner Kreisfläche: der gestrichelte Rand
+   simuliert die Kerben eines echten Chips, die inset-Schatten oben/unten
+   geben ihm die Rundung eines Zylinders (helle Kante oben, Schatten unten),
+   der äußere Schatten hebt ihn sichtbar vom Filz ab. Dieselbe Formel
+   (skaliert) für .chip-icon/.chip-fly weiter unten, damit Pot-Icon,
+   Einsatz-Anzeige und der fliegende Chip optisch zusammengehören. */
 .chip-stack-mini {
   display: block;
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, var(--accent-bright), #a3801f 75%);
-  border: 2px dashed rgba(255, 255, 255, 0.6);
-  box-shadow: -7px 4px 0 -3px var(--danger), 7px 4px 0 -3px var(--success);
+  background: radial-gradient(circle at 35% 28%, var(--accent-bright), #a3801f 78%);
+  border: 3px dashed rgba(255, 255, 255, 0.65);
+  box-shadow: -7px 4px 0 -3px var(--danger), 7px 4px 0 -3px var(--success),
+    inset 0 2px 2px rgba(255, 255, 255, 0.45), inset 0 -3px 4px rgba(0, 0, 0, 0.4), 0 4px 5px -1px rgba(0, 0, 0, 0.5);
   margin-bottom: 8px;
 }
 
@@ -677,6 +850,25 @@ button:disabled {
   border-radius: 999px;
   border: 1px solid rgba(232, 191, 74, 0.35);
   white-space: nowrap;
+  box-shadow: 0 0 0 0 rgba(232, 191, 74, 0);
+}
+
+/* Kurzer Glow-Puls, sobald sich der Pot-Betrag ändert (siehe animatePotTo()
+   in app.js) – ein sich ausdehnender Ring plus kurz intensivierter
+   Text-Schatten, statt den Betrag nur kommentarlos auszutauschen. */
+.pot-amount.pot-pulse {
+  animation: pot-pulse-glow 0.5s ease-out;
+}
+
+@keyframes pot-pulse-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(232, 191, 74, 0.55);
+    text-shadow: 0 0 30px rgba(232, 191, 74, 0.95);
+  }
+  100% {
+    box-shadow: 0 0 0 9px rgba(232, 191, 74, 0);
+    text-shadow: 0 0 18px rgba(232, 191, 74, 0.55);
+  }
 }
 
 .community-row {
@@ -708,6 +900,9 @@ button:disabled {
   transition: left 0.4s ease, top 0.4s ease;
 }
 
+/* Dezenter Glas-/Material-Look statt Flachfarbe: ein schmaler Lichtsaum
+   oben (inset), ein Schatten unten (inset) – zusätzlich zum bestehenden
+   äußeren Schlagschatten. */
 .seat-pod {
   display: flex;
   align-items: center;
@@ -716,10 +911,16 @@ button:disabled {
   border: 2px solid transparent;
   border-radius: 14px;
   padding: 6px 10px 6px 6px;
-  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+/* Geprägtes 3D-Badge statt einer flachen Farbfläche: heller Lichtsaum oben,
+   Schatten unten (Bevel/Emboss), plus ein dünner Rand und ein leichter
+   Text-Schatten für den Buchstaben – dieselbe Formel wie beim
+   Dealer-Button weiter unten, damit alle "Puck"-artigen Rundelemente am
+   Tisch optisch zusammengehören. */
 .seat-avatar {
   flex-shrink: 0;
   width: 34px;
@@ -732,6 +933,10 @@ button:disabled {
   font-weight: 800;
   font-size: 0.95rem;
   color: #1b1a15;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.5), inset 0 -3px 4px rgba(0, 0, 0, 0.35),
+    0 2px 4px -1px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .seat-text {
@@ -778,9 +983,10 @@ button:disabled {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, var(--accent-bright), #a3801f 75%);
-  border: 1.5px dashed rgba(255, 255, 255, 0.6);
-  box-shadow: -2.5px 1.5px 0 -1.2px var(--danger), 2.5px 1.5px 0 -1.2px var(--success);
+  background: radial-gradient(circle at 35% 28%, var(--accent-bright), #a3801f 78%);
+  border: 1.5px dashed rgba(255, 255, 255, 0.65);
+  box-shadow: -2.5px 1.5px 0 -1.2px var(--danger), 2.5px 1.5px 0 -1.2px var(--success),
+    inset 0 1px 1px rgba(255, 255, 255, 0.5), inset 0 -1px 1px rgba(0, 0, 0, 0.4);
 }
 
 .seat.folded .seat-pod {
@@ -837,6 +1043,9 @@ button:disabled {
 .seat-cards {
   display: flex;
   margin-top: 3px;
+  /* Tiefenwirkung für den rotateY-Flip in @keyframes card-reveal-flip,
+     analog zu .card-row weiter unten. */
+  perspective: 300px;
 }
 
 .mini-card-back {
@@ -936,17 +1145,35 @@ button:disabled {
   z-index: 5;
 }
 
+/* Rollt sichtbar (chip-roll) während des left/top-Fluges zum Pot bzw. zu
+   den Gewinnern, statt nur stumpf zu gleiten – die Rotation läuft als
+   eigene animation parallel zur transition auf left/top, beide steuern
+   unterschiedliche Aspekte desselben transform/Positions-Paars. */
 .chip-fly {
   position: absolute;
   width: 12px;
   height: 12px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle at 35% 30%, var(--accent-bright), #a3801f 75%);
-  border: 1.5px dashed rgba(255, 255, 255, 0.6);
-  box-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.6);
+  background: radial-gradient(circle at 35% 28%, var(--accent-bright), #a3801f 78%);
+  border: 1.5px dashed rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), inset 0 -1px 2px rgba(0, 0, 0, 0.4),
+    0 2px 5px -1px rgba(0, 0, 0, 0.6);
   transition: left 0.5s cubic-bezier(0.3, 0.6, 0.3, 1), top 0.5s cubic-bezier(0.3, 0.6, 0.3, 1),
     opacity 0.5s ease;
+  animation: chip-roll 0.55s ease-in-out;
+}
+
+@keyframes chip-roll {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+  }
+  35% {
+    transform: translate(-50%, -50%) rotate(160deg) scale(1.18);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg) scale(1);
+  }
 }
 
 .action-bubble {
@@ -1010,6 +1237,7 @@ button:disabled {
    pro Sitzplatz neu erzeugten Badges, damit er zwischen zwei Sitzplätzen
    sichtbar hinübergleiten kann (transition auf left/top), statt bei jedem
    Rundenwechsel hart zu "springen". */
+/* Geprägtes Badge wie .seat-avatar, statt einer flachen Farbfläche. */
 .dealer-button {
   position: absolute;
   z-index: 6;
@@ -1025,7 +1253,10 @@ button:disabled {
   font-size: 0.68rem;
   background: linear-gradient(180deg, var(--accent-bright), var(--accent));
   color: #21201a;
-  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6), inset 0 -2px 2px rgba(0, 0, 0, 0.25),
+    0 3px 6px -1px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
   transition: left 0.5s ease, top 0.5s ease;
 }
 
@@ -1120,11 +1351,18 @@ button:disabled {
   perspective: 600px;
 }
 
+/* Zusätzlich zum weißen Karton-Verlauf ein diagonaler Glanzstreifen
+   (erste background-Ebene, malt oben) für einen laminiert wirkenden
+   Materialrand statt einer reinen Flachfarbe. Als zusätzliche
+   background-Ebene statt eines ::before-Pseudo-Elements, damit sie
+   automatisch dem border-radius folgt, ohne overflow: hidden zu
+   brauchen – das würde sonst den Schlagschatten in ::after abschneiden. */
 .card {
   position: relative;
   width: 54px;
   height: 76px;
-  background: linear-gradient(160deg, #ffffff, #eae7dd);
+  background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.55) 47%, transparent 60%),
+    linear-gradient(160deg, #ffffff, #eae7dd);
   color: #1a1a1a;
   border-radius: 8px;
   display: flex;
@@ -1133,8 +1371,26 @@ button:disabled {
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.3rem;
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15), 0 8px 16px -4px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15), 0 10px 18px -5px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* Grounding-Schatten: eine eigene, unscharfe Ellipse unter der Karte statt
+   nur einem eng anliegenden box-shadow, damit die Karte sichtbar auf dem
+   Filz "liegt" statt nur davor zu schweben. Rotiert automatisch mit, wenn
+   die Karte selbst rotiert ist (z. B. die gefächerten .seat-cards), da
+   Pseudo-Elemente denselben Transform-Kontext wie ihr Host-Element teilen. */
+.card::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: -12%;
+  height: 26%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.4) 0%, transparent 72%);
+  filter: blur(3px);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .card.red {
@@ -1201,6 +1457,29 @@ button:disabled {
   }
   100% {
     transform: translateY(0) scale(1) rotate(0) rotateY(0deg);
+  }
+}
+
+/* Aufdeck-Flip beim Showdown (siehe justRevealed in renderSeats()/render()
+   in app.js): die Karte "kippt" von verdeckt auf aufgedeckt um die eigene
+   Achse, statt nur kommentarlos zu erscheinen – anders als .deal-in ohne
+   Flug/Einfliegen, weil die Karte ja schon am Tisch liegt und nur
+   umgedreht wird. */
+.card.reveal-flip {
+  animation: card-reveal-flip 0.5s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+
+@keyframes card-reveal-flip {
+  0% {
+    transform: scale(0.94) rotateY(180deg);
+    opacity: 0.5;
+  }
+  60% {
+    transform: scale(1.05) rotateY(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotateY(0deg);
   }
 }
 
@@ -1700,8 +1979,28 @@ button:disabled {
   .table-felt {
     aspect-ratio: 3 / 4;
   }
-  .felt-surface {
+  .felt-surface,
+  .felt-rail-sheen,
+  .table-drop-shadow {
     border-radius: 40px;
+  }
+  /* Performance-Kompromisse für Mobile (siehe README): der maskierte
+     conic-gradient-Sheen-Ring und der stark verblurte Tisch-Schatten sind
+     die teuersten rein dekorativen Ebenen (Masking + große Blur-Radien
+     können auf schwächeren Mobile-GPUs spürbar Kompositions-Kosten
+     verursachen) – auf schmalen/mobilen Bildschirmen bewusst abgeschaltet
+     statt nur verkleinert, die Holzkante bleibt als massive Farbfläche
+     trotzdem sichtbar. Ebenso werden die Staub-Partikel ausgeblendet:
+     sechs zusätzlich compositierte, dauerhaft animierte Ebenen lohnen sich
+     auf kleinen Bildschirmen nicht gegen ihre Akku-/GPU-Kosten. */
+  .felt-rail-sheen {
+    display: none;
+  }
+  .table-drop-shadow {
+    filter: blur(8px);
+  }
+  .dust-particles {
+    display: none;
   }
   .seat {
     width: 92px;

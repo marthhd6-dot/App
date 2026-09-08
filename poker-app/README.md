@@ -143,6 +143,87 @@ Chip-Stände definiert.
   die alte Zentrierung nur für drei einzelne Screen-IDs per Hand nachgezogen
   war – jetzt zentriert sich jedes `.panel` einheitlich über `margin: 0
   auto`.
+- **Glaubwürdiger 3D-Look für den Tisch, reines CSS** (`public/style.css`/
+  `app.js`, keine neue Engine/kein Canvas/WebGL – die App bleibt reines
+  Server-gerendertes HTML/CSS/JS ohne Build-Schritt, siehe Struktur oben):
+  Spieler werden weiterhin nur durch Name, Chip-Anzahl und Label
+  repräsentiert, keine Avatare/Figuren – die Tiefenwirkung kommt
+  ausschließlich aus Licht, Schatten und Material, nicht aus echter 3D-Geo­
+  metrie oder einer Kamera-Rotation (die hätte die Prozent-Koordinaten der
+  Sitzplätze in `renderSeats()`/`seatPositionByOrderedIndex()` unnötig
+  verkompliziert und Text lesbar zu halten wäre bei einer echten Perspektiv-
+  Rotation riskant gewesen).
+  - **Tisch** (`.felt-surface`/`.felt-rail-sheen`/`.table-drop-shadow`):
+    asymmetrische Inset-Schatten formen eine leicht konkave "Schüssel"
+    statt einer flachen Kreisfläche (heller Anriss oben, dunkler unten);
+    ein per `mask` auf die Breite der Holzkante zugeschnittener
+    `conic-gradient`-Ring simuliert deren Rundung/Prägung; ein separates,
+    breit verblurtes Schatten-Element hinter dem Tisch lässt ihn sichtbar
+    vor dem Hintergrund "schweben". Die Filz-Webstruktur (`.felt-rail`) hat
+    jetzt zwei sich überlagernde Diagonal-Muster (hell/dunkel) für mehr
+    Stoff-Textur.
+  - **Beleuchtung**: ein `radial-gradient` als erste (oberste)
+    Hintergrund-Ebene von `.felt-surface` simuliert ein Spotlicht über der
+    Tischmitte; eine `.bg-vignette` über der ganzen Seite dunkelt die Ränder
+    sanft ab und lenkt den Blick zur Mitte.
+  - **Karten** (`.card`/`.card::after`): ein diagonaler Glanzstreifen als
+    zusätzliche `background`-Ebene (kein `::before`, damit `border-radius`
+    automatisch greift, ohne `overflow: hidden` zu brauchen – das hätte den
+    Schatten in `::after` abgeschnitten) sowie ein eigener, unscharfer
+    Schlagschatten unter jeder Karte lassen sie sichtbar auf dem Filz
+    liegen statt nur zu schweben. Neu: `.reveal-flip`
+    (`@keyframes card-reveal-flip`) lässt aufgedeckte Gegner-Hände beim
+    echten Showdown einmalig um die eigene Achse "umkippen" statt nur zu
+    erscheinen (`justRevealed`-Parameter in `renderSeats()`, gesetzt aus
+    `justResolved` in `render()`).
+  - **Chips** (`.chip-stack-mini`/`.chip-icon`/`.chip-fly`): Inset-Schatten
+    oben/unten geben den bestehenden Chip-Kreisen eine Zylinder-Rundung,
+    ein zusätzlicher äußerer Schlagschatten hebt sie vom Filz ab. Der
+    fliegende Chip (`spawnChipFly()`) rollt jetzt sichtbar
+    (`@keyframes chip-roll`, Rotation + kurzes Aufplustern) während des
+    Flugs zum Pot bzw. zu den Gewinnern, statt nur stumpf zu gleiten.
+  - **Spieler-Panels ohne Avatare** (`.seat-pod`/`.seat-avatar`/
+    `.dealer-button`): ein schmaler Lichtsaum oben und ein Schatten unten
+    (Inset-Box-Shadow) geben den Panels ein Glas-/Materialgefühl statt
+    einer Flachfarbe; die Buchstaben-Badges (Sitzplatz-Initiale, Dealer-
+    Button) sind jetzt geprägt (Bevel/Emboss: heller Rand oben, Schatten
+    unten, dünner Rahmen) statt flacher Vollton-Kreise.
+  - **Pot/Einsatz**: Chips fliegen schon länger sichtbar zur Tischmitte
+    (`spawnChipFly()`/`spawnPotPayout()`, unverändert); neu pulsiert der
+    Pot-Betrag bei jeder Änderung kurz golden auf (`.pot-pulse`,
+    `animatePotTo()` in `app.js`) statt den Text nur kommentarlos
+    auszutauschen.
+  - **Hintergrund-Atmosphäre** (`.dust-particles`): sechs feste, langsam
+    nach oben treibende, unscharfe Lichtpunkte simulieren Staub/Bokeh im
+    Spotlicht – bewusst eine feste, kleine Anzahl DOM-Elemente statt eines
+    generischen Partikelsystems, damit die Kosten fix und vorhersehbar
+    bleiben.
+  - **UI-Elemente** (`.btn`/`button`): ein Lichtsaum oben (Inset) gibt
+    Knöpfen eine gewölbte, glänzende Oberfläche; `:active` tauscht ihn
+    gegen einen inneren Schatten statt nur die Position zu verschieben –
+    fühlt sich sichtbar "eingedrückt" an.
+  - **Was bewusst NICHT simuliert wird** (echte Normal-Maps, Echtzeit-
+    Schatten, echtes Bloom/Post-Processing): all das braucht eine
+    Render-Pipeline (Canvas/WebGL/Shader), die dieses Projekt nicht hat.
+    Stattdessen approximieren gestapelte CSS-Gradients/Box-Shadows densel­
+    ben visuellen Eindruck, ohne die Architektur (server-gerendertes
+    HTML/CSS/JS, kein Build-Schritt) zu ändern – Bloom z. B. über
+    `text-shadow`/`box-shadow`-Glow statt echtem Licht-Streuen.
+  - **Performance-Kompromisse & Mobile** (siehe
+    `@media (max-width: 640px)` in `style.css`): `mask` (Rail-Sheen) und
+    große `filter: blur()`-Radien (Tisch-Schatten) sind die teuersten rein
+    dekorativen Ebenen – auf schmalen/mobilen Bildschirmen wird der
+    Rail-Sheen-Ring komplett abgeschaltet (die Holzkante bleibt als
+    massive Farbfläche trotzdem sichtbar) und der Tisch-Schatten mit einem
+    kleineren Blur-Radius gerendert; die sechs Staub-Partikel werden
+    ausgeblendet (dauerhaft laufende, zusätzlich compositierte Ebenen ohne
+    spielerischen Mehrwert auf kleinen Bildschirmen). `filter: blur()` und
+    `mask-image` sind auf Desktop-GPUs praktisch kostenlos (Compositor-
+    Ebene), auf älteren/schwachen Mobile-GPUs aber die Effekte mit dem
+    größten Overdraw – deshalb die ersten Kandidaten zum Abschalten statt
+    nur zu verkleinern. Alle Animationen respektieren weiterhin die
+    globale `@media (prefers-reduced-motion: reduce)`-Regel ganz oben in
+    `style.css` (setzt jede `animation`/`transition` auf ~0).
 - **Deal-Animationen** (`public/app.js`/`style.css`): Community Cards und
   die eigenen Hole Cards fliegen beim Austeilen mit Stagger-Delay ein
   (`.deal-in`, siehe `renderCommunityCards()`/`renderMyCards()`), erkannt
