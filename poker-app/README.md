@@ -621,6 +621,43 @@ cd android && ./gradlew assembleDebug
   `BOT_THINK_DELAY_MAX_MS` überschreibbar) – rein kosmetisch, damit Bots
   nicht unnatürlich sofort reagieren; die Entscheidung selbst steht davor
   schon fest.
+- **Fähigkeiten-System** (`src/game/abilities.js`, integriert in `table.js`/
+  `server.js`/`bots.js`, UI in `public/app.js`/`style.css`): In JEDEM Modus
+  (Ranked wie Casual, 1v1v1v1 wie 2v2, auch gegen Bots) bekommt jeder
+  Spieler zu Beginn jeder Hand eine Fähigkeit aus jeder der vier Kategorien
+  zugeteilt – einmal Karten, einmal Wette/Pot, einmal Info/Gegner, einmal
+  Ressourcen (`CATEGORIES` in `abilities.js`) – dargestellt als vier
+  klickbare Karten neben den eigenen Hole Cards (`#my-abilities`), jede pro
+  Hand genau einmal einsetzbar. Da jeder Spieler exakt dieselben vier
+  Kategorien bekommt, bleibt Ranked-Matchmaking/-Rating unangetastet fair –
+  es kommt nur taktische Abwechslung dazu, kein struktureller Vorteil.
+  Aktuell eine Fähigkeit je Kategorie (das Datenmodell trägt aber
+  problemlos mehrere zufällig wählbare Optionen pro Kategorie, ohne
+  `assignAbilities()` oder die Aufrufer anzupassen):
+  - **Kartentausch** (Karten): tauscht eine zufällige der beiden Hole Cards
+    gegen eine neue vom Deck – eine echte Ja/Nein-Entscheidung, da die neue
+    Karte auch schlechter sein kann.
+  - **Pot-Bonus** (Wette/Pot): +20 % Bonus-Chips auf den eigenen
+    Gewinn-Anteil dieser Hand (`ABILITY_POT_BONUS_RATE`), falls vor
+    Hand-Ende aktiviert – wirkt sowohl bei einem Sieg durch Fold als auch
+    beim echten Showdown (`Table._applyPotBonusIfActive()`).
+  - **Spionage** (Info/Gegner): deckt eine zufällige Hole Card eines
+    zufälligen, noch nicht gefoldeten Gegners auf – nur für den
+    einsetzenden Spieler sichtbar (`spyReveals`/`spiedCard` in
+    `getPublicState()`), am Gegner-Sitzplatz als aufgedeckte Mini-Karte mit
+    blauem Ring statt der üblichen verdeckten Rückseite zu erkennen.
+  - **Chip-Boost** (Ressourcen): sofortiger Chip-Bonus in Höhe von 10 % des
+    aktuellen eigenen Stacks (`ABILITY_CHIP_BOOST_RATE`), vom "System"
+    gutgeschrieben statt anderen Spielern abgezogen.
+
+  Anders als `fold`/`check`/`call`/`bet`/`raise` ist `useAbility()` keine
+  Wettrunden-Aktion: jeder Spieler kann seine Fähigkeiten jederzeit während
+  einer laufenden Hand einsetzen, unabhängig davon, wer gerade am Zug ist
+  (rührt `actingIndex`/`hasActed` nicht an). Bots entscheiden einmalig
+  direkt nach dem Austeilen über `decideAbilityActions()` in `bots.js`:
+  Chip-Boost/Pot-Bonus/Spionage haben in diesem einfachen Design keinerlei
+  Nachteil, werden also immer sofort eingesetzt; Kartentausch nur bei einer
+  erkennbar schwachen Preflop-Hand (`preflopStrength() < 0.4`).
 
 ## Mögliche nächste Schritte (für Claude Code)
 

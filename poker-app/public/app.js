@@ -817,6 +817,43 @@ function renderCommunityCards(cards, previouslyDealt) {
   });
 }
 
+const ABILITY_CATEGORY_LABELS = {
+  cards: 'Karten',
+  pot: 'Wette/Pot',
+  intel: 'Info/Gegner',
+  resource: 'Ressourcen',
+};
+
+// Rendert die eigenen vier Fähigkeiten-Karten (eine je Kategorie, siehe
+// abilities.js) neben den eigenen Hole Cards. abilities kommt direkt aus
+// state.players[...].abilities (siehe describeAbilitiesForClient() in
+// table.js) – null, solange noch keine Hand gestartet wurde. Jede noch
+// ungenutzte Karte ist klickbar und löst use-ability aus; eine bereits
+// eingesetzte Karte bleibt bis zur nächsten Hand sichtbar, aber deaktiviert.
+function renderAbilities(abilities) {
+  const container = document.getElementById('my-abilities');
+  container.innerHTML = '';
+  if (!abilities) return;
+  abilities.forEach((ability) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = `ability-card ability-${ability.category}${ability.used ? ' ability-used' : ''}`;
+    card.disabled = ability.used;
+    card.title = ability.description;
+    card.innerHTML = `
+      <span class="ability-card-category">${ABILITY_CATEGORY_LABELS[ability.category] || ability.category}</span>
+      <span class="ability-card-icon">${ability.icon}</span>
+      <span class="ability-card-name">${escapeHtml(ability.name)}</span>
+      <span class="ability-card-status">${ability.used ? 'Eingesetzt' : 'Einsetzen'}</span>
+    `;
+    card.addEventListener('click', () => {
+      if (ability.used) return;
+      socket.emit('use-ability', { category: ability.category });
+    });
+    container.appendChild(card);
+  });
+}
+
 function renderMyCards(cards, animate, containerId = 'my-cards') {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
@@ -941,9 +978,16 @@ function renderSeats(state, winnerIds, animateDeal, justRevealed) {
     // mit der ersten.
     const delay1 = animateDeal ? `style="animation-delay:${i * 0.06}s"` : '';
     const delay2 = animateDeal ? `style="animation-delay:${(n + i) * 0.06}s"` : '';
+    // Spionage (siehe _applySpy() in table.js): p.spiedCard ist gesetzt,
+    // wenn ich diesen Gegner in dieser Hand spioniert habe – zeigt eine der
+    // beiden Mini-Karten aufgedeckt statt verdeckt, nur in meiner eigenen
+    // Ansicht (andere Spieler sehen weiterhin zwei verdeckte Rückseiten).
+    const spiedCardHtml = p.spiedCard
+      ? cardOuterHtml(p.spiedCard, ` mini-card-spied${dealClass}`)
+      : `<span class="mini-card-back${dealClass}" ${delay1}></span>`;
     const hiddenCardsHtml = showHiddenCards
       ? `<div class="seat-cards">
-          <span class="mini-card-back${dealClass}" ${delay1}></span>
+          ${spiedCardHtml}
           <span class="mini-card-back${dealClass}" ${delay2}></span>
         </div>`
       : '';
@@ -1175,6 +1219,7 @@ function render(state) {
 
   const me = state.players.find((p) => p.id === mySocketId);
   renderMyCards((me && me.holeCards) || [], isNewHand);
+  renderAbilities(me && me.abilities);
 
   // Im 2v2-Casual-Modus schickt der Server zusätzlich die Hole Cards des
   // Teammitglieds mit (siehe extraVisibleIds in server.js). Team-bewusst
