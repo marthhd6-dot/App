@@ -267,7 +267,12 @@ Chip-Stände definiert.
   den Menschen). Bot-Räume werden bewusst nicht persistiert (siehe
   `persist()`), damit nach einem Server-Neustart kein nie wieder
   erreichbarer Bot-Platzhalter an einem Tisch übrig bleibt – rein zum Üben,
-  ohne Auswirkung auf Rang oder Bestenliste.
+  ohne Auswirkung auf Rang oder Bestenliste. Bevor ein Bot-Zug tatsächlich
+  ausgeführt wird, wartet `maybeTriggerBotActions()` eine kurze zufällige
+  "Bedenkzeit" (700-1800ms, `botThinkDelayMs()`, über `BOT_THINK_DELAY_MIN_MS`/
+  `BOT_THINK_DELAY_MAX_MS` überschreibbar) – rein kosmetisch, damit Bots
+  nicht unnatürlich sofort reagieren; die Entscheidung selbst steht davor
+  schon fest.
 
 ## Mögliche nächste Schritte (für Claude Code)
 

@@ -175,6 +175,18 @@ function nextBotId() {
   return `bot-${botIdCounter}`;
 }
 
+// Künstliche "Bedenkzeit", bevor ein Bot-Zug tatsächlich ausgeführt wird –
+// rein kosmetisch (wirkt sonst unnatürlich sofort), hat keinen Einfluss auf
+// die Entscheidung selbst (siehe decideBotAction() in bots.js). Über die
+// Env-Variablen überschreibbar, z. B. für Tests, um nicht künstlich warten
+// zu müssen.
+const BOT_THINK_DELAY_MIN_MS = Number(process.env.BOT_THINK_DELAY_MIN_MS) || 700;
+const BOT_THINK_DELAY_MAX_MS = Number(process.env.BOT_THINK_DELAY_MAX_MS) || 1800;
+
+function botThinkDelayMs() {
+  return BOT_THINK_DELAY_MIN_MS + Math.random() * (BOT_THINK_DELAY_MAX_MS - BOT_THINK_DELAY_MIN_MS);
+}
+
 function getOrCreateRank(name) {
   return getPlayerRank(DATA_FILE, name) || { rating: STARTING_RATING, wins: 0, losses: 0 };
 }
@@ -1160,8 +1172,12 @@ function applyBotDecision(table, botId, decision) {
 // Hand vorbei ist, oder der Raum kein Bot-Raum ist. Wird am Ende jeder
 // handleAction()-Aktion aufgerufen (auch nach start-hand, da das ebenfalls
 // über handleAction läuft) – für Nicht-Bot-Räume ist der erste Check ein
-// günstiger No-op. Rekursion ist unproblematisch, da eine Hand nur endlich
-// viele Aktionen hat.
+// günstiger No-op. Der eigentliche Zug wird erst nach einer kurzen
+// künstlichen "Bedenkzeit" ausgeführt (siehe botThinkDelayMs()), damit Bots
+// nicht unnatürlich sofort reagieren – bis dahin zeigt das Frontend den
+// Bot-Sitzplatz ganz normal als "am Zug" an (state.actingPlayerId ändert
+// sich erst mit dem tatsächlichen Zug). Rekursion ist unproblematisch, da
+// eine Hand nur endlich viele Aktionen hat.
 function maybeTriggerBotActions(code) {
   const entry = botRooms.get(code);
   if (!entry) return;
@@ -1171,25 +1187,36 @@ function maybeTriggerBotActions(code) {
   const current = table.getCurrentPlayer();
   if (!current || !entry.bots.has(current.id)) return;
 
-  const tierName = entry.bots.get(current.id);
-  const decision = decideBotAction(table, current.id, tierName);
-  try {
-    applyBotDecision(table, current.id, decision);
-  } catch (err) {
-    // Sollte dank der Legalitäts-Garantien von decideBotAction() nie
-    // passieren – als letzte Absicherung folden, damit die Hand nicht
-    // hängen bleibt, statt den ganzen Raum lahmzulegen.
-    table.fold(current.id);
-  }
-  advancePhaseIfRoundComplete(table);
-  broadcastRoomState(code);
+  setTimeout(() => {
+    // Zustand nach der Verzögerung erneut prüfen: Raum/Tisch könnten in der
+    // Zwischenzeit verschwunden sein (z. B. der Mensch hat den Raum
+    // verlassen und die Gnadenfrist ist abgelaufen).
+    const stillTable = rooms.getTable(code);
+    const stillEntry = botRooms.get(code);
+    if (!stillTable || !stillEntry) return;
+    const stillCurrent = stillTable.getCurrentPlayer();
+    if (!stillCurrent || !stillEntry.bots.has(stillCurrent.id)) return;
 
-  if (table.phase === 'showdown') {
-    maybeFinishBotMatch(code, table);
-  }
-  persist();
+    const tierName = stillEntry.bots.get(stillCurrent.id);
+    const decision = decideBotAction(stillTable, stillCurrent.id, tierName);
+    try {
+      applyBotDecision(stillTable, stillCurrent.id, decision);
+    } catch (err) {
+      // Sollte dank der Legalitäts-Garantien von decideBotAction() nie
+      // passieren – als letzte Absicherung folden, damit die Hand nicht
+      // hängen bleibt, statt den ganzen Raum lahmzulegen.
+      stillTable.fold(stillCurrent.id);
+    }
+    advancePhaseIfRoundComplete(stillTable);
+    broadcastRoomState(code);
 
-  maybeTriggerBotActions(code); // ggf. ist gleich der nächste Bot dran
+    if (stillTable.phase === 'showdown') {
+      maybeFinishBotMatch(code, stillTable);
+    }
+    persist();
+
+    maybeTriggerBotActions(code); // ggf. ist gleich der nächste Bot dran
+  }, botThinkDelayMs());
 }
 
 // Schickt jedem Socket im Raum seine eigene Sicht auf den Tisch (fremde
