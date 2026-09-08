@@ -15,6 +15,13 @@
       <stop offset="72%" stop-color="#f0a627"/>
       <stop offset="100%" stop-color="#a56a10"/>
     </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffe9a0" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffe9a0" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="20"/>
+    </filter>
   </defs>
 
   <rect width="1024" height="1024" fill="url(#bg)"/>
@@ -24,18 +31,37 @@
     fill="url(#burst)" opacity="0.9"/>
 
   <!-- Konfetti aus Karten-Symbolen für Party-/Chaos-Stimmung -->
-  <g fill="#fff6e0" font-family="DejaVu Sans, sans-serif" font-weight="bold" opacity="0.92">
-    <text x="150" y="200" font-size="60" transform="rotate(-18 150 200)">&#9824;</text>
-    <text x="895" y="175" font-size="52" fill="#ffd0d0" transform="rotate(16 895 175)">&#9829;</text>
-    <text x="885" y="880" font-size="58" fill="#ffe9a8" transform="rotate(24 885 880)">&#9830;</text>
-    <text x="130" y="890" font-size="48" fill="#d8fff0" transform="rotate(-16 130 890)">&#9827;</text>
-    <text x="70" y="530" font-size="44" fill="#ffd9a0" transform="rotate(-26 70 530)">&#9830;</text>
-    <text x="945" y="520" font-size="50" transform="rotate(30 945 520)">&#9824;</text>
-    <text x="540" y="90" font-size="42" fill="#ffb8b8" transform="rotate(8 540 90)">&#9829;</text>
-    <text x="560" y="970" font-size="46" fill="#c8f5df" transform="rotate(-10 560 970)">&#9827;</text>
+  <g fill="#fff6e0" font-family="DejaVu Sans, sans-serif" font-weight="bold" opacity="0.9">
+    <text x="130" y="180" font-size="52" transform="rotate(-18 130 180)">&#9824;</text>
+    <text x="900" y="165" font-size="46" fill="#ffd0d0" transform="rotate(16 900 165)">&#9829;</text>
+    <text x="905" y="900" font-size="50" fill="#ffe9a8" transform="rotate(24 905 900)">&#9830;</text>
+    <text x="110" y="905" font-size="44" fill="#d8fff0" transform="rotate(-16 110 905)">&#9827;</text>
+    <text x="540" y="80" font-size="38" fill="#ffb8b8" transform="rotate(8 540 80)">&#9829;</text>
+    <text x="560" y="985" font-size="40" fill="#c8f5df" transform="rotate(-10 560 985)">&#9827;</text>
   </g>
 
-  <!-- Schräg gekippter Chip mit wildem Comic-Gesicht -->
+  <!-- Zwei gefächerte Spielkarten hinter dem Chip: sorgen für den
+       "Karten"-Wunsch aus dem Feedback und zusätzliche Tiefe/Wildheit,
+       ohne den Chip selbst zu verdecken (Chip wird danach obendrauf
+       gezeichnet). -->
+  <g transform="translate(178,748) rotate(-32)">
+    <rect x="-130" y="-180" width="260" height="360" rx="26" fill="#fffdf5" stroke="#1a1712" stroke-width="6"/>
+    <text x="-98" y="-118" font-family="DejaVu Sans, sans-serif" font-weight="bold" font-size="70" fill="#1a1712">A</text>
+    <text x="-100" y="-48" font-family="DejaVu Sans, sans-serif" font-weight="bold" font-size="56" fill="#1a1712">&#9824;</text>
+    <text x="0" y="55" font-family="DejaVu Sans, sans-serif" font-weight="bold" font-size="180" fill="#1a1712" text-anchor="middle">&#9824;</text>
+  </g>
+  <g transform="translate(846,730) rotate(28)">
+    <rect x="-130" y="-180" width="260" height="360" rx="26" fill="#fffdf5" stroke="#1a1712" stroke-width="6"/>
+    <text x="-98" y="-118" font-family="DejaVu Sans, sans-serif" font-weight="bold" font-size="70" fill="#d81e3c">K</text>
+    <text x="-100" y="-48" font-family="DejaVu Sans, sans-serif" font-weight="bold" font-size="56" fill="#d81e3c">&#9829;</text>
+    <text x="0" y="55" font-family="DejaVu Sans, sans-serif" font-weight="bold" font-size="180" fill="#d81e3c" text-anchor="middle">&#9829;</text>
+  </g>
+
+  <circle cx="512" cy="512" r="410" fill="url(#glow)" filter="url(#blur)"/>
+
+  <!-- Schräg gekippter Chip, gut erkennbar (kein Gesicht): kräftiger
+       rot-goldener Kerbenrand plus dynamische Speed-Lines für den
+       "wilderen" Auftritt. -->
   <g transform="rotate(-13 512 512)">
     <circle cx="512" cy="512" r="372" fill="url(#chip)"/>
 
@@ -53,40 +79,20 @@
     <g transform="rotate(330 512 512)"><rect x="468.0" y="152.0" width="88.0" height="32.0" rx="8.0" fill="#d81e3c"/></g>
 
     <circle cx="512" cy="512" r="372" fill="none" stroke="#5c3a08" stroke-opacity="0.55" stroke-width="6"/>
-    <circle cx="512" cy="512" r="304" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="7"/>
+    <circle cx="512" cy="512" r="304" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="8"/>
+    <circle cx="512" cy="512" r="280" fill="none" stroke="#a5670f" stroke-opacity="0.4" stroke-width="4"/>
 
-    <!-- Augenbrauen: beide nach außen-oben gezogen für einen begeisterten
-         Lach-Ausdruck, leicht unterschiedlich groß für den "wilden" Look -->
-    <rect x="-50" y="-12" width="100" height="22" rx="11" fill="#1a1712"
-      transform="translate(408,362) rotate(-16)"/>
-    <rect x="-44" y="-11" width="88" height="20" rx="10" fill="#1a1712"
-      transform="translate(610,346) rotate(16)"/>
-
-    <!-- Schielende Augen: beide Pupillen zueinander gedreht = "vom Rumble ganz benommen" -->
-    <ellipse cx="418" cy="446" rx="68" ry="76" fill="#fffdf5"/>
-    <ellipse cx="418" cy="446" rx="68" ry="76" fill="none" stroke="#1a1712" stroke-width="5"/>
-    <circle cx="448" cy="424" r="27" fill="#1a1712"/>
-    <circle cx="458" cy="415" r="8" fill="#fff"/>
-
-    <ellipse cx="612" cy="428" rx="57" ry="64" fill="#fffdf5"/>
-    <ellipse cx="612" cy="428" rx="57" ry="64" fill="none" stroke="#1a1712" stroke-width="5"/>
-    <circle cx="586" cy="409" r="22" fill="#1a1712"/>
-    <circle cx="594" cy="401" r="7" fill="#fff"/>
-
-    <!-- Breites Lachen mit Zahnreihe und Zunge statt Schreckensschrei -->
-    <ellipse cx="515" cy="612" rx="150" ry="66" fill="#1a1712"/>
-    <path d="M425,658 Q515,706 605,658 Q515,684 425,658 Z" fill="#d81e3c"/>
-    <g fill="#fffdf5">
-      <rect x="382" y="556" width="36" height="28" rx="5"/>
-      <rect x="422" y="548" width="36" height="32" rx="5"/>
-      <rect x="462" y="544" width="36" height="34" rx="5"/>
-      <rect x="502" y="544" width="36" height="34" rx="5"/>
-      <rect x="542" y="548" width="36" height="32" rx="5"/>
-      <rect x="582" y="556" width="36" height="28" rx="5"/>
+    <!-- Speed-/Impact-Linien statt Gesicht: unterstreichen die
+         Drehbewegung des Chips für mehr "wilde" Energie. -->
+    <g stroke="#5c3a08" stroke-opacity="0.3" stroke-width="7" stroke-linecap="round">
+      <line x1="330" y1="330" x2="270" y2="270"/>
+      <line x1="512" y1="255" x2="512" y2="185"/>
+      <line x1="694" y1="330" x2="754" y2="270"/>
     </g>
 
-    <!-- Rote Wangen für den letzten Schuss Albernheit -->
-    <ellipse cx="325" cy="555" rx="34" ry="22" fill="#ff5c5c" opacity="0.55" transform="rotate(-14 325 555)"/>
-    <ellipse cx="715" cy="535" rx="30" ry="20" fill="#ff5c5c" opacity="0.5" transform="rotate(10 715 535)"/>
+    <ellipse cx="418" cy="330" rx="190" ry="110" fill="#ffffff" opacity="0.22"/>
+
+    <text x="512" y="660" font-family="DejaVu Sans, sans-serif" font-size="460"
+      font-weight="bold" fill="#1a1712" text-anchor="middle" stroke="#ffd569" stroke-width="6" paint-order="stroke">&#9824;</text>
   </g>
 </svg>
