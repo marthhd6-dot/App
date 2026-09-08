@@ -139,9 +139,9 @@ const CASUAL_GROUP_SIZE = 4;
 // Ohne Rating-Konzept genügt reines FIFO: sobald CASUAL_GROUP_SIZE
 // Spieler warten, werden die ersten vier sofort zusammengelegt.
 const casualQueue = [];
-// Räume aus dem Casual-4-Matchmaking: code -> { eliminatedOrder }. Wie
-// rankedRooms, aber ohne Blind-Zeitplan (feste Blinds wie an einem
-// normalen Casual-Tisch) und ohne Rating-Auswirkung nach Matchende.
+// Räume aus dem Casual-4-Matchmaking: code -> { eliminatedOrder,
+// handsPlayed }. Wie rankedRooms inklusive Turnier-Blind-Zeitplan, aber
+// ohne Rating-Auswirkung nach Matchende.
 const casualMatchRooms = new Map();
 
 // Anzahl Spieler pro 2v2-Tisch (2 Teams à 2 Spieler).
@@ -164,15 +164,17 @@ const rankedTeamRooms = new Map();
 // Wartende Spieler für 2v2 Casual: { socket, name, joinedAt }. Reines FIFO
 // wie beim 1v1v1v1-Casual-Modus.
 const casualTeamQueue = [];
-// Räume aus dem 2v2-Casual-Matchmaking: code -> { teams, members }. Für
-// diese Räume zeigt broadcastRoomState() jedem Spieler zusätzlich die Hole
-// Cards seines Teammitglieds.
+// Räume aus dem 2v2-Casual-Matchmaking: code -> { teams, members,
+// handsPlayed }. Für diese Räume zeigt broadcastRoomState() jedem Spieler
+// zusätzlich die Hole Cards seines Teammitglieds; handsPlayed steuert wie
+// bei rankedTeamRooms den Turnier-Blind-Zeitplan.
 const casualTeamRooms = new Map();
 
 // Übungs-Räume gegen Bots (siehe play-vs-bots weiter unten): code -> {
-// bots: Map(botId -> { tier, rating }), eliminatedOrder }. Dieselbe Form
-// von "bots" wird auch von rankedRooms/casualMatchRooms/rankedTeamRooms/
-// casualTeamRooms genutzt, sobald deren Warteschlange nicht rechtzeitig
+// bots: Map(botId -> { tier, rating }), eliminatedOrder, handsPlayed }.
+// Dieselbe Form von "bots" wird auch von
+// rankedRooms/casualMatchRooms/rankedTeamRooms/casualTeamRooms genutzt,
+// sobald deren Warteschlange nicht rechtzeitig
 // voll wurde und mit Bots aufgefüllt werden musste (siehe
 // maybeBackfillQueueWithBots()) – so kann maybeTriggerBotActions() für
 // jeden Raumtyp einheitlich prüfen, ob und welche Bots dort sitzen, ohne
@@ -527,7 +529,7 @@ io.on('connection', (socket) => {
       table.addPlayer(botId, botName);
       bots.set(botId, { tier: tierName, rating: null });
     }
-    botRooms.set(code, { bots, eliminatedOrder: [] });
+    botRooms.set(code, { bots, eliminatedOrder: [], handsPlayed: 0 });
 
     socket.data.roomCode = code;
     socket.join(code);
@@ -640,11 +642,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('start-hand', () => {
-    // In beiden Ranked-Modi (1v1v1v1 und 2v2) vor jeder Hand die Blinds
-    // nach dem Turnier-Zeitplan setzen und den Hand-Zähler erhöhen (siehe
-    // blindsForHandsPlayed()).
+    // In allen Modi (Ranked und Casual, 1v1v1v1 und 2v2, sowie "Gegen Bots
+    // üben") vor jeder Hand die Blinds nach dem Turnier-Zeitplan setzen und
+    // den Hand-Zähler erhöhen (siehe blindsForHandsPlayed()): alle
+    // RANKED_BLIND_INCREASE_EVERY_HANDS Hände verdoppeln sich die Blinds,
+    // gedeckelt bei RANKED_MAX_SMALL_BLIND/-2x (aktuell 160/320).
     const code = socket.data.roomCode;
-    const escalatingEntry = rankedRooms.get(code) || rankedTeamRooms.get(code);
+    const escalatingEntry = getMatchEntry(code);
     handleAction(socket, (table) => {
       if (escalatingEntry) {
         const { smallBlind, bigBlind } = blindsForHandsPlayed(escalatingEntry.handsPlayed);
@@ -885,7 +889,7 @@ function startCasualMatch(entries) {
   entries.forEach((e) => {
     if (!e.socket) bots.set(e.id, { tier: e.tier, rating: e.rating });
   });
-  casualMatchRooms.set(code, { eliminatedOrder: [], bots });
+  casualMatchRooms.set(code, { eliminatedOrder: [], bots, handsPlayed: 0 });
   const table = rooms.getTable(code);
   for (const entry of entries) {
     table.addPlayer(entryId(entry), entry.name);
@@ -983,7 +987,7 @@ setInterval(runCasualTeamMatchmakingPass, MATCHMAKING_INTERVAL_MS);
 function startCasualTeamMatch(teamA, teamB) {
   const code = rooms.createRoom();
   const { teams, members, bots } = buildTeamAssignment(teamA, teamB);
-  casualTeamRooms.set(code, { teams, members, bots });
+  casualTeamRooms.set(code, { teams, members, bots, handsPlayed: 0 });
   const table = rooms.getTable(code);
   for (const entry of members) {
     table.addPlayer(entry.id, entry.name);

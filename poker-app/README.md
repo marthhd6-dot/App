@@ -241,9 +241,10 @@ Chip-Stände definiert.
   an einem neuen Tisch zusammenfinden, ohne Raum-Code zu teilen –, aber
   ohne jeden Rating-Bezug. Die Warteschlange ist reines FIFO: sobald vier
   Spieler warten, spielen die ersten vier zusammen (kein
-  Toleranz-Fenster nötig, da kein Rating verglichen wird). Fester
-  Tisch wie ein normaler Casual-Tisch (1000 Chips, feste Blinds 5/10,
-  kein Turnier-Zeitplan). Wie beim Ranked-Modus endet das Match, sobald
+  Toleranz-Fenster nötig, da kein Rating verglichen wird). Startkapital wie
+  ein normaler Casual-Tisch (1000 Chips), aber mit demselben
+  Turnier-Blind-Zeitplan wie Ranked (`blindsForHandsPlayed()`, 5/10 bis
+  160/320). Wie beim Ranked-Modus endet das Match, sobald
   nur noch ein Spieler Chips übrig hat, und alle werden nach
   Bust-Reihenfolge platziert (`casual-match-over`-Event mit `place`/
   `totalPlayers`) – nur eben ohne jede Auswirkung auf Rang oder
@@ -361,8 +362,6 @@ Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
 - **Postgres/Supabase statt lokaler SQLite-Datei**: sinnvoll, sobald die
   App auf mehreren Server-Prozessen/Maschinen laufen soll (SQLite ist
   an eine einzelne Datei auf einer Maschine gebunden).
-- **Turnier-Modus**: Blinds automatisch nach einem Zeitplan erhöhen,
-  Spieler mit 0 Chips aus dem Tisch nehmen.
 - **Hand-Historie & Chat**: vergangene Hände und Nachrichten pro Raum
   anzeigen (SQLite ist dafür bereits vorhanden und würde sich anbieten).
 - **Mobile-optimiertes UI**: Die Action-Bar und Karten-Reihen sind noch
