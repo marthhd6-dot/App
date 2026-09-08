@@ -1526,110 +1526,138 @@ button:disabled {
 
 /* --- Fähigkeiten-Karten (siehe abilities.js, renderAbilities() in app.js)
    ---------------------------------------------------------------------------
-   Eine Reihe aus vier kleinen Karten neben den eigenen Hole Cards, eine je
-   Kategorie (Karten/Wette-Pot/Info-Gegner/Ressourcen) – jede farblich einer
-   Kategorie zugeordnet, in derselben abgerundeten "Spielkarten"-Sprache wie
-   .card oben, aber flacher und als klickbarer <button> statt als reines
-   Anzeige-Element. */
+   Eine Reihe aus vier Karten neben den eigenen Hole Cards, eine je Kategorie
+   (Karten/Wette-Pot/Info-Gegner/Ressourcen). Bewusst auffällig statt
+   dezent: jede Kategorie bekommt denselben kräftigen Verlauf + "3D"-Kanten-
+   Schatten wie die Modus-Knöpfe im Hauptmenü (.btn-mode-ranked etc.) und
+   die Wettrunden-Buttons (.btn-fold/.btn-call/.btn-raise), plus einen
+   pulsierenden Farb-Glow (wie .seat.acting), solange die Karte noch
+   einsetzbar ist – zieht den Blick genauso auf sich wie der pulsierende
+   "Hand starten"-Knopf (#start-hand-btn), ohne eine neue visuelle Sprache
+   einzuführen. --glow/--edge sind pro Kategorie gesetzte Custom
+   Properties, die derselbe gemeinsame @keyframes-Puls unten nutzt. */
 .ability-row {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .ability-card {
+  --glow: rgba(255, 255, 255, 0.4);
+  --edge: rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  width: 84px;
-  padding: 8px 6px 7px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.18));
-  color: var(--text);
+  gap: 3px;
+  width: 96px;
+  padding: 10px 7px 8px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
   font-family: inherit;
   cursor: pointer;
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25), 0 8px 16px -6px rgba(0, 0, 0, 0.6);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  box-shadow: 0 4px 0 var(--edge), 0 10px 20px -6px rgba(0, 0, 0, 0.6), 0 0 0 0 var(--glow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
+  animation: ability-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes ability-pulse {
+  0%,
+  100% {
+    box-shadow: 0 4px 0 var(--edge), 0 10px 20px -6px rgba(0, 0, 0, 0.6), 0 0 0 0 var(--glow);
+  }
+  50% {
+    box-shadow: 0 4px 0 var(--edge), 0 10px 20px -6px rgba(0, 0, 0, 0.6), 0 0 20px 6px var(--glow);
+  }
 }
 
 .ability-card:hover:not(:disabled) {
-  transform: translateY(-3px);
-  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.25), 0 12px 20px -6px rgba(0, 0, 0, 0.65);
+  transform: translateY(-4px) scale(1.04);
+  filter: brightness(1.08);
+  box-shadow: 0 6px 0 var(--edge), 0 16px 26px -6px rgba(0, 0, 0, 0.65), 0 0 24px 7px var(--glow);
 }
 
 .ability-card:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(-1px) scale(1.01);
 }
 
 .ability-card:disabled,
 .ability-card.ability-used {
   cursor: default;
-  opacity: 0.45;
-  filter: grayscale(0.6);
+  opacity: 0.4;
+  filter: grayscale(0.75);
+  border-color: rgba(255, 255, 255, 0.14);
+  animation: none;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), 0 4px 10px -4px rgba(0, 0, 0, 0.5);
 }
 
 .ability-card-category {
-  font-size: 0.56rem;
-  font-weight: 700;
+  font-size: 0.58rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
+  letter-spacing: 0.07em;
+  opacity: 0.7;
 }
 
 .ability-card-icon {
-  font-size: 1.4rem;
-  line-height: 1.2;
+  font-size: 2rem;
+  line-height: 1.15;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
 }
 
 .ability-card-name {
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.76rem;
+  font-weight: 800;
   text-align: center;
   line-height: 1.15;
 }
 
 .ability-card-status {
-  font-size: 0.6rem;
-  font-weight: 600;
+  font-size: 0.62rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  opacity: 0.75;
   margin-top: 1px;
 }
 
-/* Kategorie-Farben, angelehnt an die bestehende Akzentpalette – dieselbe
-   Zuordnung wie ABILITY_CATEGORY_LABELS in app.js. */
+/* Kategorie-Farben: derselbe kräftige Verlauf + dunkle "3D"-Kante wie die
+   bestehenden Modus-/Aktions-Knöpfe mit vergleichbarer Bedeutung
+   (Gold=.btn-mode-ranked, Rot=.btn-fold, Blau=.btn-mode-practice,
+   Grün=.btn-mode-casual/.btn-call) – dieselbe Zuordnung wie
+   ABILITY_CATEGORY_LABELS in app.js. Dunkler Text statt var(--text), da
+   alle vier Verläufe hell genug für guten Kontrast sind. */
 .ability-card.ability-cards {
-  border-color: rgba(232, 191, 74, 0.5);
-}
-.ability-card.ability-cards .ability-card-icon {
-  filter: drop-shadow(0 0 6px rgba(232, 191, 74, 0.5));
+  --glow: rgba(232, 191, 74, 0.65);
+  --edge: #a3801f;
+  background: linear-gradient(160deg, var(--accent-bright), var(--accent) 70%);
+  border-color: #fff3c4;
+  color: #1b1a15;
 }
 
 .ability-card.ability-pot {
-  border-color: rgba(255, 92, 92, 0.5);
-}
-.ability-card.ability-pot .ability-card-icon {
-  filter: drop-shadow(0 0 6px rgba(255, 92, 92, 0.45));
+  --glow: rgba(255, 92, 92, 0.6);
+  --edge: #a23636;
+  background: linear-gradient(160deg, #ff9d9d, var(--danger) 70%);
+  border-color: #ffd7d7;
+  color: #2a0d0d;
 }
 
 .ability-card.ability-intel {
-  border-color: rgba(111, 180, 255, 0.5);
-}
-.ability-card.ability-intel .ability-card-icon {
-  filter: drop-shadow(0 0 6px rgba(111, 180, 255, 0.45));
+  --glow: rgba(111, 180, 255, 0.6);
+  --edge: #34506e;
+  background: linear-gradient(160deg, #cfe0ff, var(--info) 70%);
+  border-color: #eaf2ff;
+  color: #10192b;
 }
 
 .ability-card.ability-resource {
-  border-color: rgba(53, 214, 138, 0.5);
-}
-.ability-card.ability-resource .ability-card-icon {
-  filter: drop-shadow(0 0 6px rgba(53, 214, 138, 0.45));
+  --glow: rgba(53, 214, 138, 0.6);
+  --edge: #1f8a5c;
+  background: linear-gradient(160deg, #8ff0c0, var(--success) 70%);
+  border-color: #e2fbee;
+  color: #0a2417;
 }
 
 /* Aufgedeckte Gegner-Hände bei einem echten Showdown (siehe
@@ -2153,13 +2181,13 @@ button:disabled {
     font-size: 1.5rem;
   }
   .ability-card {
-    width: 70px;
-    padding: 6px 4px 5px;
+    width: 76px;
+    padding: 7px 4px 6px;
   }
   .ability-card-icon {
-    font-size: 1.15rem;
+    font-size: 1.5rem;
   }
   .ability-card-name {
-    font-size: 0.64rem;
+    font-size: 0.66rem;
   }
 }
