@@ -147,8 +147,8 @@ npm run cap:open:ios        # öffnet ios/App/App.xcodeproj in Xcode
    [developer.apple.com](https://developer.apple.com)).
 2. Falls CocoaPods-Plugins dazukommen: `cd ios/App && pod install`, danach
    `App.xcworkspace` statt `App.xcodeproj` öffnen.
-3. App-Icon und Splash-Screen sind bereits gesetzt (wilder, grinsender
-   Chip, siehe "App-Icons" und "Splash-Screens" unten) – kein
+3. App-Icon und Splash-Screen sind bereits gesetzt (wilder Poker-Chip,
+   siehe "App-Icons" und "Splash-Screens" unten) – kein
    Capacitor-Platzhalter mehr.
 4. Auf Simulator/eigenem Gerät testen, dann über **TestFlight** verteilen,
    bevor ihr zur App-Review einreicht.
@@ -216,12 +216,14 @@ deutlich verspielter/wilder als ein klassisches, seriöses Casino-Icon.
   `design/generate-app-icons.js` rendert beide SVGs per Playwright auf
   alle benötigten Pixelgrößen neu – nützlich, falls sich das Design mal
   ändern soll (Kommentar im Script erklärt Voraussetzungen/Aufruf).
+
 ### Splash-Screens
 
 Echte Splash-Screens statt des weißen Capacitor-Platzhalters (kleines
 blaues "X"-Logo auf Weiß): derselbe Farbverlauf wie im App-Icon-Hintergrund
-(Orange-Rot) füllt den kompletten Bildschirm, mit dem grinsenden Chip-
-Maskottchen mittig darauf – bewusst ohne Text/Wortmarke, damit es bei
+(Orange-Rot) füllt den kompletten Bildschirm, mit dem Chip-Maskottchen
+(ohne Gesicht, siehe "App-Icons" oben) mittig darauf – bewusst ohne
+Text/Wortmarke, damit es bei
 jeder Bildschirmgröße (vom kleinsten Android-Legacy-Format 320×480 bis
 zum iOS-Quadrat 2732×2732) lesbar bleibt, analog zum ursprünglichen
 Capacitor-Platzhalter, der ebenfalls nur ein zentriertes Symbol ohne Text
