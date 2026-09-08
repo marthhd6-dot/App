@@ -90,7 +90,13 @@ Chip-Stände definiert.
 - Grundstruktur für einen Tisch mit mehreren Spielern
 - **Wettrunden-Logik** in `table.js`: `placeBet`, `raise`, `call`, `check`,
   `fold`, inklusive Zugreihenfolge, Big-Blind-Option, Mindest-Raise,
-  All-In-Behandlung und automatischem Rundenabschluss
+  All-In-Behandlung und automatischem Rundenabschluss. `check()` und
+  `isBettingRoundComplete()` vergleichen den eigenen Einsatz mit
+  `>=` statt `===` gegen `currentBet`: Postet ein kurzgestapelter Big
+  Blind weniger als den vollen Big Blind (All-in-Blind), kann `currentBet`
+  unter dem Einsatz des Small Blind liegen – der darf dann trotzdem
+  checken, statt in einer Sackgasse zu landen (weder exaktes `check()`
+  noch `call()` mit `owed > 0` wären sonst möglich gewesen).
 - **Side Pots**: Sind mehrere Spieler mit unterschiedlich hohen Stacks
   all-in, teilt `Table._computePots()` den Pot beim Showdown korrekt in
   Haupt- und Neben-Pots auf – jeder Layer ist nur unter den Spielern zu
@@ -239,6 +245,29 @@ Chip-Stände definiert.
   ausgegraut) und zeigt einen Fortschrittsbalken bis zum nächsten Rang.
   Die Schwellenwerte (`RANK_TIERS`) kommen dafür im `rank-info`-Event vom
   Server mit, damit das Frontend sie nicht separat duplizieren muss.
+- **Gegen Bots üben** (`bots.js`, Handler `play-vs-bots` in `server.js`):
+  startet sofort (kein Matchmaking/Warteschlange) einen eigenen Raum mit
+  1-3 Bot-Gegnern einer wählbaren Rang-Stufe (Bronze bis Champion,
+  dieselben Namen wie im Rang-Pfad). Bots haben keinen echten Socket – ihre
+  Züge kommen aus `decideBotAction()`, das nach jeder menschlichen (und
+  jeder eigenen) Aktion automatisch nachgezogen wird
+  (`maybeTriggerBotActions()`), solange der aktuell Handelnde ein Bot ist.
+  Kein echtes maschinelles Lernen oder vollständige Equity-Berechnung,
+  sondern eine einfache Heuristik aus vier Parametern pro Rang-Stufe:
+  `mistakeRate` (Zufallsentscheidung statt der berechneten Aktion),
+  `tightness` (Sicherheitsabstand zwischen Handstärke und den tatsächlichen
+  Pot-Odds, bevor der Bot mitgeht – niedrig bei Bronze, also eher eine
+  "Calling Station", hoch bei Champion, also diszipliniertes Folden),
+  `aggression` (wie oft eine starke Hand zu einem Bet/Raise statt nur
+  Call/Check führt) und `bluffRate`. Handstärke: preflop eine grobe
+  Chart-Heuristik (hohe Karten, Paare, Suited-/Connector-Boni), postflop die
+  tatsächlich beste 5-Karten-Hand (`bestHand()` aus `handEvaluator.js`),
+  linear auf 0..1 abgebildet. Bust-Erkennung und Match-Ende nutzen dieselbe
+  `trackEliminations()` wie 1v1v1v1 Ranked/Casual (`vs-bots-over`-Event für
+  den Menschen). Bot-Räume werden bewusst nicht persistiert (siehe
+  `persist()`), damit nach einem Server-Neustart kein nie wieder
+  erreichbarer Bot-Platzhalter an einem Tisch übrig bleibt – rein zum Üben,
+  ohne Auswirkung auf Rang oder Bestenliste.
 
 ## Mögliche nächste Schritte (für Claude Code)
 

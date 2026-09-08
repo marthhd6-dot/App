@@ -21,6 +21,12 @@
 //   – und als Besonderheit sieht jeder Spieler zusätzlich die Hole Cards
 //   seines Teammitglieds (siehe extraVisibleIds in broadcastRoomState()).
 //
+// Gegen Bots üben (play-vs-bots): startet sofort (kein Matchmaking) einen
+// eigenen Raum mit 1-3 Bot-Gegnern einer wählbaren Rang-Stufe. Bots haben
+// keinen echten Socket – ihre Züge kommen aus decideBotAction() (siehe
+// bots.js) und werden nach jeder Aktion automatisch nachgezogen (siehe
+// maybeTriggerBotActions()). Rein zum Üben, kein Rating-Bezug.
+//
 // Freundesliste: Die Liste selbst liegt nur im Browser (localStorage) des
 // jeweiligen Spielers – der Server speichert keine Freundschaften, sondern
 // nur, welcher Name gerade online ist (onlineByName), damit ein Client
@@ -66,6 +72,7 @@ const {
   applyTeamMatchResult,
 } = require('./ranking');
 const { blindsForHandsPlayed } = require('./blinds');
+const { BOT_TIER_NAMES, decideBotAction } = require('./bots');
 
 const app = express();
 const server = http.createServer(app);
@@ -80,7 +87,12 @@ const rooms = new RoomManager();
 rooms.restoreSnapshot(loadSnapshot(DATA_FILE));
 
 function persist() {
-  saveSnapshot(DATA_FILE, rooms.exportSnapshot());
+  // Bot-Übungsräume nicht mit sichern (siehe botRooms weiter unten) – sie
+  // sind bewusst flüchtig, damit nach einem Neustart kein nie wieder
+  // erreichbarer Bot-Platzhalter an einem Tisch übrig bleibt.
+  const snapshot = rooms.exportSnapshot();
+  for (const code of botRooms.keys()) delete snapshot[code];
+  saveSnapshot(DATA_FILE, snapshot);
 }
 
 // Startkapital für ein Ranked-Match, wie bei einem Casual-Tisch. Die
@@ -145,6 +157,23 @@ const casualTeamQueue = [];
 // diese Räume zeigt broadcastRoomState() jedem Spieler zusätzlich die Hole
 // Cards seines Teammitglieds.
 const casualTeamRooms = new Map();
+
+// Übungs-Räume gegen Bots (siehe play-vs-bots weiter unten): code -> {
+// bots: Map(botId -> Rang-Stufe), eliminatedOrder }. eliminatedOrder wird
+// von der bereits für Ranked/Casual genutzten trackEliminations()
+// wiederverwendet, um Bust-Reihenfolge und Match-Ende einheitlich zu
+// behandeln. Bots haben keinen echten Socket – nur der menschliche Spieler
+// bekommt Ergebnisse gemeldet (siehe maybeFinishBotMatch()). Bot-Räume
+// werden bewusst NICHT persistiert (siehe persist()): nach einem
+// Server-Neustart gäbe es sonst einen "verwaisten", nie wieder
+// verbindbaren Bot-Platzhalter am Tisch. Für eine reine Übungsrunde ist
+// das ein vertretbarer Kompromiss.
+const botRooms = new Map();
+let botIdCounter = 0;
+function nextBotId() {
+  botIdCounter += 1;
+  return `bot-${botIdCounter}`;
+}
 
 function getOrCreateRank(name) {
   return getPlayerRank(DATA_FILE, name) || { rating: STARTING_RATING, wins: 0, losses: 0 };
@@ -386,6 +415,43 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Startet sofort (kein Matchmaking/Warteschlange nötig) einen eigenen
+  // Raum mit 1-3 Bot-Gegnern einer gewählten Rang-Stufe (siehe bots.js).
+  // Kein Rating-Bezug – reiner Übungsmodus, echte Ranked/Casual-Läufe mit
+  // Menschen bleiben davon unberührt.
+  socket.on('play-vs-bots', ({ name, botCount, difficulty } = {}) => {
+    if (socket.data.roomCode) {
+      socket.emit('error-message', 'Du bist bereits einem Raum beigetreten.');
+      return;
+    }
+    const trimmedName = resolveName(socket, name);
+    if (!trimmedName) {
+      socket.emit('error-message', 'Bitte gib zuerst einen Namen ein.');
+      return;
+    }
+    const tierName = BOT_TIER_NAMES.includes(difficulty) ? difficulty : BOT_TIER_NAMES[0];
+    const count = Math.min(3, Math.max(1, Math.round(Number(botCount)) || 1));
+
+    const code = rooms.createRoom();
+    const table = rooms.getTable(code);
+    table.addPlayer(socket.id, trimmedName);
+    markOnline(socket, trimmedName);
+
+    const bots = new Map();
+    for (let i = 0; i < count; i++) {
+      const botId = nextBotId();
+      const botName = count > 1 ? `${tierName}-Bot ${i + 1}` : `${tierName}-Bot`;
+      table.addPlayer(botId, botName);
+      bots.set(botId, tierName);
+    }
+    botRooms.set(code, { bots, eliminatedOrder: [] });
+
+    socket.data.roomCode = code;
+    socket.join(code);
+    socket.emit('room-joined', { code, vsBots: true, botDifficulty: tierName });
+    broadcastRoomState(code);
+  });
+
   socket.on('get-rank', ({ name } = {}) => {
     const trimmedName = resolveName(socket, name);
     if (!trimmedName) return;
@@ -555,12 +621,19 @@ io.on('connection', (socket) => {
       const currentTable = rooms.getTable(roomCode);
       if (!currentTable) return;
       currentTable.removePlayer(socket.id);
-      if (currentTable.players.length === 0) {
+      // In einem Bot-Raum bleiben Bots nach einem Verlassen des Menschen
+      // für immer sitzen (sie haben keinen eigenen Reconnect) – ohne diese
+      // Prüfung würde players.length nie 0 erreichen und der Raum bliebe
+      // dauerhaft (unbespielt) im Speicher hängen.
+      const botEntry = botRooms.get(roomCode);
+      const onlyBotsLeft = botEntry && currentTable.players.every((p) => botEntry.bots.has(p.id));
+      if (currentTable.players.length === 0 || onlyBotsLeft) {
         rooms.removeRoom(roomCode);
         rankedRooms.delete(roomCode);
         casualMatchRooms.delete(roomCode);
         rankedTeamRooms.delete(roomCode);
         casualTeamRooms.delete(roomCode);
+        botRooms.delete(roomCode);
       } else {
         broadcastRoomState(roomCode);
       }
@@ -579,6 +652,8 @@ function roomModeInfo(code, playerId) {
   if (rankedTeamEntry) return { rankedTeam: true, team: rankedTeamEntry.teams[playerId] };
   const casualTeamEntry = casualTeamRooms.get(code);
   if (casualTeamEntry) return { casualTeam: true, team: casualTeamEntry.teams[playerId] };
+  const botEntry = botRooms.get(code);
+  if (botEntry) return { vsBots: true };
   return {};
 }
 
@@ -816,8 +891,10 @@ function handleAction(socket, action) {
       else if (casualMatchRooms.has(roomCode)) maybeFinishCasualMatch(roomCode, table);
       else if (rankedTeamRooms.has(roomCode)) maybeFinishRankedTeamMatch(roomCode, table);
       else if (casualTeamRooms.has(roomCode)) maybeFinishCasualTeamMatch(roomCode, table);
+      else if (botRooms.has(roomCode)) maybeFinishBotMatch(roomCode, table);
     }
     persist(); // einfach gehalten: nach jeder Aktion speichern statt nur nach Handende
+    maybeTriggerBotActions(roomCode);
   } catch (err) {
     socket.emit('error-message', err.message);
   }
@@ -1034,6 +1111,85 @@ function maybeFinishCasualTeamMatch(code, table) {
     if (!clientSocket) return;
     clientSocket.emit('casual-team-match-over', { won: member.team === result.winningTeam });
   });
+}
+
+// Wertet ein beendetes Bot-Übungsmatch aus: kein Rating betroffen, nur der
+// menschliche Spieler bekommt Sieg/Niederlage gemeldet (Bots haben keinen
+// Socket). Nutzt trackEliminations() wie Ranked/Casual-4-Matches, da botRooms-
+// Einträge dieselbe { eliminatedOrder } Form haben.
+function maybeFinishBotMatch(code, table) {
+  const entry = botRooms.get(code);
+  if (!entry) return;
+
+  const result = trackEliminations(table, entry);
+  if (!result.finished) {
+    if (result.changed) broadcastRoomState(code);
+    return;
+  }
+  botRooms.delete(code);
+  if (result.placements.length === 0) return;
+
+  const human = result.placements.find((p) => !entry.bots.has(p.id));
+  const clientSocket = human && io.sockets.sockets.get(human.id);
+  if (!clientSocket) return;
+  clientSocket.emit('vs-bots-over', { won: result.placements[0].id === human.id });
+}
+
+// Führt eine Bot-Entscheidung über die passende Table-Methode aus (siehe
+// decideBotAction() in bots.js, das immer eine an der aktuellen Situation
+// legale Aktion liefert).
+function applyBotDecision(table, botId, decision) {
+  switch (decision.type) {
+    case 'fold':
+      return table.fold(botId);
+    case 'check':
+      return table.check(botId);
+    case 'call':
+      return table.call(botId);
+    case 'bet':
+      return table.placeBet(botId, decision.amount);
+    case 'raise':
+      return table.raise(botId, decision.amount);
+    default:
+      throw new Error(`Unbekannte Bot-Aktion: ${decision.type}`);
+  }
+}
+
+// Lässt so lange automatisch für wartende Bots handeln (siehe
+// decideBotAction() in bots.js), bis entweder ein Mensch am Zug ist, die
+// Hand vorbei ist, oder der Raum kein Bot-Raum ist. Wird am Ende jeder
+// handleAction()-Aktion aufgerufen (auch nach start-hand, da das ebenfalls
+// über handleAction läuft) – für Nicht-Bot-Räume ist der erste Check ein
+// günstiger No-op. Rekursion ist unproblematisch, da eine Hand nur endlich
+// viele Aktionen hat.
+function maybeTriggerBotActions(code) {
+  const entry = botRooms.get(code);
+  if (!entry) return;
+  const table = rooms.getTable(code);
+  if (!table) return;
+
+  const current = table.getCurrentPlayer();
+  if (!current || !entry.bots.has(current.id)) return;
+
+  const tierName = entry.bots.get(current.id);
+  const decision = decideBotAction(table, current.id, tierName);
+  try {
+    applyBotDecision(table, current.id, decision);
+  } catch (err) {
+    // Sollte dank der Legalitäts-Garantien von decideBotAction() nie
+    // passieren – als letzte Absicherung folden, damit die Hand nicht
+    // hängen bleibt, statt den ganzen Raum lahmzulegen.
+    table.fold(current.id);
+  }
+  advancePhaseIfRoundComplete(table);
+  broadcastRoomState(code);
+
+  if (table.phase === 'showdown') {
+    maybeFinishBotMatch(code, table);
+  }
+  persist();
+
+  maybeTriggerBotActions(code); // ggf. ist gleich der nächste Bot dran
 }
 
 // Schickt jedem Socket im Raum seine eigene Sicht auf den Tisch (fremde

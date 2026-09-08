@@ -140,6 +140,27 @@ run('call() ist nicht erlaubt, wenn nichts zu callen ist', () => {
   assert.throws(() => table.call('c'), /Nichts zu callen/);
 });
 
+run('check() ist auch erlaubt, wenn der eigene Einsatz über currentBet liegt (kurzgestapelter Big Blind)', () => {
+  // Postet der Big Blind mit weniger Chips als der volle Big Blind einen
+  // All-in-Blind, kann currentBet unter dem Einsatz des Small Blind liegen
+  // -- der Small Blind hat dann bereits mehr eingesetzt als aktuell
+  // gefordert und darf trotzdem checken, statt in einer Sackgasse zu
+  // landen (weder exakter check() noch call() mit owed > 0 wären sonst
+  // möglich).
+  const table = new Table({ smallBlind: 5, bigBlind: 10 });
+  table.addPlayer('a', 'Alice', 1000); // Dealer + Small Blind (heads-up)
+  table.addPlayer('b', 'Bob', 3); // Big Blind, kann nur 3 statt 10 posten
+  table.startHand();
+
+  const bob = table.players.find((p) => p.id === 'b');
+  assert.strictEqual(bob.isAllIn, true);
+  assert.strictEqual(table.currentBet, 3);
+  assert.strictEqual(table.players.find((p) => p.id === 'a').bet, 5);
+
+  assert.doesNotThrow(() => table.check('a'));
+  assert.strictEqual(table.isBettingRoundComplete(), true);
+});
+
 run('placeBet erzwingt den Mindesteinsatz und ist nur ohne bestehenden Einsatz erlaubt', () => {
   const table = makeTable(['a', 'b', 'c']);
   table.startHand();

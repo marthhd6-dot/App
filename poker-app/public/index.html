@@ -78,7 +78,8 @@
         </div>
         <p>
           Erstelle einen neuen Tisch, tritt einem bestehenden per Code bei, oder spiele 1v1v1v1 oder 2v2 – jeweils
-          Ranked oder Casual. Im 2v2 Casual siehst du zusätzlich die Karten deines Teammitglieds.
+          Ranked oder Casual. Im 2v2 Casual siehst du zusätzlich die Karten deines Teammitglieds. Zum Üben geht's
+          auch sofort gegen Bots, deren Stärke sich nach der gewählten Rang-Stufe richtet.
         </p>
         <div id="join-error" class="error-banner" hidden></div>
         <div class="account-bar">
@@ -113,6 +114,12 @@
         </div>
         <div class="join-row">
           <button id="casual-team-queue-btn" class="btn btn-casual-team">👥 2v2 Casual spielen</button>
+        </div>
+
+        <hr class="join-divider" />
+
+        <div class="join-row">
+          <button id="bots-setup-btn" class="btn btn-bots">🤖 Gegen Bots üben</button>
         </div>
 
         <hr class="join-divider" />
@@ -160,6 +167,32 @@
       </div>
     </div>
 
+    <div id="bots-screen" class="screen" hidden>
+      <div class="panel panel-wide">
+        <h1>🤖 Gegen Bots üben</h1>
+        <p>
+          Wähle Anzahl und Stärke der Bot-Gegner. Bots handeln automatisch – ideal zum Üben ohne echte Mitspieler.
+          Kein Rating-Bezug.
+        </p>
+        <div class="bots-setup-row">
+          <span class="bots-setup-label">Anzahl Bots</span>
+          <div class="bot-count-options">
+            <button type="button" class="btn btn-ghost bot-count-btn selected" data-count="1">1</button>
+            <button type="button" class="btn btn-ghost bot-count-btn" data-count="2">2</button>
+            <button type="button" class="btn btn-ghost bot-count-btn" data-count="3">3</button>
+          </div>
+        </div>
+        <div class="bots-setup-row">
+          <span class="bots-setup-label">Schwierigkeit</span>
+          <div id="bot-difficulty-options" class="bot-difficulty-options"></div>
+        </div>
+        <div class="join-row">
+          <button id="bots-start-btn" class="btn btn-primary">▶ Spiel starten</button>
+          <button id="bots-close-btn" class="btn btn-ghost">Zurück</button>
+        </div>
+      </div>
+    </div>
+
     <div id="table-screen" class="screen" hidden>
       <div id="reconnect-banner" class="error-banner" hidden>
         Verbindung unterbrochen – versuche erneut zu verbinden …
@@ -177,6 +210,7 @@
         <span id="casual4-badge" class="casual4-badge" hidden>🎲 1v1v1v1 CASUAL</span>
         <span id="ranked-team-badge" class="ranked-team-badge" hidden>⚔️ 2v2 RANKED</span>
         <span id="casual-team-badge" class="casual-team-badge" hidden>👥 2v2 CASUAL</span>
+        <span id="bots-badge" class="bots-badge" hidden>🤖 GEGEN BOTS</span>
         <span id="phase-label" class="phase-label"></span>
         <span id="current-bet-label" class="current-bet-label"></span>
         <button id="friends-btn-table" class="btn btn-ghost btn-small" title="Freunde einladen">👥</button>

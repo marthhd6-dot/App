@@ -28,6 +28,7 @@ let isRanked = false;
 let isCasual4 = false;
 let isRankedTeam = false;
 let isCasualTeam = false;
+let isVsBots = false;
 // 'ranked' | 'casual' | 'ranked-team' | 'casual-team' – bestimmt, welches
 // leave-*-queue-Event der Abbrechen-Button feuert.
 let queueType = null;
@@ -35,6 +36,9 @@ let lastPhase = null; // für Deal-Animationen: erkennt den Beginn einer neuen H
 let communityDealtCount = 0;
 let isLoggedIn = false;
 let pendingRankPathView = false; // wartet der "Mein Rang"-Button auf die nächste rank-info-Antwort?
+let pendingBotsSetupView = false; // wartet der "Gegen Bots üben"-Button auf die nächste rank-info-Antwort?
+let selectedBotCount = 1;
+let selectedBotDifficulty = null;
 
 // Freundesliste: nur Namen, gespeichert im localStorage dieses Browsers.
 // Der Server kennt keine Freundschaften, nur wer gerade online ist (siehe
@@ -57,6 +61,7 @@ const screens = {
   queue: document.getElementById('queue-screen'),
   leaderboard: document.getElementById('leaderboard-screen'),
   rank: document.getElementById('rank-screen'),
+  bots: document.getElementById('bots-screen'),
   table: document.getElementById('table-screen'),
 };
 function showScreen(name) {
@@ -76,6 +81,7 @@ const rankedBadge = document.getElementById('ranked-badge');
 const casual4Badge = document.getElementById('casual4-badge');
 const rankedTeamBadge = document.getElementById('ranked-team-badge');
 const casualTeamBadge = document.getElementById('casual-team-badge');
+const botsBadge = document.getElementById('bots-badge');
 const rankedMatchOverBanner = document.getElementById('ranked-match-over-banner');
 const teammateHandEl = document.getElementById('teammate-hand');
 
@@ -107,12 +113,13 @@ socket.on('disconnect', () => {
 
 socket.on('state', render);
 
-socket.on('room-joined', ({ code, ranked, casual4, rankedTeam, casualTeam }) => {
+socket.on('room-joined', ({ code, ranked, casual4, rankedTeam, casualTeam, vsBots }) => {
   joinedRoomCode = code;
   isRanked = Boolean(ranked);
   isCasual4 = Boolean(casual4);
   isRankedTeam = Boolean(rankedTeam);
   isCasualTeam = Boolean(casualTeam);
+  isVsBots = Boolean(vsBots);
   lastPhase = null;
   communityDealtCount = 0;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code, name: myName }));
@@ -122,6 +129,7 @@ socket.on('room-joined', ({ code, ranked, casual4, rankedTeam, casualTeam }) => 
   casual4Badge.hidden = !isCasual4;
   rankedTeamBadge.hidden = !isRankedTeam;
   casualTeamBadge.hidden = !isCasualTeam;
+  botsBadge.hidden = !isVsBots;
   document.getElementById('room-code-label').textContent = `Raum: ${code}`;
   showScreen('table');
   renderFriendsList(); // "Einladen" ist erst ab hier möglich (siehe joinedRoomCode)
@@ -149,6 +157,14 @@ socket.on('rank-info', ({ name, rating, tier, wins, losses, tiers }) => {
     pendingRankPathView = false;
     renderRankPath({ name, rating, tier, wins, losses, tiers });
     showScreen('rank');
+  }
+  // "Gegen Bots üben"-Button wurde geklickt: dieselben tiers (Bronze bis
+  // Champion) wie im Rang-Pfad bestimmen die wählbaren Bot-Schwierigkeiten,
+  // damit die Namen nicht zusätzlich im Frontend dupliziert werden müssen.
+  if (pendingBotsSetupView && tiers) {
+    pendingBotsSetupView = false;
+    renderBotDifficultyOptions(tiers);
+    showScreen('bots');
   }
 });
 
@@ -204,6 +220,13 @@ socket.on('ranked-team-match-over', ({ won, newRating, newTier, ratingChange }) 
 // 2v2-Casual-Matches haben keine Rating-Auswirkung, daher nur Sieg/Niederlage.
 socket.on('casual-team-match-over', ({ won }) => {
   document.getElementById('ranked-match-over-text').textContent = `${won ? 'Team-Sieg' : 'Team-Niederlage'}! Gutes Spiel.`;
+  rankedMatchOverBanner.hidden = false;
+  if (won) burstConfetti();
+});
+
+// Bot-Übungsmatches haben ebenfalls keine Rating-Auswirkung.
+socket.on('vs-bots-over', ({ won }) => {
+  document.getElementById('ranked-match-over-text').textContent = `${won ? 'Sieg gegen die Bots' : 'Niederlage'}! Gutes Spiel.`;
   rankedMatchOverBanner.hidden = false;
   if (won) burstConfetti();
 });
@@ -388,6 +411,58 @@ document.getElementById('rank-close-btn').addEventListener('click', () => {
 document.getElementById('ranked-back-to-menu-btn').addEventListener('click', () => {
   sessionStorage.removeItem(SESSION_KEY);
   location.reload();
+});
+
+// --- Gegen Bots üben -------------------------------------------------------
+
+document.getElementById('bots-setup-btn').addEventListener('click', () => {
+  myName = nameInput.value.trim();
+  if (!myName) {
+    joinErrorEl.textContent = 'Bitte gib zuerst einen Namen ein.';
+    joinErrorEl.hidden = false;
+    return;
+  }
+  pendingBotsSetupView = true;
+  socket.emit('get-rank', { name: myName });
+});
+
+document.querySelectorAll('.bot-count-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    selectedBotCount = Number(btn.dataset.count);
+    document.querySelectorAll('.bot-count-btn').forEach((b) => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  });
+});
+
+// Baut die Schwierigkeits-Auswahl aus denselben tiers, die auch der
+// Rang-Pfad bekommt (siehe rank-info-Handler oben) – wiederverwendet die
+// bestehenden .tier-badge-Farben, damit eine Bot-Schwierigkeit optisch
+// sofort demselben Rang zuzuordnen ist.
+function renderBotDifficultyOptions(tiers) {
+  const container = document.getElementById('bot-difficulty-options');
+  container.innerHTML = '';
+  if (!selectedBotDifficulty) selectedBotDifficulty = tiers[0].name;
+  tiers.forEach((t) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className =
+      'tier-badge bot-difficulty-btn tier-' + t.name.toLowerCase() + (t.name === selectedBotDifficulty ? ' selected' : '');
+    btn.textContent = t.name;
+    btn.addEventListener('click', () => {
+      selectedBotDifficulty = t.name;
+      container.querySelectorAll('.bot-difficulty-btn').forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+    container.appendChild(btn);
+  });
+}
+
+document.getElementById('bots-start-btn').addEventListener('click', () => {
+  socket.emit('play-vs-bots', { name: myName, botCount: selectedBotCount, difficulty: selectedBotDifficulty });
+});
+
+document.getElementById('bots-close-btn').addEventListener('click', () => {
+  showScreen('join');
 });
 
 // --- Account -------------------------------------------------------------
@@ -789,7 +864,11 @@ function render(state) {
 
   const isMyTurn = state.actingPlayerId === mySocketId;
   const canAct = isMyTurn && me && !me.folded;
-  const betsMatch = me ? me.bet === state.currentBet : false;
+  // ">=" statt "===": Postet ein kurzgestapelter Big Blind weniger als den
+  // vollen Big Blind (All-in-Blind), kann currentBet unter dem eigenen
+  // Einsatz liegen (siehe table.js check()) – dann ist Check weiterhin die
+  // richtige Aktion, nicht Call.
+  const betsMatch = me ? me.bet >= state.currentBet : false;
 
   foldBtn.disabled = !canAct;
   checkBtn.disabled = !canAct || !betsMatch;

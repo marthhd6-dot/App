@@ -350,6 +350,12 @@ button:disabled {
   box-shadow: 0 3px 0 #1f7a6f, 0 10px 22px -8px rgba(127, 224, 224, 0.5);
 }
 
+.btn-bots {
+  background: linear-gradient(135deg, #b8c4d9, #6fb4ff);
+  color: #10192b;
+  box-shadow: 0 3px 0 #34506e, 0 10px 22px -8px rgba(111, 180, 255, 0.5);
+}
+
 .btn-small {
   padding: 8px 14px;
   font-size: 0.85rem;
@@ -526,6 +532,17 @@ button:disabled {
 .casual-team-badge {
   background: linear-gradient(135deg, #7fe0e0, #6de3ac);
   color: #0c2016;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.bots-badge {
+  background: linear-gradient(135deg, #b8c4d9, #6fb4ff);
+  color: #10192b;
   font-family: var(--font-display);
   font-size: 0.72rem;
   font-weight: 800;
@@ -1138,6 +1155,60 @@ button:disabled {
   color: var(--text-dim);
   font-size: 0.85rem;
   margin: 10px 0 0;
+}
+
+/* --- Gegen Bots üben ----------------------------------------------------------- */
+
+.bots-setup-row {
+  margin-top: 18px;
+  text-align: left;
+}
+
+.bots-setup-label {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.bot-count-options,
+.bot-difficulty-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bot-count-btn {
+  min-width: 44px;
+  padding: 9px 14px;
+}
+
+.bot-count-btn.selected {
+  box-shadow: 0 0 0 2px var(--accent-bright), 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+
+.bot-difficulty-btn {
+  cursor: pointer;
+  border: none;
+  box-shadow: none;
+  font-family: var(--font-display);
+  opacity: 0.45;
+  filter: grayscale(0.5);
+  transition: opacity 0.15s, filter 0.15s, transform 0.1s;
+}
+
+.bot-difficulty-btn:hover {
+  opacity: 0.75;
+}
+
+.bot-difficulty-btn.selected {
+  opacity: 1;
+  filter: none;
+  transform: scale(1.08);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
 }
 
 /* --- Warteschlange ----------------------------------------------------------- */
