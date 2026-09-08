@@ -129,7 +129,48 @@ Chip-Stände definiert.
   verdeckte Mini-Karten (`.mini-card-back`) – sie fliegen beim Start einer
   Hand reihum ein (zwei Runden mit `n` Sitzplätzen Versatz, wie
   `Table.startHand()` intern austeilt), damit das Austeilen am ganzen Tisch
-  sichtbar ist statt nur bei der eigenen Hand.
+  sichtbar ist statt nur bei der eigenen Hand. `@keyframes deal-in` dreht
+  dabei zusätzlich per `rotateY` von 180° auf 0° (mit `perspective` auf
+  `.card-row`), sodass Karten sich beim Austeilen sichtbar "umdrehen"
+  statt nur einzufliegen.
+- **Weitere Tisch-Animationen** (`public/app.js`, Funktionen rund um
+  `detectAndShowActionFx()`): Ein persistenter `#fx-layer` über dem Tisch
+  trägt kurzlebige Effekt-Elemente, die – anders als die Sitzplätze selbst
+  – ein Neu-Rendern überleben und ihre eigene Animation zu Ende spielen,
+  bevor sie sich selbst entfernen:
+  - **Aktions-Sprechblasen**: `detectAndShowActionFx()` vergleicht jeden
+    neuen `state` mit dem vorherigen Snapshot (`prevState`) und zeigt bei
+    Bet/Call/Raise/Check/Fold eine kurze Sprechblase über dem jeweiligen
+    Sitzplatz – rein aus der Differenz der öffentlichen Spieler-Daten
+    hergeleitet, ohne dass der Server den Aktionstyp explizit mitschicken
+    müsste.
+  - **Chip-Flug**: bei Bet/Call/Raise fliegt ein kleiner Chip vom
+    Sitzplatz zum Pot (`spawnChipFly()`); ist eine Hand gerade eben zu
+    Ende gegangen (`lastHandResult` neu gesetzt), fliegen die Chips
+    umgekehrt vom Pot zu jedem Gewinner zurück (`spawnPotPayout()`).
+  - **Fold-Wegschieben**: beim Fold zusätzlich zur Sprechblase zwei kleine
+    Karten, die vom Sitzplatz wegdriften und ausblenden
+    (`spawnFoldCards()`).
+  - **Gleitender Dealer-Button** (`updateDealerButton()`): ein einziges
+    persistentes `#dealer-button`-Element statt eines pro Sitzplatz neu
+    erzeugten Badges, das per CSS-`transition` sichtbar zum neuen
+    Dealer-Sitzplatz hinübergleitet statt hart zu springen.
+  - **"Denkt nach …"-Punkte bei Bots**: im Bot-Übungsmodus (`isVsBots`)
+    ist jeder andere Spieler als ich selbst garantiert ein Bot (genau ein
+    Mensch pro Bot-Raum, siehe `play-vs-bots`), daher genügt ein rein
+    clientseitiger Check, um am Sitzplatz des aktuell handelnden Bots drei
+    pulsierende Punkte zu zeigen, ohne dass der Server ein eigenes
+    `isBot`-Flag mitschicken müsste.
+  - **Gewinner-Hand-Glow**: nach einem echten Showdown (nicht bei einem
+    reinen Fold-Sieg) leuchten die Community Cards kurz golden auf
+    (`.card.glow`, nutzt dieselbe `winner-glow`-Animation wie der
+    Gewinner-Sitzplatz), zusätzlich die eigenen Karten, falls ich selbst
+    gewonnen habe.
+
+  Ein gemeinsamer Positions-Helfer (`seatPositionByOrderedIndex()`/
+  `seatPositionForPlayer()`) berechnet die Kreisposition eines Sitzplatzes
+  einmal zentral, damit sowohl `renderSeats()` als auch alle Effekt-
+  Funktionen dieselbe Formel nutzen, statt sie zu duplizieren.
 - **Mehrere Tische/Räume** (`rooms.js`): `create-room` legt einen neuen
   Tisch mit 4-stelligem Code an, `join-room` tritt einem bestehenden Raum
   bei. Jeder Raum hat einen komplett unabhängigen Tisch-Zustand; ein
