@@ -300,7 +300,15 @@
       </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- Vendored statt vom Server unter /socket.io/socket.io.js ausgeliefert
+         (das funktioniert nur, wenn diese Seite tatsächlich vom
+         Express-Server selbst stammt): eine gebündelte native App (siehe
+         capacitor.config.json) liefert public/ als lokale Datei-Kopie ohne
+         laufenden Socket.io-Server auf demselben Origin aus – der relative
+         Pfad zu dieser Kopie funktioniert dagegen in beiden Fällen
+         identisch. Siehe server-config.js für die zugehörige Server-URL. -->
+    <script src="vendor/socket.io.min.js"></script>
+    <script src="server-config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

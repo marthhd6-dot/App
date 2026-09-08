@@ -20,7 +20,12 @@ const FRIENDS_KEY = 'pokerFriends'; // Freundesliste (nur Namen) – rein lokal 
 const FRIENDS_POLL_MS = 5000; // wie oft der Online-Status der Freunde bei geöffnetem Panel aktualisiert wird
 const ACCOUNT_TOKEN_KEY = 'pokerAccountToken'; // Session-Token nach Login/Registrierung, siehe README
 
-const socket = io();
+// window.POKER_SERVER_URL kommt aus server-config.js (vor diesem Skript
+// geladen, siehe index.html): leer im normalen Browser-Betrieb (io()
+// verbindet sich dann wie bisher automatisch mit dem eigenen Origin), eine
+// echte URL innerhalb einer nativen App ohne eigenen Server auf demselben
+// Origin (siehe dortige Kommentare).
+const socket = io(window.POKER_SERVER_URL || undefined);
 let mySocketId = null;
 let myName = '';
 let joinedRoomCode = null;

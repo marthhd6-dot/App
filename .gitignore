@@ -1,2 +1,10 @@
 node_modules/
 poker-app/data/
+
+# iOS-Projekt (Capacitor, siehe poker-app/README.md) – generierte/lokale
+# Build- und IDE-Zustandsdateien, nicht der App-Quellcode selbst.
+poker-app/ios/App/Pods/
+poker-app/ios/App/build/
+poker-app/ios/App/DerivedData/
+poker-app/ios/**/*.xcuserstate
+poker-app/ios/**/xcuserdata/
