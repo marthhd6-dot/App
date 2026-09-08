@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- Dunkles Glut-Rot statt Weiß, passend zum "Rumble"-Farbschema
+         (Radial-Verlauf-Endfarbe in design/app-icon-master.svg) – der
+         Vordergrund (ic_launcher_foreground, siehe mipmap-*) zeigt den
+         gekippten, grinsenden Poker-Chip transparent darüber. -->
+    <color name="ic_launcher_background">#7A0F0A</color>
 </resources>

@@ -147,8 +147,10 @@ npm run cap:open:ios        # öffnet ios/App/App.xcodeproj in Xcode
    [developer.apple.com](https://developer.apple.com)).
 2. Falls CocoaPods-Plugins dazukommen: `cd ios/App && pod install`, danach
    `App.xcworkspace` statt `App.xcodeproj` öffnen.
-3. App-Icons/Splash-Screen in `ios/App/App/Assets.xcassets` ersetzen
-   (aktuell nur Platzhalter).
+3. App-Icon ist bereits gesetzt (wilder, grinsender Chip, siehe
+   "App-Icons" unten) – nur der Splash-Screen in
+   `ios/App/App/Assets.xcassets/Splash.imageset` ist noch der
+   Capacitor-Platzhalter.
 4. Auf Simulator/eigenem Gerät testen, dann über **TestFlight** verteilen,
    bevor ihr zur App-Review einreicht.
 
@@ -170,8 +172,9 @@ cd android && ./gradlew assembleDebug
 
 1. Android Studio öffnet das Projekt und installiert fehlende SDK-Pakete
    normalerweise automatisch (Prompt beim ersten Öffnen).
-2. App-Icons in `android/app/src/main/res/mipmap-*` ersetzen (aktuell nur
-   Platzhalter), Splash-Screen unter `android/app/src/main/res/drawable*`.
+2. App-Icon ist bereits gesetzt (dasselbe Motiv wie iOS, siehe "App-Icons"
+   unten) – nur der Splash-Screen unter
+   `android/app/src/main/res/drawable*` ist noch der Capacitor-Platzhalter.
 3. Für den Play Store: einen Signing-Keystore erzeugen (`keytool`/Android
    Studios eigener Assistent unter *Build → Generate Signed Bundle/APK*)
    und **sicher aufbewahren** – ohne ihn lassen sich spätere Updates nicht
@@ -179,8 +182,59 @@ cd android && ./gradlew assembleDebug
 4. Erst über einen **internen Test-Track** in der Google Play Console
    verteilen, bevor ihr zur Produktions-Review einreicht.
 
+### App-Icons
+
+Echte App-Icons statt der Capacitor-Platzhalter, für iOS und Android aus
+derselben Vektor-Vorlage generiert (kein Fremd-Tool nötig – Playwright
+rendert das SVG headless auf jede benötigte Pixelgröße, dasselbe Prinzip
+wie die Playwright-Screenshots, die in dieser Session sonst zum
+UI-Testen dienen): ein leicht schräg gekippter goldener Poker-Chip mit
+klassischem rot-goldenem Kerbenrand, aber mit einem wilden, breit
+grinsenden Comic-Gesicht (schielende Augen, hochgezogene Augenbrauen,
+Zahnreihe, rote Wangen) auf einem knalligen Orange-Rot-Comic-Starburst
+mit Karten-Symbol-Konfetti drumherum – passend zum Namen "Rumble Poker"
+deutlich verspielter/wilder als ein klassisches, seriöses Casino-Icon.
+
+- **iOS**: ein einzelnes opakes 1024×1024-PNG,
+  `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`
+  (Xcodes modernes Single-Size-App-Icon-Format – Xcode skaliert selbst
+  auf alle benötigten Anzeigegrößen herunter).
+- **Android**: Legacy-Icons (`ic_launcher`/`ic_launcher_round`, dasselbe
+  Bild – der Launcher wendet seine eigene Rund-/Squircle-Maske ohnehin
+  selbst an) bei 48/72/96/144/192px sowie ein **Adaptive-Icon-
+  Vordergrund** (`ic_launcher_foreground`, transparent, innerhalb der
+  Safe Zone zentriert, damit auf keiner Icon-Form etwas abgeschnitten
+  wird) bei 108/162/216/324/432px, je Dichtestufe unter
+  `android/app/src/main/res/mipmap-*`. Die Adaptive-Icon-Hintergrundfarbe
+  (`values/ic_launcher_background.xml`) ist auf dasselbe dunkle Glut-Rot
+  gesetzt wie der Hintergrund-Verlauf im Master-SVG, statt des weißen
+  Platzhalters.
+- Quelle: `design/app-icon-master.svg` (iOS + Android-Legacy-Icons) und
+  `design/app-icon-foreground.svg` (Android-Adaptive-Vordergrund –
+  derselbe Chip, per SVG-Transform um denselben Mittelpunkt auf 86 %
+  skaliert, damit er innerhalb der Safe Zone bleibt, ohne alle
+  Element-Koordinaten von Hand neu berechnen zu müssen).
+  `design/generate-app-icons.js` rendert beide SVGs per Playwright auf
+  alle benötigten Pixelgrößen neu – nützlich, falls sich das Design mal
+  ändern soll (Kommentar im Script erklärt Voraussetzungen/Aufruf).
+- Splash-Screens sind bewusst **nicht** mit angefasst (andere Bildmaße/
+  -logik, eigenständiger nächster Schritt) – aktuell noch der
+  Capacitor-Platzhalter in `ios/App/App/Assets.xcassets/Splash.imageset`
+  bzw. `android/app/src/main/res/drawable*/splash.png`.
+
 ### Gemeinsame Punkte für beide Plattformen
 
+- Der angezeigte App-Name ist **"Rumble Poker"** (`capacitor.config.json`
+  → `appName`, iOS `CFBundleDisplayName`, Android `strings.xml` →
+  `app_name`/`title_activity_main`, sowie Browser-Titel/-Logo in
+  `public/index.html`). Die interne Bundle-/Package-ID
+  `com.pokerapp.texasholdem` (`appId` in `capacitor.config.json`, iOS
+  Bundle-Identifier, Android `applicationId`/Java-Package) ist davon
+  unabhängig und bewusst unverändert geblieben – sie ist für Nutzer nicht
+  sichtbar, und sie umzubenennen würde die Java-Package-Ordnerstruktur
+  unter `android/app/src/main/java/` sowie die Xcode-Projekteinstellungen
+  verändern, was ohne lokale Build-Tools (Android Studio/Xcode) riskant
+  zu verifizieren ist.
 - `capacitor.config.json` → `appId` (`com.pokerapp.texasholdem`) ist ein
   **Platzhalter** – vor der echten Einreichung auf die im eigenen Apple-/
   Google-Developer-Account registrierte ID ändern (danach `npm run
