@@ -159,17 +159,32 @@ Chip-Stände definiert.
     persistentes `#dealer-button`-Element statt eines pro Sitzplatz neu
     erzeugten Badges, das per CSS-`transition` sichtbar zum neuen
     Dealer-Sitzplatz hinübergleitet statt hart zu springen.
-  - **"Denkt nach …"-Punkte bei Bots**: im Bot-Übungsmodus (`isVsBots`)
-    ist jeder andere Spieler als ich selbst garantiert ein Bot (genau ein
-    Mensch pro Bot-Raum, siehe `play-vs-bots`), daher genügt ein rein
-    clientseitiger Check, um am Sitzplatz des aktuell handelnden Bots drei
-    pulsierende Punkte zu zeigen, ohne dass der Server ein eigenes
-    `isBot`-Flag mitschicken müsste.
+  - **"Denkt nach …"-Punkte bei Bots**: `state.botIds` listet die
+    Bot-Sitzplätze des aktuellen Raums (egal ob reiner Übungsmodus oder ein
+    mit Bots aufgefülltes Ranked/Casual-Match, siehe `broadcastRoomState()`
+    in `server.js`) – `renderSeats()` zeigt drei pulsierende Punkte am
+    Sitzplatz des gerade handelnden Bots.
   - **Gewinner-Hand-Glow**: nach einem echten Showdown (nicht bei einem
     reinen Fold-Sieg) leuchten die Community Cards kurz golden auf
     (`.card.glow`, nutzt dieselbe `winner-glow`-Animation wie der
     Gewinner-Sitzplatz), zusätzlich die eigenen Karten, falls ich selbst
     gewonnen habe.
+  - **Karten-Reveal beim Showdown**: Bei einem echten Showdown (Karten
+    tatsächlich verglichen, nicht bei einem Sieg durch Fold) schickt der
+    Server über `getPublicState()` (`table.js`) die Hole Cards aller nicht
+    gefoldeten Spieler an JEDEN Client mit, statt sie wie sonst nur dem
+    jeweiligen Spieler selbst zu zeigen – gefoldete Spieler bleiben
+    verborgen (es gibt nichts zu vergleichen). Das Frontend zeigt die
+    aufgedeckten Gegner-Hände zweifach: als kleine, gefächerte Karten direkt
+    am Sitzplatz (`renderSeats()`, dieselbe Optik wie die verdeckten
+    `.mini-card-back`, nur mit sichtbarem Rang/Symbol) und zusätzlich groß
+    und namentlich gelistet im Panel "Karten beim Showdown"
+    (`#showdown-reveal`, generalisiert aus dem bisherigen
+    Teammitglied-Panel), damit klar wird, gegen welche Hand man gewonnen
+    oder verloren hat. Die Teammitglied-Erkennung (2v2 Casual) prüft dafür
+    jetzt `state.teams`, statt allein daran zu erkennen, dass `holeCards`
+    nicht `null` ist – sonst würde ein beim Showdown aufgedeckter Gegner
+    fälschlich im Teammitglied-Panel landen.
 
   Ein gemeinsamer Positions-Helfer (`seatPositionByOrderedIndex()`/
   `seatPositionForPlayer()`) berechnet die Kreisposition eines Sitzplatzes

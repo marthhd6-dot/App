@@ -437,7 +437,15 @@ class Table {
   // ebenfalls sichtbar sein sollen (z. B. das Teammitglied im Casual-Team-
   // Modus, siehe server.js). Normalerweise leer – dann sieht jeder wie
   // gewohnt nur die eigenen Karten.
+  //
+  // Bei einem echten Showdown (this.lastHandResult.reason === 'showdown',
+  // also nachdem Hände tatsächlich verglichen wurden – im Unterschied zu
+  // einem Sieg durch Fold, wo niemand seine Karten zeigt) werden zusätzlich
+  // die Hole Cards aller nicht gefoldeten Spieler für JEDEN sichtbar, damit
+  // klar ist, gegen welche Hand man gewonnen oder verloren hat – wie am
+  // echten Tisch.
   getPublicState(forPlayerId, extraVisibleIds = []) {
+    const revealAtShowdown = this.phase === 'showdown' && this.lastHandResult?.reason === 'showdown';
     return {
       phase: this.phase,
       pot: this.pot,
@@ -446,16 +454,22 @@ class Table {
       actingPlayerId: this.getCurrentPlayer()?.id ?? null,
       dealerPlayerId: this.players[this.dealerIndex]?.id ?? null,
       lastHandResult: this.lastHandResult,
-      players: this.players.map((p) => ({
-        id: p.id,
-        name: p.name,
-        chips: p.chips,
-        bet: p.bet,
-        folded: p.folded,
-        isAllIn: p.isAllIn,
-        disconnected: p.disconnected,
-        holeCards: p.id === forPlayerId || extraVisibleIds.includes(p.id) ? p.holeCards : null,
-      })),
+      players: this.players.map((p) => {
+        const visible =
+          p.id === forPlayerId ||
+          extraVisibleIds.includes(p.id) ||
+          (revealAtShowdown && !p.folded);
+        return {
+          id: p.id,
+          name: p.name,
+          chips: p.chips,
+          bet: p.bet,
+          folded: p.folded,
+          isAllIn: p.isAllIn,
+          disconnected: p.disconnected,
+          holeCards: visible ? p.holeCards : null,
+        };
+      }),
     };
   }
 }

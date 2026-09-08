@@ -85,6 +85,8 @@ const casualTeamBadge = document.getElementById('casual-team-badge');
 const botsBadge = document.getElementById('bots-badge');
 const rankedMatchOverBanner = document.getElementById('ranked-match-over-banner');
 const teammateHandEl = document.getElementById('teammate-hand');
+const showdownRevealEl = document.getElementById('showdown-reveal');
+const showdownRevealListEl = document.getElementById('showdown-reveal-list');
 
 const foldBtn = document.getElementById('fold-btn');
 const checkBtn = document.getElementById('check-btn');
@@ -685,17 +687,20 @@ function isRedSuit(suit) {
   return suit === 'H' || suit === 'D';
 }
 
-function renderCard(card) {
-  const el = document.createElement('div');
-  el.className = 'card' + (isRedSuit(card.suit) ? ' red' : '');
+function cardOuterHtml(card) {
   const rank = RANK_LABELS[card.rank] || card.rank;
   const suit = SUIT_SYMBOLS[card.suit];
-  el.innerHTML = `
+  return `<div class="card${isRedSuit(card.suit) ? ' red' : ''}">
     <span class="card-corner card-corner-top"><span>${rank}</span><span class="card-suit-mini">${suit}</span></span>
     <span class="card-suit-big">${suit}</span>
     <span class="card-corner card-corner-bottom"><span>${rank}</span><span class="card-suit-mini">${suit}</span></span>
-  `;
-  return el;
+  </div>`;
+}
+
+function renderCard(card) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = cardOuterHtml(card).trim();
+  return wrapper.firstElementChild;
 }
 
 // Rendert die Community Cards und animiert nur die seit dem letzten Rendern
@@ -841,6 +846,16 @@ function renderSeats(state, winnerIds, animateDeal) {
         </div>`
       : '';
 
+    // Aufgedeckte Mini-Karten bei echtem Showdown: getPublicState() in
+    // table.js schickt dafür die Hole Cards aller nicht gefoldeten Gegner
+    // mit (statt null), damit sichtbar wird, gegen welche Hand man
+    // gewonnen/verloren hat – wie am echten Tisch. Bei mir selbst nicht
+    // nötig, die großen Karten stehen schon in #my-cards.
+    const revealedCardsHtml =
+      state.phase === 'showdown' && p.id !== mySocketId && p.holeCards
+        ? `<div class="seat-cards">${p.holeCards.map(cardOuterHtml).join('')}</div>`
+        : '';
+
     const initial = (p.name[0] || '?').toUpperCase();
     seat.innerHTML = `
       <div class="seat-pod">
@@ -851,6 +866,7 @@ function renderSeats(state, winnerIds, animateDeal) {
         </div>
       </div>
       ${hiddenCardsHtml}
+      ${revealedCardsHtml}
       ${thinkingHtml}
       <div class="seat-bet">${p.bet > 0 ? `<span class="chip-icon"></span>Einsatz: ${p.bet}` : ''}</div>
       <div class="seat-badges">${badges.map((b) => `<span class="badge ${b.cls}">${b.label}</span>`).join('')}</div>
@@ -1051,15 +1067,47 @@ function render(state) {
   renderMyCards((me && me.holeCards) || [], isNewHand);
 
   // Im 2v2-Casual-Modus schickt der Server zusätzlich die Hole Cards des
-  // Teammitglieds mit (siehe extraVisibleIds in server.js) – erkennbar
-  // daran, dass ein fremder Spieler holeCards != null hat.
-  const teammate = state.players.find((p) => p.id !== mySocketId && p.holeCards);
+  // Teammitglieds mit (siehe extraVisibleIds in server.js). Team-bewusst
+  // geprüft (state.teams), damit ein bei einem echten Showdown aufgedeckter
+  // GEGNER (siehe showdownOpponents unten) hier nicht fälschlich als
+  // "Teammitglied" auftaucht – beide haben holeCards != null, aber nur der
+  // eine ist wirklich im selben Team.
+  const teammate = state.players.find(
+    (p) => p.id !== mySocketId && p.holeCards && state.teams && state.teams[p.id] === state.teams[mySocketId]
+  );
   if (teammate) {
     document.getElementById('teammate-name').textContent = teammate.name;
     renderMyCards(teammate.holeCards, isNewHand, 'teammate-cards');
     teammateHandEl.hidden = false;
   } else {
     teammateHandEl.hidden = true;
+  }
+
+  // Bei einem echten Showdown schickt der Server (getPublicState() in
+  // table.js) zusätzlich die Hole Cards aller nicht gefoldeten GEGNER mit
+  // (nicht das Teammitglied, das schon oben behandelt wird), damit sichtbar
+  // wird, gegen welche Hand man gewonnen/verloren hat – wie am echten Tisch.
+  const showdownOpponents = state.players.filter(
+    (p) => p.id !== mySocketId && p.holeCards && !(state.teams && state.teams[p.id] === state.teams[mySocketId])
+  );
+  if (state.phase === 'showdown' && showdownOpponents.length > 0) {
+    showdownRevealListEl.innerHTML = '';
+    showdownOpponents.forEach((p) => {
+      const entry = document.createElement('div');
+      entry.className = 'showdown-reveal-entry';
+      const nameEl = document.createElement('span');
+      nameEl.className = 'showdown-reveal-name';
+      nameEl.textContent = p.name;
+      const cardRow = document.createElement('div');
+      cardRow.className = 'card-row showdown-reveal-cards';
+      p.holeCards.forEach((c) => cardRow.appendChild(renderCard(c)));
+      entry.appendChild(nameEl);
+      entry.appendChild(cardRow);
+      showdownRevealListEl.appendChild(entry);
+    });
+    showdownRevealEl.hidden = false;
+  } else {
+    showdownRevealEl.hidden = true;
   }
 
   // Kurzes Aufleuchten der Community Cards nach einem echten Showdown
