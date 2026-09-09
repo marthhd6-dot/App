@@ -19,6 +19,7 @@ const SESSION_KEY = 'pokerSession'; // { code, name } des zuletzt beigetretenen 
 const FRIENDS_KEY = 'pokerFriends'; // Freundesliste (nur Namen) – rein lokal im Browser, siehe README
 const FRIENDS_POLL_MS = 5000; // wie oft der Online-Status der Freunde bei geöffnetem Panel aktualisiert wird
 const ACCOUNT_TOKEN_KEY = 'pokerAccountToken'; // Session-Token nach Login/Registrierung, siehe README
+const COOKIE_CONSENT_KEY = 'pokerCookieNoticeAck'; // einmalige Bestätigung des Speicher-Hinweis-Banners
 
 // window.POKER_SERVER_URL kommt aus server-config.js (vor diesem Skript
 // geladen, siehe index.html): leer im normalen Browser-Betrieb (io()
@@ -636,6 +637,24 @@ renderFriendsList();
 
 document.getElementById('friend-invite-dismiss-btn').addEventListener('click', () => {
   document.getElementById('friend-invite-banner').hidden = true;
+});
+
+// Speicher-/Cookie-Hinweis: einmalig anzeigen, bis er bestätigt wurde
+// (siehe cookies.html für die vollständige Richtlinie).
+try {
+  if (!localStorage.getItem(COOKIE_CONSENT_KEY)) {
+    document.getElementById('cookie-banner').hidden = false;
+  }
+} catch {
+  // localStorage nicht verfügbar (z. B. deaktiviert) – Banner einfach nicht zeigen
+}
+document.getElementById('cookie-banner-ack-btn').addEventListener('click', () => {
+  document.getElementById('cookie-banner').hidden = true;
+  try {
+    localStorage.setItem(COOKIE_CONSENT_KEY, '1');
+  } catch {
+    // ignorieren, siehe oben
+  }
 });
 
 document.getElementById('friend-invite-join-btn').addEventListener('click', () => {

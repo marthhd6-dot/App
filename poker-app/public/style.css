@@ -639,6 +639,103 @@ button:disabled {
   background: linear-gradient(135deg, #d9a6ff, var(--accent-bright));
 }
 
+/* Cookie-/Speicher-Hinweis: schwebt fix am unteren Bildschirmrand, bis er
+   einmalig bestätigt wird (siehe COOKIE_CONSENT_KEY in app.js). */
+.cookie-banner {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: min(92vw, 620px);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+  border-radius: 14px;
+  padding: 14px 18px;
+}
+
+.cookie-banner p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.cookie-banner a {
+  color: var(--accent-bright);
+}
+
+.cookie-banner .btn {
+  flex-shrink: 0;
+}
+
+.legal-footer {
+  margin-top: 14px;
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.legal-footer a {
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.legal-footer a:hover,
+.legal-footer a:focus-visible {
+  color: var(--accent-bright);
+  text-decoration: underline;
+}
+
+/* --- Legal-Seiten (Datenschutz/AGB/Cookies) ------------------------------- */
+
+.legal-page {
+  max-width: 720px;
+  padding: 40px 20px 60px;
+  margin: 0 auto;
+}
+
+.legal-page h1 {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+}
+
+.legal-page h2 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  margin-top: 28px;
+}
+
+.legal-page p,
+.legal-page li {
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.legal-page a {
+  color: var(--accent-bright);
+}
+
+.legal-page .legal-updated {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  margin-top: -8px;
+}
+
+.legal-page .legal-back {
+  display: inline-block;
+  margin-top: 32px;
+}
+
 @keyframes result-pop {
   0% {
     transform: scale(0.85);
