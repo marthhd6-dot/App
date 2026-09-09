@@ -767,6 +767,32 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   Formularfelder ohne sichtbares `<label>`) – Farbkontrast (heller Text auf
   sehr dunklem Grund) und sichtbare Fokus-Zustände bei Eingabefeldern waren
   bereits vor dieser Änderung gegeben.
+- **Sound & Spielgefühl** (`public/sound.js`, eingebunden in `index.html`
+  vor `app.js`): Soundeffekte für Deal, Kartenaufdeckung/Showdown, Check,
+  Call, Bet/Raise (Lautstärke/Klick-Anzahl skaliert mit dem Einsatz
+  relativ zum Stack), All-In, Fold, Chip-Flug (Richtung Pot wie zurück zum
+  Gewinner), Handgewinn, Fähigkeits-Einsatz, "du bist dran" sowie ein
+  leiser Klick auf jeden Action-Bar-Button – alle Sounds rein synthetisch
+  per Web Audio API erzeugt (`tone()`/`noiseBurst()` in `sound.js`), also
+  ohne eingebundene Audio-Dateien/Lizenzfragen. Docken bewusst an die
+  bereits vorhandenen visuellen FX-Auslösepunkte in `app.js` an
+  (`detectAndShowActionFx()`, `spawnChipFly()`, `burstConfetti()`,
+  `renderCommunityCards()`/`renderMyCards()` bei neuer Hand, `justResolved`
+  beim Showdown, `renderAbilities()`, `justBecameMyTurn` in
+  `renderBetSizer()`) statt eigene, parallele Zustandserkennung zu bauen.
+  `AudioContext` wird erst nach der ersten echten Nutzerinteraktion
+  erzeugt/fortgesetzt (Autoplay-Policy der Browser), Stumm-Schalter
+  (`#sound-toggle-btn` im Tisch-Header) merkt sich den Zustand in
+  `localStorage` (`SOUND_MUTED_KEY`).
+  Zusätzlich haptisches Feedback für die nativen Apps über
+  `@capacitor/haptics` (leichter Impuls bei "du bist dran", mittlerer bei
+  Handgewinn) – `triggerHaptic()` in `sound.js` greift nur auf
+  `window.Capacitor.Plugins.Haptics` zu, wenn die App tatsächlich nativ
+  läuft (`Capacitor.isNativePlatform()`), und ist im normalen Browser ein
+  No-Op. Da das Plugin neu zu den Dependencies hinzukam, muss vor dem
+  nächsten nativen Build einmal `npx cap sync` laufen (siehe
+  "Native Apps" oben), damit es tatsächlich in die iOS/Android-Projekte
+  eingebunden wird.
 
 ## Mögliche nächste Schritte (für Claude Code)
 

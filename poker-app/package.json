@@ -17,6 +17,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.1",
     "@capacitor/core": "^8.5.1",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.5.1",
     "better-sqlite3": "^13.0.3",
     "express": "^4.19.2",
