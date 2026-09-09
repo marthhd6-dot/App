@@ -41,7 +41,16 @@
     <div id="friend-invite-banner" class="error-banner invite-banner" hidden>
       <span id="friend-invite-text"></span>
       <button id="friend-invite-join-btn" class="btn btn-primary btn-small">Beitreten</button>
-      <button id="friend-invite-dismiss-btn" class="btn btn-ghost btn-small">✕</button>
+      <button id="friend-invite-dismiss-btn" class="btn btn-ghost btn-small" aria-label="Einladung ausblenden">✕</button>
+    </div>
+
+    <div id="cookie-banner" class="cookie-banner" hidden>
+      <p>
+        Rumble Poker speichert nur technisch notwendige Daten in deinem Browser (z. B. deinen Sitzungsstatus und
+        deine Freundesliste) – keine Werbe- oder Tracking-Cookies. Details dazu in unserer
+        <a href="cookies.html">Cookie-Richtlinie</a>.
+      </p>
+      <button id="cookie-banner-ack-btn" class="btn btn-primary btn-small">Verstanden</button>
     </div>
 
     <div id="friends-overlay" class="modal-overlay" hidden>
@@ -49,7 +58,13 @@
         <h1>👥 Freunde</h1>
         <div id="friends-error" class="error-banner" hidden></div>
         <div class="join-row">
-          <input id="friend-name-input" type="text" placeholder="Name des Freundes" maxlength="20" />
+          <input
+            id="friend-name-input"
+            type="text"
+            placeholder="Name des Freundes"
+            aria-label="Name des Freundes"
+            maxlength="20"
+          />
           <button id="add-friend-btn" class="btn btn-ghost">Hinzufügen</button>
         </div>
         <div id="friends-list" class="friends-list"></div>
@@ -67,8 +82,14 @@
           kannst du weiterhin einfach mit einem beliebigen Namen spielen.
         </p>
         <div id="account-error" class="error-banner" hidden></div>
-        <input id="account-username-input" type="text" placeholder="Nutzername" maxlength="20" />
-        <input id="account-password-input" type="password" placeholder="Passwort" />
+        <input
+          id="account-username-input"
+          type="text"
+          placeholder="Nutzername"
+          aria-label="Nutzername"
+          maxlength="20"
+        />
+        <input id="account-password-input" type="password" placeholder="Passwort" aria-label="Passwort" />
         <div class="join-row">
           <button id="login-btn" class="btn btn-primary">Anmelden</button>
           <button id="register-btn" class="btn btn-ghost">Account erstellen</button>
@@ -92,7 +113,7 @@
         </p>
         <div id="join-error" class="error-banner" hidden></div>
         <div class="account-bar">
-          <input id="name-input" type="text" placeholder="Dein Name" maxlength="20" />
+          <input id="name-input" type="text" placeholder="Dein Name" aria-label="Dein Name" maxlength="20" />
           <button id="account-btn" class="btn btn-ghost btn-small">👤 Account</button>
           <button id="logout-btn" class="btn btn-ghost btn-small" hidden>Abmelden</button>
         </div>
@@ -106,7 +127,7 @@
             <button id="create-room-btn" class="btn btn-ghost">Neuen Tisch erstellen</button>
           </div>
           <div class="join-row">
-            <input id="room-code-input" type="text" placeholder="Raum-Code" maxlength="4" />
+            <input id="room-code-input" type="text" placeholder="Raum-Code" aria-label="Raum-Code" maxlength="4" />
             <button id="join-room-btn" class="btn btn-ghost">Tisch beitreten</button>
           </div>
         </div>
@@ -150,6 +171,12 @@
 
         <div class="lobby-footer">
           <button id="friends-btn" class="btn btn-ghost btn-small">👥 Freunde</button>
+        </div>
+        <div class="legal-footer">
+          <a href="datenschutz.html">Datenschutz</a>
+          <a href="agb.html">AGB</a>
+          <a href="cookies.html">Cookies</a>
+          <a href="mailto:marthhd.6@gmail.com">Kontakt</a>
         </div>
       </div>
     </div>
@@ -236,7 +263,14 @@
         <span id="bots-badge" class="bots-badge" hidden>🤖 GEGEN BOTS</span>
         <span id="phase-label" class="phase-label"></span>
         <span id="current-bet-label" class="current-bet-label"></span>
-        <button id="friends-btn-table" class="btn btn-ghost btn-small" title="Freunde einladen">👥</button>
+        <button
+          id="friends-btn-table"
+          class="btn btn-ghost btn-small"
+          title="Freunde einladen"
+          aria-label="Freunde einladen"
+        >
+          👥
+        </button>
         <button id="leave-table-btn" class="btn btn-ghost btn-small" title="Zurück zum Hauptmenü">🚪 Menü</button>
       </div>
 
@@ -282,7 +316,15 @@
             <button id="all-in-btn" type="button" class="btn btn-ghost btn-small btn-allin">All-In</button>
           </div>
           <div class="bet-sizer-slider-row">
-            <input id="bet-amount-slider" type="range" min="0" max="0" value="0" step="1" />
+            <input
+              id="bet-amount-slider"
+              type="range"
+              min="0"
+              max="0"
+              value="0"
+              step="1"
+              aria-label="Bet-/Raise-Betrag"
+            />
             <span id="bet-amount-value" class="bet-amount-value">0</span>
           </div>
         </div>
@@ -291,11 +333,11 @@
         <button id="check-btn" class="btn btn-neutral">Check</button>
         <button id="call-btn" class="btn btn-call">Call</button>
         <span class="bet-control">
-          <input id="bet-input" type="number" min="1" placeholder="Betrag" />
+          <input id="bet-input" type="number" min="1" placeholder="Betrag" aria-label="Bet-Betrag" />
           <button id="bet-btn" class="btn btn-raise">Bet</button>
         </span>
         <span class="bet-control">
-          <input id="raise-input" type="number" min="1" placeholder="Raise auf" />
+          <input id="raise-input" type="number" min="1" placeholder="Raise auf" aria-label="Raise-Betrag" />
           <button id="raise-btn" class="btn btn-raise">Raise</button>
         </span>
       </div>

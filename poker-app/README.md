@@ -745,6 +745,29 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   Nachteil, werden also immer sofort eingesetzt; Kartentausch nur bei einer
   erkennbar schwachen Preflop-Hand (`preflopStrength() < 0.4`).
 
+- **Rechtliche Seiten & Cookie-Hinweis** (`public/datenschutz.html`,
+  `public/agb.html`, `public/cookies.html`, verlinkt über `.legal-footer` im
+  Lobby-Screen sowie im Cookie-Banner selbst): drei eigenständige,
+  nicht-SPA-Seiten (kein Socket.io/app.js nötig) im selben Dark-Theme wie
+  die App, mit den für ein kostenloses Hobby-Projekt ohne Echtgeld,
+  Werbung oder Drittanbieter-Tracking tatsächlich zutreffenden Inhalten:
+  welche Daten serverseitig anfallen (Anzeigename, optionale
+  Account-Zugangsdaten als scrypt-Hash, Rang-Statistik), wofür sie genutzt
+  werden, und welche zwei Browser-Speicher (`localStorage`/
+  `sessionStorage`, siehe `SESSION_KEY`/`FRIENDS_KEY`/`ACCOUNT_TOKEN_KEY`
+  in `app.js`) rein lokal auf dem Gerät der Spieler:innen liegen – klassische
+  HTTP-Cookies setzt die App nicht. Ein einmaliger Hinweis-Banner
+  (`#cookie-banner`, Bestätigung in `COOKIE_CONSENT_KEY`) informiert beim
+  ersten Besuch knapp darüber und verlinkt auf die vollständige
+  Cookie-Richtlinie. Kontaktadresse auf allen drei Seiten sowie im Footer:
+  `marthhd.6@gmail.com`.
+- **Barrierefreiheit, kleinere Nachbesserungen**: `aria-label` für
+  bislang icon-only bzw. nur mit Platzhaltertext versehene Bedienelemente
+  ergänzt (z. B. `#friend-invite-dismiss-btn`, `#friends-btn-table`, alle
+  Formularfelder ohne sichtbares `<label>`) – Farbkontrast (heller Text auf
+  sehr dunklem Grund) und sichtbare Fokus-Zustände bei Eingabefeldern waren
+  bereits vor dieser Änderung gegeben.
+
 ## Mögliche nächste Schritte (für Claude Code)
 
 Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
