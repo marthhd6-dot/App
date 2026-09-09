@@ -189,11 +189,13 @@ derselben Vektor-Vorlage generiert (kein Fremd-Tool nötig – Playwright
 rendert das SVG headless auf jede benötigte Pixelgröße, dasselbe Prinzip
 wie die Playwright-Screenshots, die in dieser Session sonst zum
 UI-Testen dienen): ein leicht schräg gekippter goldener Poker-Chip mit
-klassischem rot-goldenem Kerbenrand, aber mit einem wilden, breit
-grinsenden Comic-Gesicht (schielende Augen, hochgezogene Augenbrauen,
-Zahnreihe, rote Wangen) auf einem knalligen Orange-Rot-Comic-Starburst
-mit Karten-Symbol-Konfetti drumherum – passend zum Namen "Rumble Poker"
-deutlich verspielter/wilder als ein klassisches, seriöses Casino-Icon.
+klassischem rot-goldenem Kerbenrand und großem schwarzen Pik-Symbol –
+bewusst ohne Gesicht, damit der Chip selbst sofort erkennbar bleibt –
+dafür mit zwei gefächerten Spielkarten (Pik-Ass, Herz-König), die hinter
+dem Chip hervorschauen, sowie Speed-Lines für Drehbewegung, auf einem
+knalligen Orange-Rot-Comic-Starburst mit Karten-Symbol-Konfetti
+drumherum – passend zum Namen "Rumble Poker" deutlich wilder als ein
+klassisches, seriöses Casino-Icon, ohne den Chip selbst zu verdecken.
 
 - **iOS**: ein einzelnes opakes 1024×1024-PNG,
   `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`
@@ -209,11 +211,15 @@ deutlich verspielter/wilder als ein klassisches, seriöses Casino-Icon.
   (`values/ic_launcher_background.xml`) ist auf dasselbe dunkle Glut-Rot
   gesetzt wie der Hintergrund-Verlauf im Master-SVG, statt des weißen
   Platzhalters.
-- Quelle: `design/app-icon-master.svg` (iOS + Android-Legacy-Icons) und
+- Quelle: `design/app-icon-master.svg` (iOS + Android-Legacy-Icons,
+  inklusive Hintergrund/Karten/Konfetti) und
   `design/app-icon-foreground.svg` (Android-Adaptive-Vordergrund –
   derselbe Chip, per SVG-Transform um denselben Mittelpunkt auf 86 %
   skaliert, damit er innerhalb der Safe Zone bleibt, ohne alle
-  Element-Koordinaten von Hand neu berechnen zu müssen).
+  Element-Koordinaten von Hand neu berechnen zu müssen). Die
+  Adaptive-Icon-Maske würde die gefächerten Karten aus dem Master
+  teilweise abschneiden, daher enthält die Vordergrund-Datei bewusst nur
+  den Chip selbst.
   `design/generate-app-icons.js` rendert beide SVGs per Playwright auf
   alle benötigten Pixelgrößen neu – nützlich, falls sich das Design mal
   ändern soll (Kommentar im Script erklärt Voraussetzungen/Aufruf).

@@ -8,10 +8,13 @@
     </radialGradient>
   </defs>
 
-  <!-- Um denselben Mittelpunkt (512,512) skaliert wie app-icon-master.svg,
-       damit der Chip innerhalb der Android-Adaptive-Icon-"Safe Zone"
-       bleibt (siehe README, Abschnitt "App-Icons") – dieselben Element-
-       Koordinaten wie im Master, keine manuelle Neuberechnung nötig. -->
+  <!-- Nur der Chip, ohne die gefächerten Karten aus app-icon-master.svg:
+       Android setzt den Adaptive-Icon-Vordergrund innerhalb einer runden/
+       eckigen Maske zusammen, die weiter außen liegende Elemente
+       abschneiden würde – die Karten sind bewusst nur Teil des vollen
+       iOS-/Android-Legacy-Icons (siehe app-icon-master.svg), nicht dieser
+       Datei. Um denselben Mittelpunkt (512,512) skaliert wie beim Master,
+       damit der Chip innerhalb der Safe Zone bleibt. -->
   <g transform="translate(512,512) scale(0.86) translate(-512,-512)">
     <g transform="rotate(-13 512 512)">
       <circle cx="512" cy="512" r="372" fill="url(#chip)"/>
@@ -30,36 +33,19 @@
       <g transform="rotate(330 512 512)"><rect x="468.0" y="152.0" width="88.0" height="32.0" rx="8.0" fill="#d81e3c"/></g>
 
       <circle cx="512" cy="512" r="372" fill="none" stroke="#5c3a08" stroke-opacity="0.55" stroke-width="6"/>
-      <circle cx="512" cy="512" r="304" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="7"/>
+      <circle cx="512" cy="512" r="304" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="8"/>
+      <circle cx="512" cy="512" r="280" fill="none" stroke="#a5670f" stroke-opacity="0.4" stroke-width="4"/>
 
-      <rect x="-50" y="-12" width="100" height="22" rx="11" fill="#1a1712"
-        transform="translate(408,362) rotate(-16)"/>
-      <rect x="-44" y="-11" width="88" height="20" rx="10" fill="#1a1712"
-        transform="translate(610,346) rotate(16)"/>
-
-      <ellipse cx="418" cy="446" rx="68" ry="76" fill="#fffdf5"/>
-      <ellipse cx="418" cy="446" rx="68" ry="76" fill="none" stroke="#1a1712" stroke-width="5"/>
-      <circle cx="448" cy="424" r="27" fill="#1a1712"/>
-      <circle cx="458" cy="415" r="8" fill="#fff"/>
-
-      <ellipse cx="612" cy="428" rx="57" ry="64" fill="#fffdf5"/>
-      <ellipse cx="612" cy="428" rx="57" ry="64" fill="none" stroke="#1a1712" stroke-width="5"/>
-      <circle cx="586" cy="409" r="22" fill="#1a1712"/>
-      <circle cx="594" cy="401" r="7" fill="#fff"/>
-
-      <ellipse cx="515" cy="612" rx="150" ry="66" fill="#1a1712"/>
-      <path d="M425,658 Q515,706 605,658 Q515,684 425,658 Z" fill="#d81e3c"/>
-      <g fill="#fffdf5">
-        <rect x="382" y="556" width="36" height="28" rx="5"/>
-        <rect x="422" y="548" width="36" height="32" rx="5"/>
-        <rect x="462" y="544" width="36" height="34" rx="5"/>
-        <rect x="502" y="544" width="36" height="34" rx="5"/>
-        <rect x="542" y="548" width="36" height="32" rx="5"/>
-        <rect x="582" y="556" width="36" height="28" rx="5"/>
+      <g stroke="#5c3a08" stroke-opacity="0.3" stroke-width="7" stroke-linecap="round">
+        <line x1="330" y1="330" x2="270" y2="270"/>
+        <line x1="512" y1="255" x2="512" y2="185"/>
+        <line x1="694" y1="330" x2="754" y2="270"/>
       </g>
 
-      <ellipse cx="325" cy="555" rx="34" ry="22" fill="#ff5c5c" opacity="0.55" transform="rotate(-14 325 555)"/>
-      <ellipse cx="715" cy="535" rx="30" ry="20" fill="#ff5c5c" opacity="0.5" transform="rotate(10 715 535)"/>
+      <ellipse cx="418" cy="330" rx="190" ry="110" fill="#ffffff" opacity="0.22"/>
+
+      <text x="512" y="660" font-family="DejaVu Sans, sans-serif" font-size="460"
+        font-weight="bold" fill="#1a1712" text-anchor="middle" stroke="#ffd569" stroke-width="6" paint-order="stroke">&#9824;</text>
     </g>
   </g>
 </svg>
