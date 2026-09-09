@@ -118,6 +118,17 @@ const RANKED_STARTING_CHIPS = 1000;
 // Betrag wie beim Beitreten, damit niemand durch Nachkaufen besser oder
 // schlechter dasteht als ein frisch dazugekommener Spieler.
 const REBUY_CHIPS = 1000;
+
+// --- Tisch-Chat ------------------------------------------------------------
+// Bewusst nur im Arbeitsspeicher und pro Raum begrenzt: Der Chat soll den
+// laufenden Tisch begleiten, nicht dauerhaft protokolliert werden (siehe
+// auch Datenschutzerklärung – es entsteht kein gespeicherter Nachrichten-
+// verlauf). Beim Entfernen eines Raums wird der Verlauf mitgelöscht.
+const CHAT_HISTORY_LIMIT = 50;
+const CHAT_MAX_LENGTH = 200;
+// Einfacher Flood-Schutz: schnellere Folgenachrichten werden verworfen.
+const CHAT_MIN_INTERVAL_MS = 600;
+const chatHistory = new Map(); // roomCode -> [{ name, text, at }]
 // Anzahl Spieler pro Ranked-Tisch ("1v1v1v1").
 const RANKED_GROUP_SIZE = 4;
 
@@ -710,6 +721,43 @@ io.on('connection', (socket) => {
   // bzw. Freundes-Einladung) pleite ist. In den Matchmaking-Modi bewusst
   // nicht möglich: Dort IST das Ausscheiden das Spielziel, und die
   // Platzierung/Wertung hängt daran (siehe trackEliminations()).
+  // Chat-Verlauf des eigenen Raums nachladen – der Client fragt ihn direkt
+  // nach dem Beitritt an, damit auch Nachzügler den bisherigen Verlauf
+  // sehen (statt diesen an alle sieben room-joined-Stellen zu hängen).
+  socket.on('get-chat-history', () => {
+    const code = socket.data.roomCode;
+    if (!code) return;
+    socket.emit('chat-history', chatHistory.get(code) || []);
+  });
+
+  socket.on('chat-message', ({ text } = {}) => {
+    const code = socket.data.roomCode;
+    const table = code && rooms.getTable(code);
+    if (!table) {
+      socket.emit('error-message', 'Du bist in keinem Raum.');
+      return;
+    }
+    const trimmed = typeof text === 'string' ? text.trim().slice(0, CHAT_MAX_LENGTH) : '';
+    if (!trimmed) return;
+
+    const now = Date.now();
+    if (now - (socket.data.lastChatAt || 0) < CHAT_MIN_INTERVAL_MS) return;
+    socket.data.lastChatAt = now;
+
+    // Name aus dem Tisch statt aus der Client-Nachricht: So kann niemand
+    // unter fremdem Namen schreiben (siehe resolveName() für dasselbe
+    // Prinzip beim Beitreten).
+    const player = table.players.find((p) => p.id === socket.id);
+    const message = { name: player ? player.name : 'Unbekannt', text: trimmed, at: now };
+
+    const history = chatHistory.get(code) || [];
+    history.push(message);
+    if (history.length > CHAT_HISTORY_LIMIT) history.splice(0, history.length - CHAT_HISTORY_LIMIT);
+    chatHistory.set(code, history);
+
+    io.to(code).emit('chat-message', message);
+  });
+
   socket.on('rebuy', () => {
     const code = socket.data.roomCode;
     if (getMatchEntry(code)) {
@@ -775,6 +823,8 @@ io.on('connection', (socket) => {
         rankedTeamRooms.delete(roomCode);
         casualTeamRooms.delete(roomCode);
         botRooms.delete(roomCode);
+        chatHistory.delete(roomCode);
+        clearTurnTimer(roomCode);
       } else {
         broadcastRoomState(roomCode);
       }

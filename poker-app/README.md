@@ -838,6 +838,28 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   Einsatz gar nicht überbieten kann (z. B. gegen ein deckendes All-In) –
   vorher quittierte jeder Klick dort nur mit einer Fehlermeldung.
 
+- **Tisch-Chat** (`socket.on('chat-message')` im Server, Schublade
+  `#chat-drawer` im Client): Nachrichten gehen an alle im selben Raum, der
+  Absendername kommt aus dem Tisch statt aus der Nachricht (niemand kann
+  unter fremdem Namen schreiben). Der Verlauf (die letzten
+  `CHAT_HISTORY_LIMIT` Nachrichten) liegt nur im Arbeitsspeicher und wird
+  mit dem Raum gelöscht; Nachzügler laden ihn per `get-chat-history` nach.
+  Ein einfacher Flood-Schutz (`CHAT_MIN_INTERVAL_MS`) verwirft zu schnelle
+  Folgenachrichten. Die Schublade schwebt bewusst über dem Tisch, statt Teil
+  der Flex-Spalte von `#table-screen` zu sein – sonst würde sie das
+  bildschirmfüllende Layout wieder sprengen.
+- **Poker-Hilfe** (`#help-overlay`, Knopf ❓ in der Tisch-Kopfzeile):
+  Handrangfolge, Ablauf einer Hand, Bedeutung der Aktionen und der
+  Fähigkeiten – damit auch jemand ohne Poker-Vorwissen sofort mitspielen
+  kann, statt die Regeln woanders nachschlagen zu müssen.
+- **Installierbar als PWA** (`public/manifest.webmanifest`, `public/sw.js`,
+  Icons in `public/icons/` via `design/generate-web-icons.js`): Die App
+  lässt sich auf dem Handy zum Startbildschirm hinzufügen und startet dann
+  im Vollbild ohne Browserleiste. Der Service Worker ist bewusst eng
+  gefasst – "network-first" nur für die bekannte statische Oberfläche,
+  `/socket.io/` und alle Nicht-GET-Anfragen bleiben unangetastet, damit
+  der Cache niemals den Live-Spielzustand verfälscht.
+
 ## Mögliche nächste Schritte (für Claude Code)
 
 Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
@@ -845,10 +867,12 @@ Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
 - **Postgres/Supabase statt lokaler SQLite-Datei**: sinnvoll, sobald die
   App auf mehreren Server-Prozessen/Maschinen laufen soll (SQLite ist
   an eine einzelne Datei auf einer Maschine gebunden).
-- **Hand-Historie & Chat**: vergangene Hände und Nachrichten pro Raum
-  anzeigen (SQLite ist dafür bereits vorhanden und würde sich anbieten).
-- **Mobile-optimiertes UI**: Die Action-Bar und Karten-Reihen sind noch
-  nicht für kleine Bildschirme optimiert.
+- **Hand-Historie**: vergangene Hände pro Raum anzeigen (SQLite ist dafür
+  bereits vorhanden und würde sich anbieten). Der Chat existiert
+  inzwischen, die Historie fehlt noch.
+- **Push-Benachrichtigung, wenn man am Zug ist**: sinnvoll in Kombination
+  mit dem Zug-Zeitlimit, damit ein weggelegtes Handy nicht automatisch
+  foldet.
 
 ## Guter erster Prompt für Claude Code
 

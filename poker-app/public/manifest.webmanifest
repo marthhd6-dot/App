@@ -1,0 +1,33 @@
+{
+  "name": "Rumble Poker",
+  "short_name": "Rumble",
+  "description": "Texas Hold'em kostenlos im Browser: 1v1v1v1 und 2v2, Ranked oder Casual, mit Freunden oder gegen Bots.",
+  "lang": "de",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#050e0b",
+  "theme_color": "#050e0b",
+  "categories": ["games"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

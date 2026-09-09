@@ -145,6 +145,12 @@ socket.on('room-joined', ({ code, ranked, casual4, rankedTeam, casualTeam, vsBot
   communityDealtCount = 0;
   prevState = null;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code, name: myName }));
+  // Chat des neuen Raums frisch laden (siehe get-chat-history im Server)
+  chatMessagesEl.innerHTML = '';
+  chatDrawer.hidden = true;
+  unreadChatCount = 0;
+  renderChatUnread();
+  socket.emit('get-chat-history');
   reconnectBanner.hidden = true;
   rankedMatchOverBanner.hidden = true;
   rankedBadge.hidden = !isRanked;
@@ -1263,6 +1269,78 @@ function animatePotTo(target) {
   potAnimationFrame = requestAnimationFrame(step);
 }
 
+// --- Tisch-Chat ------------------------------------------------------------
+// Der Verlauf lebt nur im Server-Arbeitsspeicher (siehe chatHistory dort)
+// und wird nach dem Beitritt einmalig nachgeladen. Bei geschlossener
+// Schublade zählt ein Punkt am Chat-Knopf ungelesene Nachrichten.
+const chatDrawer = document.getElementById('chat-drawer');
+const chatMessagesEl = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const chatUnreadEl = document.getElementById('chat-unread');
+let unreadChatCount = 0;
+
+function renderChatUnread() {
+  chatUnreadEl.hidden = unreadChatCount === 0;
+  chatUnreadEl.textContent = unreadChatCount > 9 ? '9+' : String(unreadChatCount);
+}
+
+function appendChatMessage({ name, text, at }) {
+  const row = document.createElement('div');
+  row.className = 'chat-message' + (name === myName ? ' chat-message-own' : '');
+  const time = new Date(at || Date.now()).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  row.innerHTML = `<span class="chat-message-meta">${escapeHtml(name)} · ${time}</span><span class="chat-message-text">${escapeHtml(text)}</span>`;
+  chatMessagesEl.appendChild(row);
+  // Immer ans Ende scrollen: Die neueste Nachricht ist die relevante.
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+}
+
+function openChat() {
+  chatDrawer.hidden = false;
+  unreadChatCount = 0;
+  renderChatUnread();
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  chatInput.focus();
+}
+
+document.getElementById('chat-toggle-btn').addEventListener('click', () => {
+  playUiClickSound();
+  if (chatDrawer.hidden) openChat();
+  else chatDrawer.hidden = true;
+});
+document.getElementById('chat-close-btn').addEventListener('click', () => {
+  chatDrawer.hidden = true;
+});
+document.getElementById('chat-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = chatInput.value.trim();
+  if (!text) return;
+  socket.emit('chat-message', { text });
+  chatInput.value = '';
+});
+
+socket.on('chat-history', (messages) => {
+  chatMessagesEl.innerHTML = '';
+  (messages || []).forEach(appendChatMessage);
+});
+
+socket.on('chat-message', (message) => {
+  appendChatMessage(message);
+  if (chatDrawer.hidden && message.name !== myName) {
+    unreadChatCount += 1;
+    renderChatUnread();
+  }
+});
+
+// --- Poker-Hilfe -----------------------------------------------------------
+const helpOverlay = document.getElementById('help-overlay');
+document.getElementById('help-btn').addEventListener('click', () => {
+  playUiClickSound();
+  helpOverlay.hidden = false;
+});
+document.getElementById('help-close-btn').addEventListener('click', () => {
+  helpOverlay.hidden = true;
+});
+
 // --- Zug-Countdown ---------------------------------------------------------
 // Der Server erzwingt nach TURN_TIMEOUT_MS automatisch Check bzw. Fold
 // (siehe ensureTurnTimer() dort) und schickt den Ablaufzeitpunkt als
@@ -1449,4 +1527,19 @@ function render(state) {
   }
 
   prevState = state;
+}
+
+// --- PWA-Installation ------------------------------------------------------
+// Registriert den Service Worker (siehe sw.js), damit sich die App auf dem
+// Handy zum Startbildschirm hinzufügen lässt und die Oberfläche auch ohne
+// Netz erscheint. Bewusst abgesichert: In der gebündelten nativen App
+// (Capacitor, eigenes Schema statt http/https) gibt es keinen Service
+// Worker – ein Fehlschlag darf das Spiel dort nicht beeinträchtigen.
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      // Nicht verfügbar (privater Modus, blockiert, native App) – die App
+      // funktioniert auch ohne, nur eben ohne Installations-Angebot.
+    });
+  });
 }
