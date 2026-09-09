@@ -566,6 +566,22 @@ document.getElementById('friends-btn').addEventListener('click', openFriendsOver
 document.getElementById('friends-btn-table').addEventListener('click', openFriendsOverlay);
 document.getElementById('friends-close-btn').addEventListener('click', closeFriendsOverlay);
 
+// Sound-Stumm-Schalter: Zustand kommt aus sound.js (COOKIE_CONSENT_KEY-
+// artig in localStorage gemerkt, siehe SOUND_MUTED_KEY dort).
+const soundToggleBtn = document.getElementById('sound-toggle-btn');
+function updateSoundToggleBtn() {
+  const muted = isSoundMuted();
+  soundToggleBtn.textContent = muted ? '🔇' : '🔊';
+  soundToggleBtn.title = muted ? 'Sound ist aus – klicken zum Einschalten' : 'Sound ist an – klicken zum Ausschalten';
+  soundToggleBtn.setAttribute('aria-label', soundToggleBtn.title);
+}
+updateSoundToggleBtn();
+soundToggleBtn.addEventListener('click', () => {
+  setSoundMuted(!isSoundMuted());
+  updateSoundToggleBtn();
+  if (!isSoundMuted()) playUiClickSound();
+});
+
 document.getElementById('add-friend-btn').addEventListener('click', addFriend);
 document.getElementById('friend-name-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') addFriend();
@@ -704,14 +720,32 @@ function renderRankPath({ name, rating, tier, wins, losses, tiers }) {
   }
 }
 
-startHandBtn.addEventListener('click', () => socket.emit('start-hand'));
-foldBtn.addEventListener('click', () => socket.emit('fold'));
-checkBtn.addEventListener('click', () => socket.emit('check'));
-callBtn.addEventListener('click', () => socket.emit('call'));
+// Leiser, sofortiger Klick-Sound auf jeden Action-Bar-Button (Antwortzeit
+// wirkt dadurch spürbar niedriger als das Warten auf die eigentliche
+// Aktions-/Chip-Sound-Bestätigung aus detectAndShowActionFx, die erst mit
+// dem nächsten Server-State eintrifft).
+startHandBtn.addEventListener('click', () => {
+  playUiClickSound();
+  socket.emit('start-hand');
+});
+foldBtn.addEventListener('click', () => {
+  playUiClickSound();
+  socket.emit('fold');
+});
+checkBtn.addEventListener('click', () => {
+  playUiClickSound();
+  socket.emit('check');
+});
+callBtn.addEventListener('click', () => {
+  playUiClickSound();
+  socket.emit('call');
+});
 betBtn.addEventListener('click', () => {
+  playUiClickSound();
   socket.emit('bet', { amount: Number(betInput.value) });
 });
 raiseBtn.addEventListener('click', () => {
+  playUiClickSound();
   socket.emit('raise', { amount: Number(raiseInput.value) });
 });
 
@@ -730,9 +764,18 @@ function setBetSizerValue(amount) {
 }
 
 betAmountSlider.addEventListener('input', () => setBetSizerValue(Number(betAmountSlider.value)));
-quarterPotBtn.addEventListener('click', () => setBetSizerValue(betSizerBounds.pot * 0.25));
-halfPotBtn.addEventListener('click', () => setBetSizerValue(betSizerBounds.pot * 0.5));
-allInBtn.addEventListener('click', () => setBetSizerValue(betSizerBounds.max));
+quarterPotBtn.addEventListener('click', () => {
+  playUiClickSound();
+  setBetSizerValue(betSizerBounds.pot * 0.25);
+});
+halfPotBtn.addEventListener('click', () => {
+  playUiClickSound();
+  setBetSizerValue(betSizerBounds.pot * 0.5);
+});
+allInBtn.addEventListener('click', () => {
+  playUiClickSound();
+  setBetSizerValue(betSizerBounds.max);
+});
 
 // Manuelle Eingabe in den bestehenden Zahlenfeldern hält den Schieberegler
 // synchron, damit beide Bedienwege (Regler vs. Zahl eintippen) konsistent
@@ -796,6 +839,10 @@ function renderBetSizer(state, me, canBet, canRaise) {
   // Chip-Flug-Animation) bleibt ein bereits gewählter Betrag erhalten.
   const isMyTurn = state.actingPlayerId === mySocketId;
   const justBecameMyTurn = isMyTurn && !wasMyTurn;
+  if (justBecameMyTurn) {
+    playYourTurnSound();
+    hapticLight();
+  }
   const current = justBecameMyTurn ? min : Number(betAmountSlider.value) || min;
   setBetSizerValue(current);
 }
@@ -826,6 +873,7 @@ function renderCard(card, extraClass = '') {
 function renderCommunityCards(cards, previouslyDealt) {
   const container = document.getElementById('community-cards');
   container.innerHTML = '';
+  const newlyDealt = Math.max(0, cards.length - previouslyDealt);
   cards.forEach((card, i) => {
     const el = renderCard(card);
     if (i >= previouslyDealt) {
@@ -834,6 +882,7 @@ function renderCommunityCards(cards, previouslyDealt) {
     }
     container.appendChild(el);
   });
+  if (newlyDealt > 0) playDealSound(newlyDealt);
 }
 
 const ABILITY_CATEGORY_LABELS = {
@@ -867,13 +916,14 @@ function renderAbilities(abilities) {
     `;
     card.addEventListener('click', () => {
       if (ability.used) return;
+      playAbilitySound();
       socket.emit('use-ability', { category: ability.category });
     });
     container.appendChild(card);
   });
 }
 
-function renderMyCards(cards, animate, containerId = 'my-cards') {
+function renderMyCards(cards, animate, containerId = 'my-cards', playSound = true) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
   cards.forEach((card, i) => {
@@ -884,6 +934,7 @@ function renderMyCards(cards, animate, containerId = 'my-cards') {
     }
     container.appendChild(el);
   });
+  if (animate && cards.length > 0 && playSound) playDealSound(cards.length);
 }
 
 function escapeHtml(str) {
@@ -1068,6 +1119,7 @@ function updateDealerButton(state) {
 const POT_POSITION = { left: 50, top: 26 }; // deckt sich mit .pot-display (top: 26%)
 
 function spawnChipFly(fromPos, toPos) {
+  playChipFlySound();
   const layer = document.getElementById('fx-layer');
   const chip = document.createElement('div');
   chip.className = 'chip-fly';
@@ -1130,9 +1182,11 @@ function detectAndShowActionFx(state, prev) {
     if (p.folded && !before.folded) {
       showActionBubble(pos, 'Fold');
       spawnFoldCards(pos);
+      playFoldSound();
       return;
     }
     if (p.bet > before.bet) {
+      const isAllIn = p.chips === 0;
       if (prev.currentBet === 0) {
         showActionBubble(pos, `Bet ${p.bet}`);
       } else if (p.bet > prev.currentBet) {
@@ -1141,10 +1195,18 @@ function detectAndShowActionFx(state, prev) {
         showActionBubble(pos, 'Call');
       }
       spawnChipFly(pos, POT_POSITION);
+      if (isAllIn) {
+        playAllInSound();
+      } else if (p.bet > prev.currentBet) {
+        playBetSound(p.bet - before.bet, before.chips + before.bet);
+      } else {
+        playCallSound();
+      }
       return;
     }
     if (!p.folded && !before.folded && p.bet === before.bet && prev.actingPlayerId === p.id && state.actingPlayerId !== p.id) {
       showActionBubble(pos, 'Check');
+      playCheckSound();
     }
   });
 }
@@ -1195,6 +1257,8 @@ function animatePotTo(target) {
 }
 
 function burstConfetti() {
+  playWinSound();
+  hapticMedium();
   const container = document.getElementById('confetti-container');
   for (let i = 0; i < 70; i++) {
     const piece = document.createElement('div');
@@ -1251,7 +1315,7 @@ function render(state) {
   );
   if (teammate) {
     document.getElementById('teammate-name').textContent = teammate.name;
-    renderMyCards(teammate.holeCards, isNewHand, 'teammate-cards');
+    renderMyCards(teammate.holeCards, isNewHand, 'teammate-cards', false);
     teammateHandEl.hidden = false;
   } else {
     teammateHandEl.hidden = true;
@@ -1293,6 +1357,7 @@ function render(state) {
     if (winnerIds.has(mySocketId)) {
       document.querySelectorAll('#my-cards .card').forEach((el) => el.classList.add('glow'));
     }
+    playFlipSound();
   }
 
   lastPhase = state.phase;
