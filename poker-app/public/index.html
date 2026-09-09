@@ -253,6 +253,10 @@
         <button id="ranked-back-to-menu-btn" class="btn btn-primary btn-small">Neues Match suchen</button>
       </div>
       <div id="hand-result" class="hand-result" hidden></div>
+      <div id="rebuy-banner" class="hand-result rebuy-banner" hidden>
+        <span>Du hast keine Chips mehr.</span>
+        <button id="rebuy-btn" class="btn btn-primary btn-small">💰 1000 Chips nachkaufen</button>
+      </div>
 
       <div class="table-header">
         <span id="room-code-label" class="room-code-label"></span>
@@ -262,6 +266,7 @@
         <span id="casual-team-badge" class="casual-team-badge" hidden>👥 2v2 CASUAL</span>
         <span id="bots-badge" class="bots-badge" hidden>🤖 GEGEN BOTS</span>
         <span id="phase-label" class="phase-label"></span>
+        <span id="turn-timer" class="turn-timer" hidden></span>
         <span id="current-bet-label" class="current-bet-label"></span>
         <button
           id="friends-btn-table"
@@ -300,7 +305,7 @@
         <div id="fx-layer" class="fx-layer"></div>
       </div>
 
-      <div class="my-hand">
+      <div id="my-hand" class="my-hand">
         <h2>Deine Karten</h2>
         <div id="my-cards" class="card-row my-card-row"></div>
         <div id="my-abilities" class="ability-row"></div>
@@ -333,21 +338,21 @@
               step="1"
               aria-label="Bet-/Raise-Betrag"
             />
-            <span id="bet-amount-value" class="bet-amount-value">0</span>
+            <input
+              id="bet-amount-input"
+              type="number"
+              min="1"
+              class="bet-amount-value"
+              aria-label="Einsatzbetrag"
+            />
           </div>
         </div>
         <button id="start-hand-btn" class="btn btn-primary">▶ Hand starten</button>
         <button id="fold-btn" class="btn btn-fold">Fold</button>
         <button id="check-btn" class="btn btn-neutral">Check</button>
         <button id="call-btn" class="btn btn-call">Call</button>
-        <span class="bet-control">
-          <input id="bet-input" type="number" min="1" placeholder="Betrag" aria-label="Bet-Betrag" />
-          <button id="bet-btn" class="btn btn-raise">Bet</button>
-        </span>
-        <span class="bet-control">
-          <input id="raise-input" type="number" min="1" placeholder="Raise auf" aria-label="Raise-Betrag" />
-          <button id="raise-btn" class="btn btn-raise">Raise</button>
-        </span>
+        <button id="bet-btn" class="btn btn-raise">Bet</button>
+        <button id="raise-btn" class="btn btn-raise">Raise</button>
       </div>
     </div>
 

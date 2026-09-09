@@ -794,6 +794,50 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   "Native Apps" oben), damit es tatsächlich in die iOS/Android-Projekte
   eingebunden wird.
 
+- **Bildschirmfüllendes Tisch-Layout** (`#table-screen` in `style.css`):
+  Der Tisch-Screen ist eine Flex-Spalte über die exakte Viewport-Höhe
+  (`100dvh` abzüglich des `body`-Paddings, deshalb liegen dessen Werte als
+  `--body-pad-y`/`--body-pad-x` in `:root`). Kopfzeile, eigene Karten,
+  Fähigkeiten und Aktions-Leiste behalten ihre Höhe, `.table-felt` nimmt
+  als einziges Element den Rest und schrumpft mit – dadurch sind Tisch,
+  eigene Karten und Fold/Check/Call auf jeder Bildschirmgröße gleichzeitig
+  sichtbar, ohne zu scrollen. Vorher hatte der Tisch ein festes
+  Seitenverhältnis und schob die Aktions-Leiste ausnahmslos überall unter
+  die Falz. Zwei Sonderfälle: `padding-inline` am Tisch-Screen reserviert
+  Platz für die Sitzplätze, die konstruktionsbedingt seitlich über die
+  Filzkante hinausragen (sonst ragten sie zwischen ~640px und ~830px
+  Fensterbreite aus dem Viewport), und im **Querformat** (`orientation:
+  landscape` mit geringer Höhe) wechselt der Screen auf ein Raster mit
+  Tisch links und Karten/Fähigkeiten/Aktionen rechts daneben.
+- **Touch-Zielgrößen**: Unter `@media (pointer: coarse)` sind die Knöpfe
+  der Aktions-Leiste mindestens 44px hoch (WCAG 2.5.5). Der
+  Bet-Schieberegler ist jetzt ein 32px hohes, transparentes Element mit
+  gemalter 6px-Schiene (`::-webkit-slider-runnable-track`) – vorher war das
+  Element selbst nur so hoch wie die dünne Linie und damit kaum zu treffen.
+  Die beiden getrennten Zahlenfelder für Bet und Raise wurden durch ein
+  gemeinsames Feld direkt neben dem Regler ersetzt: Beide Aktionen nutzen
+  denselben Betrag, und die doppelte Eingabe kostete eine ganze Zeile.
+- **Pleite-Spieler & Nachkaufen**: Wer keine Chips mehr hat, setzt die Hand
+  aus (`sittingOut` in `table.js`) statt mit 0 Chips als "all-in" bis zum
+  Showdown mitzulaufen, ohne je etwas gewinnen zu können. In normalen
+  Räumen (eigener Code/Freundes-Einladung) bietet ein Banner
+  `💰 1000 Chips nachkaufen` an (`socket.on('rebuy')`); in den
+  Matchmaking-Modi bewusst nicht, dort ist das Ausscheiden Teil der
+  Wertung.
+- **Zug-Zeitlimit** (`TURN_TIMEOUT_MS`, Standard 45s, per Umgebungsvariable
+  überschreibbar): Läuft die Bedenkzeit ab, führt der Server automatisch
+  Check aus (falls nichts nachzuzahlen ist) bzw. Fold. Ohne das blockierte
+  ein verbundener, aber untätiger Spieler den Tisch dauerhaft – die
+  bestehende Gnadenfrist greift nur bei einem echten Verbindungsabbruch.
+  Der Ablaufzeitpunkt geht als `state.actingDeadline` an die Clients, die
+  daraus denselben Countdown anzeigen (`#turn-timer`).
+- **Kleinere Spiellogik-Korrekturen**: Einsätze werden am Hand-Ende
+  zurückgesetzt (`_clearBets()`) – vorher stand bis zur nächsten Hand
+  weiter "Einsatz: 10" am Sitzplatz, obwohl der Pot längst ausgezahlt war.
+  Der Raise-Knopf ist deaktiviert, wenn der eigene Stack den aktuellen
+  Einsatz gar nicht überbieten kann (z. B. gegen ein deckendes All-In) –
+  vorher quittierte jeder Klick dort nur mit einer Fehlermeldung.
+
 ## Mögliche nächste Schritte (für Claude Code)
 
 Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
