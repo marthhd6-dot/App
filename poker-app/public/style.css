@@ -1280,38 +1280,68 @@ button:disabled {
    die endet bei rotate(0) und würde sonst den gefächerten Kippwinkel oben
    (:first-child/:last-child) im Moment des Austeilens kurzzeitig aufheben. */
 .mini-card-back:first-child.deal-in {
-  animation: deal-in-fan-left 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation: deal-in-fan-left 0.55s linear both;
 }
 
 .mini-card-back:last-child.deal-in {
-  animation: deal-in-fan-right 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation: deal-in-fan-right 0.55s linear both;
 }
 
 @keyframes deal-in-fan-left {
   0% {
-    transform: translateY(-40px) scale(0.4) rotate(-12deg);
+    transform: translateY(-70.0px) scale(0.450) rotate(-20.0deg);
     opacity: 0;
   }
-  70% {
-    transform: translateY(4px) scale(1.05) rotate(-9deg);
+  8% {
+    transform: translateY(-44.6px) scale(0.650) rotate(-15.3deg);
+  }
+  16% {
+    transform: translateY(-29.0px) scale(0.773) rotate(-12.4deg);
     opacity: 1;
   }
+  26% {
+    transform: translateY(-16.8px) scale(0.868) rotate(-10.1deg);
+  }
+  38% {
+    transform: translateY(-8.7px) scale(0.932) rotate(-8.6deg);
+  }
+  52% {
+    transform: translateY(-4.0px) scale(0.969) rotate(-7.7deg);
+  }
+  70% {
+    transform: translateY(-1.3px) scale(0.990) rotate(-7.2deg);
+  }
   100% {
-    transform: translateY(0) scale(1) rotate(-7deg);
+    transform: translateY(-0.0px) scale(1.000) rotate(-7.0deg);
   }
 }
 
 @keyframes deal-in-fan-right {
   0% {
-    transform: translateY(-40px) scale(0.4) rotate(12deg);
+    transform: translateY(-70.0px) scale(0.450) rotate(20.0deg);
     opacity: 0;
   }
-  70% {
-    transform: translateY(4px) scale(1.05) rotate(9deg);
+  8% {
+    transform: translateY(-44.6px) scale(0.650) rotate(15.3deg);
+  }
+  16% {
+    transform: translateY(-29.0px) scale(0.773) rotate(12.4deg);
     opacity: 1;
   }
+  26% {
+    transform: translateY(-16.8px) scale(0.868) rotate(10.1deg);
+  }
+  38% {
+    transform: translateY(-8.7px) scale(0.932) rotate(8.6deg);
+  }
+  52% {
+    transform: translateY(-4.0px) scale(0.969) rotate(7.7deg);
+  }
+  70% {
+    transform: translateY(-1.3px) scale(0.990) rotate(7.2deg);
+  }
   100% {
-    transform: translateY(0) scale(1) rotate(7deg);
+    transform: translateY(-0.0px) scale(1.000) rotate(7.0deg);
   }
 }
 
@@ -1547,8 +1577,20 @@ button:disabled {
    background-Ebene statt eines ::before-Pseudo-Elements, damit sie
    automatisch dem border-radius folgt, ohne overflow: hidden zu
    brauchen – das würde sonst den Schlagschatten in ::after abschneiden. */
+/* Echte Vorder- UND Rückseite in einem Element: .card ist die Vorderseite,
+   ::after die Rückseite (um 180 Grad weggedreht). Zusammen mit
+   preserve-3d und backface-visibility ergibt das einen echten Flip – beim
+   Drehen verschwindet die Vorderseite und die Rückseite kommt zum
+   Vorschein. Vorher drehten die Flip-Animationen eine Karte OHNE
+   Rückseite: In der ersten Hälfte der Drehung sah man schlicht die
+   gespiegelte Vorderseite. Technik übernommen aus react-poker
+   (therewillbecode/react-deck, ISC) – dort über getrennte .front/.back-
+   Elemente gelöst; hier per Pseudo-Element, weil die Kartenauszeichnung
+   in cardOuterHtml() (app.js) dadurch unverändert bleiben kann. */
 .card {
   position: relative;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
   width: 54px;
   height: 76px;
   background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.55) 47%, transparent 60%),
@@ -1563,6 +1605,35 @@ button:disabled {
   font-size: 1.3rem;
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15), 0 10px 18px -5px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* Rang- und Symbol-Elemente würden sonst beim Wegdrehen der Karte
+   gespiegelt durch die Rückseite scheinen (backface-visibility wirkt pro
+   Element, nicht vererbt). */
+.card > * {
+  backface-visibility: hidden;
+}
+
+/* Die Rückseite selbst: dasselbe Rautenmuster wie die verdeckten
+   Mini-Karten an den Sitzplätzen (.mini-card-back), damit eine Karte beim
+   Umdrehen erkennbar dieselbe bleibt. */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+      45deg,
+      var(--table-green-dark) 0 4px,
+      var(--table-green-mid) 4px 8px
+    ),
+    var(--table-green-dark);
+  border: 1px solid rgba(232, 191, 74, 0.55);
+  /* translateZ hält die Rückseite eine Haaresbreite hinter der
+     Vorderseite, sonst liegen beide exakt in derselben Ebene und der
+     Browser entscheidet willkürlich, welche er zeichnet (z-Fighting). */
+  transform: rotateY(180deg) translateZ(1px);
+  backface-visibility: hidden;
 }
 
 /* Grounding-Schatten: eine eigene, unscharfe Ellipse unter der Karte statt
@@ -1630,46 +1701,82 @@ button:disabled {
 }
 
 .card.deal-in {
-  animation: deal-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation: deal-in 0.55s linear both;
 }
 
-/* rotateY simuliert das Umdrehen von verdeckt zu aufgedeckt, zusätzlich
-   zum bisherigen Einfliegen/Skalieren – siehe .card-row's perspective
-   oben, ohne die diese Rotation flach und ohne Tiefenwirkung aussähe. */
+/* Die Stützstellen sind keine handgewählten Werte, sondern die
+   nachgerechnete Bahn einer gedämpften Feder – dieselben Parameter, die
+   react-poker (therewillbecode/react-deck, ISC) über react-motion für
+   seine Kartenanimationen nutzt: Steifigkeit 340, Dämpfung 88, Masse 1,
+   integriert mit festem Zeitschritt 1/60s. Der Dämpfungsgrad liegt bei
+   2,39, die Feder ist also überdämpft: Die Karte schwingt NICHT nach,
+   sondern startet sehr schnell und läuft lang und weich aus – das
+   charakteristische Gleiten einer über den Filz geschobenen Karte, statt
+   des federnden Aufpoppens der früheren cubic-bezier-Kurve mit
+   Überschwinger. Der Kurvenabschnitt bis 99,5% ist auf die
+   Animationsdauer gestaucht, damit die Karte exakt landet.
+   WICHTIG: animation-timing-function muss deshalb linear bleiben – eine
+   zusätzliche Easing-Kurve würde die Federbahn ein zweites Mal verzerren.
+   rotateY dreht die Karte dabei von der Rückseite (siehe .card::before) auf
+   die Vorderseite. */
 @keyframes deal-in {
   0% {
-    transform: translateY(-40px) scale(0.4) rotate(-12deg) rotateY(180deg);
-    opacity: 0;
+    transform: translateY(-110.0px) scale(0.550) rotate(-14.0deg) rotateY(180deg);
   }
-  60% {
-    transform: translateY(4px) scale(1.05) rotate(2deg) rotateY(0deg);
-    opacity: 1;
+  8% {
+    transform: translateY(-70.0px) scale(0.713) rotate(-8.9deg) rotateY(49deg);
+  }
+  16% {
+    transform: translateY(-45.5px) scale(0.814) rotate(-5.8deg) rotateY(0deg);
+  }
+  26% {
+    transform: translateY(-26.5px) scale(0.892) rotate(-3.4deg) rotateY(0deg);
+  }
+  38% {
+    transform: translateY(-13.7px) scale(0.944) rotate(-1.7deg) rotateY(0deg);
+  }
+  52% {
+    transform: translateY(-6.2px) scale(0.975) rotate(-0.8deg) rotateY(0deg);
+  }
+  70% {
+    transform: translateY(-2.1px) scale(0.992) rotate(-0.3deg) rotateY(0deg);
   }
   100% {
-    transform: translateY(0) scale(1) rotate(0) rotateY(0deg);
+    transform: translateY(-0.0px) scale(1.000) rotate(0.0deg) rotateY(0deg);
   }
 }
 
 /* Aufdeck-Flip beim Showdown (siehe justRevealed in renderSeats()/render()
-   in app.js): die Karte "kippt" von verdeckt auf aufgedeckt um die eigene
-   Achse, statt nur kommentarlos zu erscheinen – anders als .deal-in ohne
-   Flug/Einfliegen, weil die Karte ja schon am Tisch liegt und nur
-   umgedreht wird. */
+   in app.js): die Karte kippt von der Rückseite auf die Vorderseite um die
+   eigene Achse – anders als .deal-in ohne Flug/Einfliegen, weil die Karte
+   ja schon am Tisch liegt und nur umgedreht wird. Die Stützstellen
+   stammen wie beim Austeilen aus der nachgerechneten Federkurve, deshalb
+   linear als Timing-Funktion (siehe @keyframes deal-in). */
 .card.reveal-flip {
-  animation: card-reveal-flip 0.5s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+  animation: card-reveal-flip 0.6s linear both;
 }
 
 @keyframes card-reveal-flip {
   0% {
-    transform: scale(0.94) rotateY(180deg);
-    opacity: 0.5;
+    transform: scale(0.900) rotateY(180deg);
   }
-  60% {
-    transform: scale(1.05) rotateY(0deg);
-    opacity: 1;
+  10% {
+    transform: scale(0.943) rotateY(103deg);
+  }
+  20% {
+    transform: scale(0.967) rotateY(60deg);
+  }
+  32% {
+    transform: scale(0.983) rotateY(31deg);
+  }
+  46% {
+    transform: scale(0.992) rotateY(14deg);
+  }
+  62% {
+    transform: scale(0.997) rotateY(6deg);
   }
   100% {
-    transform: scale(1) rotateY(0deg);
+    transform: scale(1.000) rotateY(0deg);
   }
 }
 
