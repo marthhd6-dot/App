@@ -359,13 +359,20 @@
         <div class="table-drop-shadow"></div>
         <div class="felt-surface">
           <div class="felt-rail"></div>
-          <div class="pot-display">
-            <span class="pot-chips-icon">
-              <span class="chip-stack-mini"></span>
-            </span>
-            <span id="pot-label" class="pot-amount">Pot: 0</span>
+          <!-- Pot und Community Cards als ein gemeinsamer, mittig
+               ausgerichteter Stapel statt zweier einzeln in Prozent
+               positionierter Elemente: Bei einem flachen Tisch (z. B.
+               Tablet im Querformat) lagen die beiden Prozentwerte so nah
+               beieinander, dass die Karten den Pot-Betrag verdeckten. -->
+          <div class="felt-center">
+            <div class="pot-display">
+              <span class="pot-chips-icon">
+                <span class="chip-stack-mini"></span>
+              </span>
+              <span id="pot-label" class="pot-amount">Pot: 0</span>
+            </div>
+            <div id="community-cards" class="card-row community-row"></div>
           </div>
-          <div id="community-cards" class="card-row community-row"></div>
         </div>
         <div class="felt-rail-sheen"></div>
         <div id="players-list" class="seats"></div>
@@ -373,7 +380,12 @@
         <div id="fx-layer" class="fx-layer"></div>
       </div>
 
-      <div id="my-hand" class="my-hand">
+      <!-- Eigene Karten, Fähigkeiten und Aktions-Leiste als ein Block:
+           Im Hochformat stapelt er sich wie bisher unter dem Tisch, im
+           Querformat rückt er als Ganzes daneben (siehe .table-side in
+           style.css) – dadurch bekommt der Tisch die volle Resthöhe. -->
+      <div class="table-side">
+        <div id="my-hand" class="my-hand">
         <h2>Deine Karten</h2>
         <div id="my-cards" class="card-row my-card-row"></div>
         <div id="my-abilities" class="ability-row"></div>
@@ -421,6 +433,7 @@
         <button id="call-btn" class="btn btn-call">Call</button>
         <button id="bet-btn" class="btn btn-raise">Bet</button>
         <button id="raise-btn" class="btn btn-raise">Raise</button>
+        </div>
       </div>
     </div>
 

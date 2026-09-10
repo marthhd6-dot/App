@@ -1225,7 +1225,23 @@ function updateDealerButton(state) {
 // bei jedem State-Update, siehe dort) und ihre eigene, kurze Animation zu
 // Ende spielen können, bevor sie sich selbst wieder entfernen.
 
-const POT_POSITION = { left: 50, top: 26 }; // deckt sich mit .pot-display (top: 26%)
+// Position des Pots in Prozent der Tischfläche, für Start-/Zielpunkt der
+// fliegenden Chips. Wird gemessen statt fest verdrahtet: Der Pot sitzt
+// jetzt in einem mittig ausgerichteten Stapel (.felt-center in style.css)
+// und verschiebt sich dadurch je nach Tischhöhe und Anzahl der offenen
+// Karten – ein fester Prozentwert würde die Chips daneben fliegen lassen.
+function potPosition() {
+  const felt = document.querySelector('.table-felt');
+  const pot = document.querySelector('.pot-display');
+  if (!felt || !pot) return { left: 50, top: 44 };
+  const f = felt.getBoundingClientRect();
+  const p = pot.getBoundingClientRect();
+  if (f.width === 0 || f.height === 0) return { left: 50, top: 44 };
+  return {
+    left: ((p.left + p.width / 2 - f.left) / f.width) * 100,
+    top: ((p.top + p.height / 2 - f.top) / f.height) * 100,
+  };
+}
 
 function spawnChipFly(fromPos, toPos) {
   playChipFlySound();
@@ -1303,7 +1319,7 @@ function detectAndShowActionFx(state, prev) {
       } else {
         showActionBubble(pos, 'Call');
       }
-      spawnChipFly(pos, POT_POSITION);
+      spawnChipFly(pos, potPosition());
       if (isAllIn) {
         playAllInSound();
       } else if (p.bet > prev.currentBet) {
@@ -1328,7 +1344,7 @@ function spawnPotPayout(state) {
   state.lastHandResult.pots.forEach((pot) => {
     pot.winners.forEach((w) => {
       const pos = seatPositionForPlayer(state, w.id);
-      if (pos) spawnChipFly(POT_POSITION, pos);
+      if (pos) spawnChipFly(potPosition(), pos);
     });
   });
 }
