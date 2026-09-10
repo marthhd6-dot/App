@@ -104,6 +104,9 @@ const raiseBtn = document.getElementById('raise-btn');
 const startHandBtn = document.getElementById('start-hand-btn');
 const rebuyBanner = document.getElementById('rebuy-banner');
 const turnTimerEl = document.getElementById('turn-timer');
+// Der Zähler schreibt nur in dieses <span>, nicht in den ganzen Knopf –
+// sonst würde das Uhr-Symbol daneben bei jedem Tick überschrieben.
+const turnTimerValueEl = document.getElementById('turn-timer-value');
 const betSizerEl = document.getElementById('bet-sizer');
 const betAmountSlider = document.getElementById('bet-amount-slider');
 // Ein einziges Betragsfeld für Bet UND Raise (früher zwei getrennte
@@ -677,7 +680,11 @@ document.getElementById('friends-close-btn').addEventListener('click', closeFrie
 const soundToggleBtn = document.getElementById('sound-toggle-btn');
 function updateSoundToggleBtn() {
   const muted = isSoundMuted();
-  soundToggleBtn.textContent = muted ? '🔇' : '🔊';
+  // Nur das Symbol im vorhandenen <svg> austauschen. Ein textContent würde
+  // das <svg> aus dem Knopf werfen und der Knopf bliebe für immer leer.
+  soundToggleBtn
+    .querySelector('use')
+    .setAttribute('href', muted ? '#icon-sound-off' : '#icon-sound-on');
   soundToggleBtn.title = muted ? 'Sound ist aus – klicken zum Einschalten' : 'Sound ist an – klicken zum Ausschalten';
   soundToggleBtn.setAttribute('aria-label', soundToggleBtn.title);
 }
@@ -997,6 +1004,18 @@ const ABILITY_CATEGORY_LABELS = {
   resource: 'Ressourcen',
 };
 
+// Welches Symbol aus dem Sprite in index.html eine Fähigkeit bekommt.
+// Die Zuordnung liegt im Frontend, nicht im Server-Katalog: Der Server
+// sagt, WELCHE Fähigkeit ein Spieler hat, wie sie aussieht, ist Sache
+// der Oberfläche. Unbekannte ids fallen auf das Kartensymbol zurück,
+// damit nie ein leerer Verweis in der Seite landet.
+const ABILITY_SYMBOLS = {
+  cardSwap: 'icon-ability-swap',
+  potBonus: 'icon-ability-pot',
+  spy: 'icon-ability-spy',
+  chipBoost: 'icon-ability-boost',
+};
+
 // Rendert die eigenen vier Fähigkeiten-Karten (eine je Kategorie, siehe
 // abilities.js) neben den eigenen Hole Cards. abilities kommt direkt aus
 // state.players[...].abilities (siehe describeAbilitiesForClient() in
@@ -1015,7 +1034,9 @@ function renderAbilities(abilities) {
     card.title = ability.description;
     card.innerHTML = `
       <span class="ability-card-category">${ABILITY_CATEGORY_LABELS[ability.category] || ability.category}</span>
-      <span class="ability-card-icon">${ability.icon}</span>
+      <svg class="ability-card-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#${
+        ABILITY_SYMBOLS[ability.id] || 'icon-ability-swap'
+      }" /></svg>
       <span class="ability-card-name">${escapeHtml(ability.name)}</span>
       <span class="ability-card-status">${ability.used ? 'Eingesetzt' : 'Einsetzen'}</span>
     `;
@@ -1476,7 +1497,7 @@ function renderTurnTimer() {
   }
   const secondsLeft = Math.max(0, Math.ceil((actingDeadline - Date.now()) / 1000));
   turnTimerEl.hidden = false;
-  turnTimerEl.textContent = `⏱ ${secondsLeft}s`;
+  turnTimerValueEl.textContent = `${secondsLeft}s`;
   turnTimerEl.classList.toggle('turn-timer-urgent', secondsLeft <= 10);
 }
 

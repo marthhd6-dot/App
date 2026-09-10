@@ -51,7 +51,7 @@
          sagt, WOFÜR (Gold = Ranked, Grün = Casual, Blau = Üben). Bewusst
          als Pfade statt als Schriftzeichen, damit sie unabhängig von
          installierten Schriften überall gleich aussehen. -->
-    <svg class="suit-sprite" aria-hidden="true" focusable="false">
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
       <defs>
         <symbol id="suit-spade" viewBox="0 0 24 24">
           <path d="M12 2.2C12 2.2 3.6 9 3.6 14.1a4.3 4.3 0 0 0 7.3 3.1c.1 2.1-.9 3.5-2.2 4.6h6.6c-1.3-1.1-2.3-2.5-2.2-4.6a4.3 4.3 0 0 0 7.3-3.1C20.4 9 12 2.2 12 2.2Z"/>
@@ -64,6 +64,64 @@
         </symbol>
         <symbol id="suit-club" viewBox="0 0 24 24">
           <path d="M12 2.1a3.9 3.9 0 0 0-3.2 6.1 3.9 3.9 0 1 0-.9 7.4 3.9 3.9 0 0 0 2.9-1.3c.1 2.6-.8 4.3-2 5.5h6.4c-1.2-1.2-2.1-2.9-2-5.5a3.9 3.9 0 0 0 2.9 1.3 3.9 3.9 0 1 0-.9-7.4A3.9 3.9 0 0 0 12 2.1Z"/>
+        </symbol>
+
+        <!-- Bedienfeld-Symbole. Ein gemeinsamer Strichstil (24er-Raster,
+             1.8 Linienstärke, runde Enden, currentColor) statt Emoji: die
+             Zeichen sehen auf jedem Gerät gleich aus, nehmen die Textfarbe
+             ihres Knopfes an und lassen sich beliebig skalieren. -->
+        <symbol id="icon-friends" viewBox="0 0 24 24">
+          <circle cx="9" cy="8" r="3.2"/>
+          <path d="M3 19.5c0-3.4 2.8-5.4 6-5.4 1.2 0 2.3.3 3.2.8"/>
+          <path d="M18 13v6M15 16h6"/>
+        </symbol>
+        <symbol id="icon-chat" viewBox="0 0 24 24">
+          <path d="M20 4H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3v4l4.5-4H20a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1Z"/>
+        </symbol>
+        <symbol id="icon-help" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M9.2 9.3a3 3 0 1 1 3.7 3.8c-.6.2-.9.7-.9 1.3v.6"/>
+          <path d="M12 17.6h.01"/>
+        </symbol>
+        <symbol id="icon-sound-on" viewBox="0 0 24 24">
+          <path d="M4 9.5h3.2L12 5.5v13L7.2 14.5H4Z"/>
+          <path d="M16 9.6a4 4 0 0 1 0 4.8"/>
+          <path d="M18.8 7a7.5 7.5 0 0 1 0 10"/>
+        </symbol>
+        <symbol id="icon-sound-off" viewBox="0 0 24 24">
+          <path d="M4 9.5h3.2L12 5.5v13L7.2 14.5H4Z"/>
+          <path d="M16.5 10l5 4M21.5 10l-5 4"/>
+        </symbol>
+        <symbol id="icon-timer" viewBox="0 0 24 24">
+          <circle cx="12" cy="13.5" r="8"/>
+          <path d="M12 9.5v4l2.5 2"/>
+          <path d="M9.5 2.5h5"/>
+        </symbol>
+        <symbol id="icon-exit" viewBox="0 0 24 24">
+          <path d="M14 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8"/>
+          <path d="M11 12h9M17 8.5l3.5 3.5L17 15.5"/>
+        </symbol>
+
+        <!-- Fähigkeiten-Symbole. Sie kommen nicht mehr vom Server: der
+             schickt nur noch den Symbolnamen (siehe abilities.js), das
+             Bild dazu liegt hier im Frontend, wo es hingehört. -->
+        <symbol id="icon-ability-swap" viewBox="0 0 24 24">
+          <path d="M4 9h13M14 6l3 3-3 3"/>
+          <path d="M20 15H7M10 18l-3-3 3-3"/>
+        </symbol>
+        <symbol id="icon-ability-pot" viewBox="0 0 24 24">
+          <ellipse cx="11" cy="9" rx="6.5" ry="2.8"/>
+          <path d="M4.5 9v4.5c0 1.5 2.9 2.8 6.5 2.8s6.5-1.3 6.5-2.8V9"/>
+          <path d="M4.5 13.5V18c0 1.5 2.9 2.8 6.5 2.8s6.5-1.3 6.5-2.8v-4.5"/>
+          <path d="M19 2.5v5M16.5 5h5"/>
+        </symbol>
+        <symbol id="icon-ability-spy" viewBox="0 0 24 24">
+          <path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12Z"/>
+          <circle cx="12" cy="12" r="2.6"/>
+        </symbol>
+        <symbol id="icon-ability-boost" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8.5"/>
+          <path d="M12 16.5V7.5M8 11.5 12 7.5l4 4"/>
         </symbol>
       </defs>
     </svg>
@@ -388,31 +446,38 @@
         <span id="casual-team-badge" class="casual-team-badge" hidden>2v2 Casual</span>
         <span id="bots-badge" class="bots-badge" hidden>Gegen Bots</span>
         <span id="phase-label" class="phase-label"></span>
-        <span id="turn-timer" class="turn-timer" hidden></span>
+        <span id="turn-timer" class="turn-timer" hidden
+          ><svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-timer" /></svg
+          ><span id="turn-timer-value"></span
+        ></span>
         <span id="current-bet-label" class="current-bet-label"></span>
         <button
           id="friends-btn-table"
-          class="btn btn-ghost btn-small"
+          class="btn btn-ghost btn-small btn-icon"
           title="Freunde einladen"
           aria-label="Freunde einladen"
         >
-          👥
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-friends" /></svg>
         </button>
-        <button id="chat-toggle-btn" class="btn btn-ghost btn-small" title="Chat" aria-label="Chat öffnen">
-          💬<span id="chat-unread" class="chat-unread" hidden></span>
+        <button id="chat-toggle-btn" class="btn btn-ghost btn-small btn-icon" title="Chat" aria-label="Chat öffnen">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-chat" /></svg>
+          <span id="chat-unread" class="chat-unread" hidden></span>
         </button>
-        <button id="help-btn" class="btn btn-ghost btn-small" title="Poker-Hilfe" aria-label="Poker-Hilfe öffnen">
-          ❓
+        <button id="help-btn" class="btn btn-ghost btn-small btn-icon" title="Poker-Hilfe" aria-label="Poker-Hilfe öffnen">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-help" /></svg>
         </button>
         <button
           id="sound-toggle-btn"
-          class="btn btn-ghost btn-small"
+          class="btn btn-ghost btn-small btn-icon"
           title="Sound ein/aus"
           aria-label="Sound ein/aus"
         >
-          🔊
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-sound-on" /></svg>
         </button>
-        <button id="leave-table-btn" class="btn btn-ghost btn-small" title="Zurück zum Hauptmenü">🚪 Menü</button>
+        <button id="leave-table-btn" class="btn btn-ghost btn-small" title="Zurück zum Hauptmenü">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-exit" /></svg>
+          Menü
+        </button>
       </div>
 
       <div class="table-felt">
