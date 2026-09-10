@@ -932,6 +932,23 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   `/socket.io/` und alle Nicht-GET-Anfragen bleiben unangetastet, damit
   der Cache niemals den Live-Spielzustand verfälscht.
 
+## Skill für Claude Code
+
+`.claude/skills/rumble-poker/SKILL.md` (im Wurzelverzeichnis des
+Repositorys, eine Ebene über diesem Ordner) hält die Arbeitsweise an
+diesem Projekt fest, damit sie nicht in jeder neuen Sitzung neu erarbeitet
+werden muss: der Ablauf von Branch bis Pull Request, die harten
+Randbedingungen des Frontends (kein Build-Schritt, viewport-füllender
+Tisch-Screen), die Bildschirmgrößen und Messungen, die hier bereits echte
+Fehler gefunden haben, die Fallstricke, die schon einmal zugeschlagen
+haben (etwa `opacity` unter 1, das `preserve-3d` aufhebt), sowie die
+gestalterischen Leitplanken.
+
+Der Gestaltungsteil übernimmt Leitlinien aus Anthropics
+`frontend-design`-Skill (Apache-2.0), gekürzt und auf die bestehende
+Handschrift von Rumble Poker bezogen – die Quellenangabe liegt daneben in
+`NOTICE.md`.
+
 ## Mögliche nächste Schritte (für Claude Code)
 
 Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
