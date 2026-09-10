@@ -320,17 +320,31 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   unten in der Mitte), animiertes Karten-Austeilen (siehe unten), ein
   pulsierender Rahmen um den aktiven Spieler, Konfetti bei einem eigenen
   Sieg, und eine identische Optik für Ranked-Warteschlange und Bestenliste.
-- **Casino-Lobby-Menü statt loser Knopf-Liste** (`public/index.html`/
-  `style.css`): Das Hauptmenü gruppiert die Spielmodi in klar beschriftete
-  Abschnitte ("Eigener Tisch", "Ranked", "Casual", "Üben") mit
-  Sektions-Label und farbigem Chip-Punkt (`.lobby-section`,
-  `.lobby-chip-dot-*`) – wie die Kategorien einer echten Casino-Lobby. Eine
-  einzige Farbe pro KATEGORIE statt pro einzelnem Modus: Gold ist exklusiv
-  für Ranked reserviert (`.btn-mode-ranked`, egal ob 1v1v1v1 oder 2v2),
-  Grün für Casual (`.btn-mode-casual`), Blau-Grau für den Übungsmodus
-  (`.btn-mode-practice`) – derselbe Farbcode zieht sich weiter zu den
+- **Lobby als zweispaltiger Startbildschirm** (`public/index.html`/
+  `style.css`): Links ein Panel mit Marke, Name, eigenem Tisch und den
+  Nebenwegen (Bestenliste, Rang, Freunde), rechts die fünf Spielmodi als
+  Karten-Raster (`.lobby`, `.lobby-intro`, `.lobby-modes`, `.mode-card`).
+  Unter 900px Breite fällt beides untereinander, unter 520px werden auch
+  die Modus-Karten einspaltig. Die Modi sind bewusst nicht gleich groß:
+  Ranked 1v1v1v1 ist der Einstieg, den die meisten suchen, und bekommt als
+  `.mode-card-hero` doppelte Breite, eine größere Marke und einen
+  kräftigeren Farbrand. Jede Raster-Zeile enthält genau eine Spielart
+  (`.mode-card-wide`), damit die Farbcodierung nicht durch nebeneinander
+  stehende Kategorien verwässert.
+- **Kartenfarben statt Emoji als Modus-Marken** (`public/index.html`):
+  Die vier Farben liegen einmal als SVG-Symbole im Dokument (`#suit-spade`
+  bis `#suit-club`) und werden per `<use>` referenziert. Die **Anordnung**
+  sagt, wie gespielt wird – vier einzelne Farben im Kreis heißt vier
+  Spieler für sich, zwei berührende Paare heißen zwei Teams, eine gefüllte
+  gegen zwei umrandete Farben (`.mode-mark-hollow`) heißt Mensch gegen
+  Bots. Die **Farbe** sagt, wofür: Gold ist exklusiv für Ranked reserviert
+  (`.mode-card-ranked`, egal ob 1v1v1v1 oder 2v2), Grün für Casual
+  (`.mode-card-casual`), Blau für den Übungsmodus
+  (`.mode-card-practice`) – derselbe Farbcode zieht sich weiter zu den
   Tisch-Badges (`.ranked-badge`/`.ranked-team-badge` usw.), damit die
-  Kategorie am Tisch genauso erkennbar bleibt wie im Menü. Zusätzlich
+  Kategorie am Tisch genauso erkennbar bleibt wie im Menü. Die Badges
+  tragen dabei keine Emoji und keine Versalien mehr, sondern nur noch den
+  Modusnamen in ihrer Kategoriefarbe. Zusätzlich
   bekommen Tisch-Kopfzeile (`.table-header`) und Aktions-Leiste
   (`.action-bar`) eine eigene, dezente Hintergrund-Fläche statt lose auf dem
   Seitenhintergrund zu schweben – wie eine Infotafel bzw. ein Bedienpult an
@@ -339,6 +353,13 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   die alte Zentrierung nur für drei einzelne Screen-IDs per Hand nachgezogen
   war – jetzt zentriert sich jedes `.panel` einheitlich über `margin: 0
   auto`.
+- **Abgeschnittener Startbildschirm behoben** (`public/style.css`): Der
+  `body` zentriert seine Screens senkrecht. Ist ein Screen höher als das
+  Fenster, schiebt `align-items: center` seinen Anfang über die obere
+  Fensterkante hinaus – und dorthin kann man nicht scrollen, der Inhalt
+  ist unerreichbar weg. `align-items: safe center` zentriert nur solange
+  Platz da ist und fällt sonst auf `flex-start` zurück. Die einfache
+  `center`-Zeile bleibt als Rückfall für ältere Browser davor stehen.
 - **Glaubwürdiger 3D-Look für den Tisch, reines CSS** (`public/style.css`/
   `app.js`, keine neue Engine/kein Canvas/WebGL – die App bleibt reines
   Server-gerendertes HTML/CSS/JS ohne Build-Schritt, siehe Struktur oben):

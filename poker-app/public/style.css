@@ -50,7 +50,15 @@ body {
   color: var(--text);
   font-family: var(--font-body);
   display: flex;
+  /* "safe" ist hier der entscheidende Teil: Ein zentriertes Flex-Kind, das
+     höher als der Viewport ist, wird sonst OBEN abgeschnitten – und der
+     abgeschnittene Rand lässt sich nicht wegscrollen, weil der Überlauf
+     auf der falschen Seite entsteht. Mit "safe center" fällt die
+     Ausrichtung in genau diesem Fall auf "start" zurück, der Anfang
+     bleibt also erreichbar. Die Zeile davor bleibt als Rückfallebene für
+     Browser ohne safe-Unterstützung stehen. */
   align-items: center;
+  align-items: safe center;
   justify-content: center;
   padding: var(--body-pad-y) var(--body-pad-x);
   position: relative;
@@ -422,77 +430,180 @@ h2 {
 }
 
 /* --- Hauptmenü-Lobby ------------------------------------------------------
-   Statt einer einzelnen langen Knopf-Liste gruppiert die Lobby die
-   Spielmodi in klar beschriftete Abschnitte, wie die Kategorien einer
-   echten Casino-Lobby (Poker-Pit, Automaten, Turnierbereich …): jede
-   Kategorie hat eine eigene Farbe, die sich konsequent durch Sektions-Label,
-   Knöpfe und später auch die Badges am Tisch zieht (siehe .btn-mode-*/
-   .*-badge weiter unten) – Gold ist damit exklusiv für Ranked reserviert,
-   statt wie zuvor mehrere Knöpfe gleichzeitig gold-ähnlich aufblitzen zu
-   lassen. */
-.lobby-section {
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+   Zwei Spalten ab 900px: links Identität, Name und der eigene Tisch,
+   rechts die Spielmodi als Raster. Darunter einspaltig. Die Modi sind
+   bewusst KEINE gleich großen Knöpfe mehr – Ranked 1v1v1v1 ist der
+   Einstieg, den die meisten suchen, und bekommt deshalb als einziges Feld
+   doppelte Breite und mehr Gewicht. */
+
+.lobby {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: 1fr;
+  text-align: left;
 }
 
-.lobby-section-label {
-  display: flex;
+@media (min-width: 900px) {
+  .lobby {
+    grid-template-columns: minmax(300px, 380px) 1fr;
+    gap: 34px;
+    align-items: stretch;
+    /* Auf großen Bildschirmen bleibt sonst oben und unten ein breiter
+       leerer Streifen stehen. min-height ist genau die verfügbare Höhe
+       (Viewport minus body-Padding), also wächst die Lobby in den Platz
+       hinein, ohne je eine Bildlaufleiste zu erzeugen. Der Deckel bei
+       760px verhindert, dass die Modus-Karten auf sehr hohen Fenstern
+       zu leeren Flächen auseinandergezogen werden. */
+    min-height: min(680px, calc(100dvh - 2 * var(--body-pad-y)));
+  }
+
+  /* Das Panel füllt seine Spalte. Die überschüssige Höhe verteilt sich
+     gleichmäßig auf die drei Trennstellen (eigener Tisch, Links,
+     Rechtstexte), statt als ein einzelnes Loch am Fuß zu stehen –
+     drei gleiche auto-Ränder teilen den Rest unter sich auf. */
+  .lobby-intro {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .lobby-intro .lobby-block,
+  .lobby-intro .lobby-links,
+  .lobby-intro .legal-footer {
+    margin-top: auto;
+    padding-top: 18px;
+  }
+
+  /* Die überschüssige Höhe verteilt sich auf die Modus-Zeilen, statt als
+     Leerraum unter dem Raster zu bleiben. */
+  .lobby .lobby-modes {
+    align-content: stretch;
+  }
+}
+
+.lobby-intro,
+.lobby-modes {
+  min-width: 0;
+}
+
+.lobby-intro {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  padding: 26px 24px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+}
+
+/* In der Lobby steht die Marke linksbündig über dem übrigen Text – die
+   allgemeine .brand-Regel weiter oben zentriert, weil sie in den
+   schmalen Panels der anderen Bildschirme sitzt. */
+.lobby-intro .brand {
+  justify-content: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.brand-chip {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  margin-bottom: 12px;
-}
-
-.lobby-section-label-ranked {
-  color: var(--accent-bright);
-}
-
-.lobby-section-label-casual {
-  color: #8ff0c0;
-}
-
-.lobby-section-label-practice {
-  color: var(--info);
-}
-
-.lobby-chip-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  flex: none;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.4);
+  background: radial-gradient(circle at 35% 30%, var(--accent-bright), var(--accent) 70%);
+  box-shadow: 0 4px 14px rgba(232, 191, 74, 0.4);
 }
 
-.lobby-chip-dot-table {
-  background: radial-gradient(circle at 35% 30%, #e8e4d8, #9a9484 75%);
+.brand-chip-suit {
+  width: 20px;
+  height: 20px;
+  fill: #21201a;
 }
 
-.lobby-chip-dot-ranked {
-  background: radial-gradient(circle at 35% 30%, var(--accent-bright), var(--accent) 75%);
+#join-screen h1 {
+  font-size: clamp(1.7rem, 1.2rem + 1.6vw, 2.4rem);
+  font-weight: 800;
+  line-height: 1.05;
+  /* Der einmalige Glanz über den Titel bleibt der einzige Effekt ohne
+     Nutzerauslöser auf diesem Bildschirm. */
+  background: linear-gradient(100deg, var(--text) 30%, var(--accent-bright) 45%, var(--text) 60%);
+  background-size: 240% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: title-shimmer 3.2s ease-in-out 0.3s 1;
 }
 
-.lobby-chip-dot-casual {
-  background: radial-gradient(circle at 35% 30%, #8ff0c0, var(--success) 75%);
+@keyframes title-shimmer {
+  to {
+    background-position: -40% 0;
+  }
 }
 
-.lobby-chip-dot-practice {
-  background: radial-gradient(circle at 35% 30%, #cfe0ff, var(--info) 75%);
+.lobby-claim {
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  margin: 0 0 18px;
 }
 
-.lobby-footer {
-  margin-top: 22px;
+.lobby-block {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lobby-block h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.lobby-block p {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.account-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#name-input {
+  flex: 1 1 150px;
+  min-width: 0;
+  text-align: left;
+}
+
+#room-code-input {
+  flex: 0 1 130px;
+  min-width: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+.join-row {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lobby-links {
+  margin-top: 20px;
   padding-top: 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
-  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .rank-label {
@@ -501,12 +612,159 @@ h2 {
   margin-top: 10px;
 }
 
-.join-row {
-  margin-top: 14px;
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  flex-wrap: wrap;
+/* --- Spielmodi als Karten ------------------------------------------------- */
+
+.lobby-modes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  align-content: start;
+}
+
+.mode-card {
+  --tint: var(--accent);
+  --tint-bright: var(--accent-bright);
+  display: grid;
+  grid-template-areas:
+    'mark kind'
+    'mark name'
+    'note note';
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 14px;
+  padding: 18px 18px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Dieselbe Material-Anmutung wie die Knöpfe am Tisch: ein Lichtsaum
+     oben, eine farbige Kante unten, kein flaches Feld. */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.22)),
+    var(--panel);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 10px 24px -14px rgba(0, 0, 0, 0.8);
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.mode-card:hover,
+.mode-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--tint) 55%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 16px 30px -16px rgba(0, 0, 0, 0.9),
+    0 0 0 1px color-mix(in srgb, var(--tint) 35%, transparent);
+}
+
+.mode-card:active {
+  transform: translateY(0);
+}
+
+/* Volle Breite für die Karten, die allein in ihrer Zeile stehen. Jede
+   Zeile bleibt dadurch bei EINER Spielart – sonst stünden Ranked und
+   Casual nebeneinander und die Farbcodierung liefe ins Leere. Ranked
+   1v1v1v1 ist zusätzlich der Einstieg, den die meisten suchen: größere
+   Marke, kräftigerer Farbrand. */
+.mode-card-hero,
+.mode-card-wide {
+  grid-column: 1 / -1;
+}
+
+.mode-card-hero {
+  padding: 24px 22px 20px;
+  border-color: color-mix(in srgb, var(--tint) 45%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tint) 14%, transparent), rgba(0, 0, 0, 0.24)),
+    var(--panel);
+}
+
+.mode-mark {
+  grid-area: mark;
+  width: 56px;
+  height: 40px;
+  fill: var(--tint-bright);
+  flex: 0 0 auto;
+}
+
+.mode-card-hero .mode-mark {
+  width: 78px;
+  height: 56px;
+}
+
+/* Umrandet statt gefüllt – markiert die Bot-Gegner. */
+.mode-mark-hollow {
+  fill: none;
+  stroke: var(--tint-bright);
+  /* Die Symbole werden von 24px auf 14px verkleinert, die Linienstärke
+     schrumpft dabei mit – deshalb bewusst kräftiger angesetzt. */
+  stroke-width: 2.4;
+  opacity: 0.8;
+}
+
+.mode-kind {
+  grid-area: kind;
+  font-size: 0.78rem;
+  color: var(--tint-bright);
+  font-weight: 600;
+}
+
+.mode-name {
+  grid-area: name;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.mode-card-hero .mode-name {
+  font-size: 1.7rem;
+}
+
+.mode-note {
+  grid-area: note;
+  margin-top: 10px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.mode-card-ranked {
+  --tint: var(--accent);
+  --tint-bright: var(--accent-bright);
+}
+
+.mode-card-casual {
+  --tint: var(--success);
+  --tint-bright: #8ff0c0;
+}
+
+.mode-card-practice {
+  --tint: var(--info);
+  --tint-bright: #cfe0ff;
+}
+
+/* Sehr schmale Geräte: zwei Modus-Karten nebeneinander werden zu eng. */
+@media (max-width: 520px) {
+  .lobby-modes {
+    grid-template-columns: 1fr;
+  }
+  .mode-card,
+  .mode-card-hero {
+    padding: 16px;
+  }
+  .mode-card-hero .mode-mark {
+    width: 62px;
+    height: 44px;
+  }
+  .mode-card-hero .mode-name {
+    font-size: 1.4rem;
+  }
+}
+
+/* Der Sprite selbst wird nie gezeichnet, nur seine Symbole referenziert. */
+.suit-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
 }
 
 /* --- Buttons ------------------------------------------------------------ */
@@ -559,33 +817,6 @@ button:disabled {
 
 .btn-ghost:not(:disabled):active {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-/* Ein Knopf-Stil pro Modus-KATEGORIE statt pro einzelnem Modus: 1v1v1v1 und
-   2v2 derselben Kategorie sehen jetzt bewusst gleich aus (Unterschied steht
-   im Text), damit Farbe eindeutig "Ranked"/"Casual"/"Üben" bedeutet statt
-   fünf beliebig unterschiedlicher Verläufe nebeneinander um Aufmerksamkeit
-   zu konkurrieren. Dieselben drei Farben ziehen sich weiter zu den
-   Tisch-Badges (.ranked-badge etc. weiter unten). */
-.btn-mode {
-  width: 100%;
-}
-
-.btn-mode-ranked {
-  background: linear-gradient(135deg, var(--accent-bright), var(--accent));
-  box-shadow: 0 3px 0 #a3801f, 0 10px 22px -8px rgba(232, 191, 74, 0.55);
-}
-
-.btn-mode-casual {
-  background: linear-gradient(135deg, #8ff0c0, var(--success));
-  color: #0a2417;
-  box-shadow: 0 3px 0 #1f8a5c, 0 10px 22px -8px rgba(53, 214, 138, 0.5);
-}
-
-.btn-mode-practice {
-  background: linear-gradient(135deg, #cfe0ff, var(--info));
-  color: #10192b;
-  box-shadow: 0 3px 0 #34506e, 0 10px 22px -8px rgba(111, 180, 255, 0.5);
 }
 
 .btn-small {
@@ -739,6 +970,10 @@ button:disabled {
   font-size: 0.78rem;
 }
 
+.lobby-intro .legal-footer {
+  justify-content: flex-start;
+}
+
 .legal-footer a {
   color: var(--text-dim);
   text-decoration: none;
@@ -868,7 +1103,7 @@ button:disabled {
   }
 }
 
-/* Dieselbe Farb-Kategorie wie in der Lobby (siehe .btn-mode-* weiter oben):
+/* Dieselbe Farb-Kategorie wie in der Lobby (siehe .mode-card-* weiter oben):
    Ranked-Badges immer gold, Casual-Badges immer grün, Bot-Badge immer blau –
    egal ob 1v1v1v1 oder 2v2, damit die Kategorie am Tisch auf den ersten
    Blick genauso erkennbar ist wie schon beim Modus-Auswählen im Menü. */
@@ -879,8 +1114,7 @@ button:disabled {
 .bots-badge {
   font-family: var(--font-display);
   font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  font-weight: 700;
   padding: 4px 10px;
   border-radius: 999px;
 }
@@ -1843,7 +2077,7 @@ button:disabled {
    Eine Reihe aus vier Karten neben den eigenen Hole Cards, eine je Kategorie
    (Karten/Wette-Pot/Info-Gegner/Ressourcen). Bewusst auffällig statt
    dezent: jede Kategorie bekommt denselben kräftigen Verlauf + "3D"-Kanten-
-   Schatten wie die Modus-Knöpfe im Hauptmenü (.btn-mode-ranked etc.) und
+   Schatten wie die Modus-Karten im Hauptmenü (.mode-card-ranked etc.) und
    die Wettrunden-Buttons (.btn-fold/.btn-call/.btn-raise), plus einen
    pulsierenden Farb-Glow (wie .seat.acting), solange die Karte noch
    einsetzbar ist – zieht den Blick genauso auf sich wie der pulsierende
@@ -1938,8 +2172,8 @@ button:disabled {
 
 /* Kategorie-Farben: derselbe kräftige Verlauf + dunkle "3D"-Kante wie die
    bestehenden Modus-/Aktions-Knöpfe mit vergleichbarer Bedeutung
-   (Gold=.btn-mode-ranked, Rot=.btn-fold, Blau=.btn-mode-practice,
-   Grün=.btn-mode-casual/.btn-call) – dieselbe Zuordnung wie
+   (Gold=.mode-card-ranked, Rot=.btn-fold, Blau=.mode-card-practice,
+   Grün=.mode-card-casual/.btn-call) – dieselbe Zuordnung wie
    ABILITY_CATEGORY_LABELS in app.js. Dunkler Text statt var(--text), da
    alle vier Verläufe hell genug für guten Kontrast sind. */
 .ability-card.ability-cards {
