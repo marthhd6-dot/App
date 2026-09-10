@@ -49,6 +49,10 @@ class Table {
       hasActed: false,
       disconnected: false,
       totalContributed: 0,
+      // true, solange der Spieler keine Chips mehr hat: Er bleibt am Tisch
+      // sichtbar, bekommt aber keine Karten und nimmt an der Hand nicht
+      // teil (siehe startHand()).
+      sittingOut: false,
       abilities: null, // erst ab der ersten Hand zugewiesen, siehe startHand()
     });
   }
@@ -82,9 +86,18 @@ class Table {
     return oldId;
   }
 
+  // Startet eine Hand mit allen Spielern, die noch Chips haben. Wer bei 0
+  // Chips steht, setzt diese Hand aus (sittingOut): Er bekommt keine Karten
+  // und wird für die gesamte Wettlogik wie ein gefoldeter Spieler behandelt.
+  // Vorher wurde er ganz normal mit eingeteilt, galt wegen 0 Chips sofort
+  // als all-in mit 0 Einsatz und lief bis zum Showdown mit, konnte dort
+  // aber nichts gewinnen (kein Pot-Layer enthält ihn, siehe _computePots) –
+  // ein Geisterspieler, der in Räumen ohne Ausscheiden-Logik dauerhaft
+  // einen Platz blockierte.
   startHand() {
-    if (this.players.length < 2) {
-      throw new Error('Mindestens 2 Spieler nötig, um eine Hand zu starten.');
+    const inHand = this.players.filter((p) => p.chips > 0);
+    if (inHand.length < 2) {
+      throw new Error('Mindestens 2 Spieler mit Chips nötig, um eine Hand zu starten.');
     }
     this.deck = shuffle(createDeck());
     this.communityCards = [];
@@ -93,28 +106,36 @@ class Table {
     this.lastHandResult = null;
     this.players.forEach((p) => {
       p.holeCards = [];
-      p.folded = false;
+      p.sittingOut = p.chips <= 0;
+      // Aussetzende Spieler zählen wie gefoldet: So greifen ohne weitere
+      // Sonderfälle alle bestehenden Prüfungen (_nextActiveIndex,
+      // isBettingRoundComplete, _computePots), die "gefoldet" bereits
+      // korrekt übergehen.
+      p.folded = p.sittingOut;
       p.isAllIn = false;
       p.bet = 0;
       p.hasActed = false;
       p.totalContributed = 0;
       // Jede Hand neu: eine frische, ungenutzte Fähigkeit pro Kategorie
       // (Karten/Wette-Pot/Info-Gegner/Ressourcen), siehe abilities.js.
-      p.abilities = assignAbilities();
+      p.abilities = p.sittingOut ? null : assignAbilities();
     });
     // Wer in dieser Hand wessen Karte "spioniert" hat (siehe useAbility()
     // unten) – pro Hand neu, gilt nur bis zum nächsten startHand().
     this.spyReveals = [];
 
-    // Dealer-Button vor jeder Hand außer der ersten weiterrücken
-    if (this._firstHandDealt) {
-      this.dealerIndex = (this.dealerIndex + 1) % this.players.length;
+    // Dealer-Button vor jeder Hand außer der ersten weiterrücken – dabei
+    // aussetzende Spieler überspringen, damit Blinds nicht auf einen
+    // Platz ohne Chips fallen.
+    if (this._firstHandDealt || this.players[this.dealerIndex].sittingOut) {
+      this.dealerIndex = this._nextInHandIndex(this.dealerIndex);
     }
     this._firstHandDealt = true;
 
     // Hole Cards austeilen (zwei Runden, wie am echten Tisch)
     for (let round = 0; round < 2; round++) {
       for (const p of this.players) {
+        if (p.sittingOut) continue;
         const { drawn, remaining } = draw(this.deck, 1);
         this.deck = remaining;
         p.holeCards.push(drawn[0]);
@@ -124,11 +145,27 @@ class Table {
     this._postBlinds();
   }
 
-  _postBlinds() {
+  // Nächster Platz nach fromIndex, der in dieser Hand tatsächlich mitspielt.
+  // Fällt auf fromIndex zurück, wenn es keinen gibt (kann nach der Prüfung
+  // in startHand() nicht vorkommen, verhindert aber eine Endlosschleife).
+  _nextInHandIndex(fromIndex) {
     const n = this.players.length;
+    for (let step = 1; step <= n; step++) {
+      const idx = (fromIndex + step) % n;
+      if (!this.players[idx].sittingOut) return idx;
+    }
+    return fromIndex;
+  }
+
+  _postBlinds() {
+    // Zählt nur die Spieler, die in dieser Hand tatsächlich mitspielen
+    // (siehe sittingOut in startHand()) – sonst griffe die
+    // Heads-up-Sonderregel nicht mehr, sobald ein dritter Spieler ohne
+    // Chips nur noch am Tisch sitzt.
+    const inHandCount = this.players.filter((p) => !p.sittingOut).length;
     // Heads-up-Sonderregel: Der Dealer ist gleichzeitig Small Blind.
-    const sbIndex = n === 2 ? this.dealerIndex : (this.dealerIndex + 1) % n;
-    const bbIndex = n === 2 ? (this.dealerIndex + 1) % n : (this.dealerIndex + 2) % n;
+    const sbIndex = inHandCount === 2 ? this.dealerIndex : this._nextInHandIndex(this.dealerIndex);
+    const bbIndex = this._nextInHandIndex(sbIndex);
 
     this._postBlind(sbIndex, this.smallBlind);
     this._postBlind(bbIndex, this.bigBlind);
@@ -423,6 +460,7 @@ class Table {
     const potShare = this._applyPotBonusIfActive(winner, amount);
     winner.chips += potShare;
     this.pot = 0;
+    this._clearBets();
     this.phase = 'showdown';
     this.actingIndex = -1;
     this.lastHandResult = {
@@ -505,9 +543,21 @@ class Table {
     });
 
     this.pot = 0;
+    this._clearBets();
     this.phase = 'showdown';
     this.lastHandResult = { reason: 'showdown', pots: potResults };
     return { pots: potResults };
+  }
+
+  // Setzt die Einsätze der laufenden Wettrunde zurück, sobald eine Hand
+  // beendet ist. Diese Chips liegen zu dem Zeitpunkt längst im Pot bzw.
+  // sind schon ausgezahlt – ohne das Zurücksetzen zeigte der Sitzplatz
+  // aber bis zum Start der nächsten Hand weiter "Einsatz: 10" an, als
+  // stünde noch Geld im Spiel.
+  _clearBets() {
+    this.players.forEach((p) => {
+      p.bet = 0;
+    });
   }
 
   // Teilt den Pot anhand der Gesamteinsätze (totalContributed) aller
@@ -596,6 +646,9 @@ class Table {
           folded: p.folded,
           isAllIn: p.isAllIn,
           disconnected: p.disconnected,
+          // Damit der Client "Pleite" statt "Fold" anzeigen kann – technisch
+          // ist beides folded, gemeint ist aber etwas völlig anderes.
+          sittingOut: p.sittingOut,
           holeCards: visible ? p.holeCards : null,
           spiedCard: spied ? p.holeCards[spied.cardIndex] : null,
           // Die eigenen Fähigkeits-Karten (siehe abilities.js) sind privat –

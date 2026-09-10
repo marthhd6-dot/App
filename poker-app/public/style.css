@@ -17,6 +17,11 @@
   --wood: #3a2416;
   --font-display: 'Outfit', 'Segoe UI', sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Als Variablen statt fest im body-Padding, weil #table-screen seine Höhe
+     exakt auf "Viewport minus dieses Padding" rechnet (siehe dort) – beide
+     Werte müssen dafür zwingend übereinstimmen. */
+  --body-pad-y: 24px;
+  --body-pad-x: 16px;
 }
 
 * {
@@ -47,7 +52,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px;
+  padding: var(--body-pad-y) var(--body-pad-x);
   position: relative;
   overflow-x: hidden;
 }
@@ -213,9 +218,40 @@ h2 {
   z-index: 1;
 }
 
+/* Der Tisch-Screen füllt exakt den sichtbaren Bereich und verteilt ihn als
+   Flex-Spalte: Kopfzeile, eigene Karten, Fähigkeiten und Aktions-Leiste
+   behalten ihre natürliche Höhe, der Tisch selbst (.table-felt) nimmt den
+   Rest und schrumpft mit. Vorher hatte der Tisch ein festes
+   Seitenverhältnis und schob die Aktions-Leiste auf JEDER Bildschirmgröße
+   unter die Falz – man musste mitten in der Hand scrollen, um überhaupt
+   Fold/Check/Call zu erreichen.
+   dvh statt vh: Auf Mobilgeräten zählt vh die ein-/ausblendbare
+   Browserleiste mit, wodurch die Aktions-Leiste genau dann verdeckt wäre,
+   wenn die Leiste eingeblendet ist. Die vh-Zeile davor bleibt als
+   Rückfallebene für Browser ohne dvh-Unterstützung stehen.
+   padding-inline: Die Sitzplätze ragen konstruktionsbedingt über die
+   Filzkante hinaus (Mittelpunkt bei 44% Radius, halbe Sitzbreite 64px,
+   siehe seatPositionByOrderedIndex in app.js) – ohne diesen Reservestreifen
+   ragen sie zwischen ~640px und ~830px Fensterbreite seitlich aus dem
+   Viewport. */
 #table-screen {
   max-width: 900px;
   margin: 0 auto;
+  padding-inline: 28px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 2 * var(--body-pad-y));
+  height: calc(100dvh - 2 * var(--body-pad-y));
+}
+
+/* Kopfzeile, eigene Karten, Fähigkeiten und Aktions-Leiste behalten ihre
+   Höhe; nur der Tisch gibt nach. */
+#table-screen > .table-header,
+#table-screen > .my-hand,
+#table-screen > .action-bar,
+#table-screen > .error-banner,
+#table-screen > .hand-result {
+  flex: 0 0 auto;
 }
 
 /* max-width + margin: 0 auto zentrieren jedes .panel innerhalb seines
@@ -297,7 +333,7 @@ h2 {
 
 #join-screen input,
 .modal-overlay input,
-.bet-control input {
+#bet-amount-input {
   font-family: var(--font-body);
   font-size: 1rem;
   padding: 11px 14px;
@@ -311,13 +347,13 @@ h2 {
 
 #join-screen input::placeholder,
 .modal-overlay input::placeholder,
-.bet-control input::placeholder {
+#bet-amount-input::placeholder {
   color: rgba(243, 242, 236, 0.4);
 }
 
 #join-screen input:focus,
 .modal-overlay input:focus,
-.bet-control input:focus {
+#bet-amount-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(232, 191, 74, 0.18);
 }
@@ -639,6 +675,16 @@ button:disabled {
   background: linear-gradient(135deg, #d9a6ff, var(--accent-bright));
 }
 
+.rebuy-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: linear-gradient(135deg, #ffc98a, #e08a2b);
+  color: #2b1a06;
+}
+
 /* Cookie-/Speicher-Hinweis: schwebt fix am unteren Bildschirmrand, bis er
    einmalig bestätigt wird (siehe COOKIE_CONSENT_KEY in app.js). */
 .cookie-banner {
@@ -761,7 +807,7 @@ button:disabled {
   gap: 14px;
   align-items: center;
   justify-content: center;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
   background: rgba(0, 0, 0, 0.26);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -787,6 +833,31 @@ button:disabled {
 .current-bet-label {
   color: var(--text-dim);
   font-size: 0.9rem;
+}
+
+/* Countdown der Bedenkzeit (siehe TURN_TIMEOUT_MS im Server): normal
+   dezent, in den letzten Sekunden auffällig rot pulsierend. */
+.turn-timer {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.turn-timer-urgent {
+  color: #fff;
+  background: var(--danger);
+  animation: turn-timer-pulse 1s ease-in-out infinite;
+}
+
+@keyframes turn-timer-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 
 /* Dieselbe Farb-Kategorie wie in der Lobby (siehe .btn-mode-* weiter oben):
@@ -832,12 +903,20 @@ button:disabled {
    .felt-surface, die als einzige beschnitten wird ("overflow: hidden") –
    so können Sitzplätze am Rand optisch auf der Holzkante sitzen, statt
    hart abgeschnitten zu werden. */
+/* Kein festes aspect-ratio mehr: Der Tisch ist Flex-Kind von #table-screen
+   und bekommt die Höhe, die nach Kopfzeile/Karten/Aktions-Leiste übrig
+   bleibt (min-height: 0 erlaubt das Schrumpfen unter die Inhaltshöhe).
+   Weil die Sitzplätze in Prozent seiner Box positioniert werden (siehe
+   renderSeats() in app.js), wandern sie automatisch mit – das Oval bleibt
+   in jeder Größe stimmig, statt die Seite über den Bildschirm hinaus zu
+   verlängern. */
 .table-felt {
   position: relative;
   width: 100%;
   max-width: 760px;
-  aspect-ratio: 16 / 10;
-  margin: 0 auto 28px;
+  flex: 1 1 auto;
+  min-height: 200px;
+  margin: 0 auto 14px;
 }
 
 /* Weicher, breiter Schlagschatten des ganzen Tisches auf den Hintergrund –
@@ -1428,6 +1507,13 @@ button:disabled {
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* Deutlich auffälliger als ein Fold: "Pleite" heißt, dass der Platz bis
+   zum Nachkaufen gar nicht mehr mitspielt (siehe sittingOut in table.js). */
+.badge-broke {
+  background: linear-gradient(135deg, #ffb46b, #d97a1f);
+  color: #2b1a06;
+}
+
 .badge-disconnected {
   background: var(--danger);
   color: white;
@@ -1588,7 +1674,7 @@ button:disabled {
 }
 
 .my-hand {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .my-hand h2 {
@@ -1598,7 +1684,7 @@ button:disabled {
   letter-spacing: 0.08em;
   color: var(--text-dim);
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 /* Teammitglied-Karten im 2v2-Casual-Modus (siehe extraVisibleIds in
@@ -1645,7 +1731,7 @@ button:disabled {
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .ability-card {
@@ -1809,16 +1895,11 @@ button:disabled {
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  margin-top: 22px;
+  margin-top: 10px;
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
-  padding: 14px 16px;
-}
-
-.bet-control {
-  display: inline-flex;
-  gap: 6px;
+  padding: 10px 12px;
 }
 
 /* Bet-Schieberegler + ¼/½-Pot-/All-In-Schnellwahl: eigene, volle Zeile
@@ -1829,8 +1910,8 @@ button:disabled {
   flex-basis: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 4px;
+  gap: 4px;
+  margin-bottom: 2px;
   transition: opacity 0.15s ease;
 }
 
@@ -1861,21 +1942,40 @@ button:disabled {
 /* Eigener Chip-artiger Slider-"Daumen" statt des Browser-Standards, damit
    der Regler zum Rest der Casino-Optik passt (Gold-Verlauf wie ein
    Poker-Chip, siehe .chip-stack-mini). */
+/* Das Eingabe-Element selbst ist bewusst 32px hoch und durchsichtig, die
+   sichtbare 6px-Schiene wird über ::-*-track gemalt: Vorher war das ganze
+   Element nur 6px hoch – also exakt so groß wie die dünne Linie – und
+   damit auf Touch-Geräten kaum zu treffen. */
 #bet-amount-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
   max-width: 360px;
+  height: 32px;
+  background: transparent;
+  outline: none;
+}
+
+#bet-amount-slider::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.4);
-  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+#bet-amount-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 #bet-amount-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
+  /* Hebt den Daumen mittig auf die 6px-Schiene (halbe Daumenhöhe minus
+     halbe Schienenhöhe). */
+  margin-top: -8px;
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -1904,13 +2004,21 @@ button:disabled {
   font-weight: 800;
   font-size: 1rem;
   color: var(--accent-bright);
-  min-width: 48px;
-  text-align: left;
+  width: 86px;
+  flex: 0 0 auto;
+  text-align: center;
+  padding: 8px 6px;
+  /* Die Standard-Spinner von type="number" sind auf Touch-Geräten winzig
+     und würden hier nur Platz kosten – der Regler daneben übernimmt das
+     schrittweise Verstellen. */
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
-.bet-control input {
-  width: 116px;
-  padding: 10px 12px;
+.bet-amount-value::-webkit-outer-spin-button,
+.bet-amount-value::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* --- Freundesliste ----------------------------------------------------------- */
@@ -2225,8 +2333,14 @@ button:disabled {
 /* --- Responsive -------------------------------------------------------------- */
 
 @media (max-width: 640px) {
-  .table-felt {
-    aspect-ratio: 3 / 4;
+  /* Schmalere Seitenränder: Auf Handys zählt jeder Pixel Tischfläche, und
+     die Sitzplätze sind hier ohnehin kleiner (siehe .seat weiter unten). */
+  :root {
+    --body-pad-y: 12px;
+    --body-pad-x: 10px;
+  }
+  #table-screen {
+    padding-inline: 4px;
   }
   .felt-surface,
   .felt-rail-sheen,
@@ -2337,4 +2451,372 @@ button:disabled {
     height: 45px;
     font-size: 0.78rem;
   }
+}
+
+/* Touch-Bedienung: Zeigergeräte ohne Feinsteuerung (Finger statt Maus)
+   brauchen laut WCAG 2.5.5 / Apple HIG mindestens ~44px hohe Ziele. Die
+   Knöpfe der Aktions-Leiste waren durchweg nur 31-40px hoch und damit im
+   Eifer des Gefechts leicht zu verfehlen – gerade Fold/Check/Call, wo ein
+   Fehlgriff die Hand kostet. Bewusst nur für coarse-Zeiger, damit die
+   Maus-/Desktop-Optik unverändert kompakt bleibt. */
+@media (pointer: coarse) {
+  .action-bar .btn,
+  .table-header .btn {
+    min-height: 44px;
+  }
+  .bet-sizer-quick .btn {
+    min-height: 40px;
+    padding-inline: 14px;
+  }
+  #bet-amount-input {
+    min-height: 44px;
+  }
+}
+
+
+
+/* Schmale Bildschirme: Die Kopfzeile über dem Tisch brach auf 375px in
+   vier Zeilen um (136px Höhe – mehr als die eigenen Karten) und schob so
+   den halben Tisch aus dem Bild. Kleinere Schrift, engere Abstände, und
+   der Hinweis auf den aktuellen Einsatz entfällt: Pot-Anzeige und die
+   Einsatz-Schilder an den Sitzplätzen zeigen dieselbe Information bereits
+   direkt am Tisch. */
+@media (max-width: 640px) {
+  .table-header {
+    gap: 6px;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+  }
+  .room-code-label {
+    font-size: 0.8rem;
+  }
+  .phase-label {
+    font-size: 0.88rem;
+  }
+  .current-bet-label {
+    display: none;
+  }
+  .table-header .btn {
+    padding: 6px 10px;
+  }
+}
+
+/* Niedrige Bildschirme (z. B. iPhone SE mit 667px, ältere Android-Geräte):
+   Hier reicht die Höhe nicht für Überschrift, große Karten und die
+   ausführlichen Fähigkeiten-Karten gleichzeitig. Statt zu scrollen wird
+   alles Feste flacher – der Tisch bleibt dadurch spielbar groß. */
+@media (max-height: 740px) {
+  .table-felt {
+    min-height: 170px;
+    margin-bottom: 8px;
+  }
+  #my-hand h2 {
+    display: none;
+  }
+  .my-card-row .card {
+    width: 56px;
+    height: 78px;
+    font-size: 1.35rem;
+  }
+  .ability-row {
+    margin-top: 6px;
+    gap: 6px;
+  }
+  .ability-card {
+    width: 66px;
+    padding: 5px 3px 4px;
+  }
+  .ability-card-category {
+    display: none;
+  }
+  .ability-card-icon {
+    font-size: 1.3rem;
+  }
+  .ability-card-name {
+    font-size: 0.62rem;
+  }
+  .action-bar {
+    margin-top: 6px;
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .action-bar .btn {
+    padding: 8px 12px;
+  }
+}
+
+/* Querformat auf Handys (niedrige, breite Fenster): Hier bleiben nach
+   Kopfzeile, eigenen Karten, Fähigkeiten und Aktions-Leiste sonst nur
+   wenige Pixel für den Tisch übrig. Deshalb rücken die eigenen Karten und
+   die Fähigkeiten neben den Tisch statt darunter, und die festen Elemente
+   werden flacher – so bleibt der Tisch auch gedreht spielbar, statt dass
+   man scrollen muss. */
+@media (orientation: landscape) and (max-height: 560px) {
+  :root {
+    --body-pad-y: 6px;
+    --body-pad-x: 8px;
+  }
+  #table-screen {
+    max-width: none;
+    /* Reservestreifen für die seitlich überstehenden Sitzplätze, hier
+       schmaler als im Hochformat, weil .seat unten ebenfalls schrumpft. */
+    padding-inline: 26px;
+    display: grid;
+    grid-template-columns: 1fr minmax(190px, 250px);
+    grid-template-rows: auto 1fr auto;
+    column-gap: 10px;
+  }
+  /* Kopfzeile über beide Spalten, Tisch links über die volle Resthöhe,
+     eigene Karten und Aktions-Leiste rechts daneben. Ohne die explizite
+     Zeilenzuordnung landet die Aktions-Leiste in einer eigenen dritten
+     Zeile und drückt den Tisch auf die Höhe der Karten-Spalte zusammen. */
+  #table-screen > .table-header,
+  #table-screen > .error-banner,
+  #table-screen > .hand-result {
+    grid-column: 1 / -1;
+  }
+  .table-felt {
+    grid-column: 1;
+    grid-row: 2 / -1;
+    /* Der eigene Sitzplatz und der Dealer-Button sitzen am unteren Rand
+       des Ovals und ragen ein Stück darunter hinaus – im Hochformat fängt
+       das der Bereich mit den eigenen Karten auf, hier braucht es einen
+       eigenen Reservestreifen, sonst entsteht genau dadurch wieder eine
+       Scrollleiste. */
+    margin-bottom: 24px;
+    min-height: 0;
+  }
+  /* Rein dekorativ und ragt konstruktionsbedingt unter den Tisch (bottom:
+     -8%) – im knappen Querformat kostet das nur Platz. */
+  .table-drop-shadow {
+    display: none;
+  }
+  #my-hand {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+  }
+  #table-screen > .action-bar {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: end;
+  }
+  /* Im Querformat ist rechts nur Platz für die eigenen Karten – die
+     Showdown-Karten der Gegner sind ohnehin an deren Sitzplätzen zu sehen. */
+  #showdown-reveal {
+    display: none;
+  }
+  .seat {
+    width: 96px;
+  }
+  .table-header {
+    margin-bottom: 4px;
+    padding: 4px 8px;
+    gap: 6px;
+    font-size: 0.85rem;
+  }
+  /* Der aktuelle Einsatz steht ohnehin an den Sitzplätzen und am Pot – in
+     der einzeiligen Querformat-Kopfzeile kostet er nur die Zeile, die
+     sonst umbricht und den Tisch verkleinert. */
+  .current-bet-label {
+    display: none;
+  }
+  .table-header .btn {
+    padding: 4px 8px;
+  }
+  .my-hand h2,
+  .teammate-hand {
+    display: none;
+  }
+  .my-card-row .card {
+    width: 40px;
+    height: 56px;
+    font-size: 0.95rem;
+  }
+  .ability-row {
+    margin-top: 6px;
+    gap: 5px;
+  }
+  .ability-card {
+    width: 48px;
+    padding: 3px 2px;
+  }
+  .ability-card-category,
+  .ability-card-status {
+    display: none;
+  }
+  .ability-card-icon {
+    font-size: 1.15rem;
+  }
+  .ability-card-name {
+    font-size: 0.55rem;
+  }
+  .action-bar {
+    margin-top: 4px;
+    padding: 5px 6px;
+    gap: 4px;
+  }
+  .action-bar .btn {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+  .bet-sizer {
+    gap: 2px;
+  }
+  #bet-amount-slider {
+    height: 24px;
+  }
+}
+
+/* --- Tisch-Chat ------------------------------------------------------------
+   Bewusst als schwebende Schublade und nicht als weiteres Element in der
+   Flex-Spalte von #table-screen: Der Tisch-Screen ist exakt auf die
+   Viewport-Höhe gerechnet (siehe dort), jedes zusätzliche Element im Fluss
+   würde die Aktions-Leiste wieder unter die Falz drücken. */
+.chat-drawer {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1200;
+  width: min(92vw, 320px);
+  max-height: min(60vh, 420px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+}
+
+.chat-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.chat-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+
+.chat-message-meta {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+}
+
+.chat-message-text {
+  /* Lange Wörter ohne Leerzeichen dürfen die Schublade nicht sprengen. */
+  overflow-wrap: anywhere;
+}
+
+.chat-message-own .chat-message-meta {
+  color: var(--accent-bright);
+}
+
+.chat-form {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chat-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  outline: none;
+}
+
+.chat-form input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(232, 191, 74, 0.18);
+}
+
+/* Zähler ungelesener Nachrichten am Chat-Knopf in der Kopfzeile. */
+.chat-unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 3px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+/* --- Poker-Hilfe ------------------------------------------------------------ */
+
+.help-panel {
+  text-align: left;
+  max-height: 86vh;
+  overflow-y: auto;
+}
+
+.help-panel h1 {
+  text-align: center;
+}
+
+.help-panel h2 {
+  font-size: 1rem;
+  margin-top: 18px;
+  margin-bottom: 6px;
+  color: var(--accent-bright);
+}
+
+.help-hands {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.help-hands strong {
+  color: var(--text);
+}
+
+.help-text {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  margin: 0;
+  padding-left: 0;
+}
+
+ul.help-text {
+  padding-left: 20px;
+}
+
+.help-text strong {
+  color: var(--text);
 }

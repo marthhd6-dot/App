@@ -794,6 +794,72 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   "Native Apps" oben), damit es tatsächlich in die iOS/Android-Projekte
   eingebunden wird.
 
+- **Bildschirmfüllendes Tisch-Layout** (`#table-screen` in `style.css`):
+  Der Tisch-Screen ist eine Flex-Spalte über die exakte Viewport-Höhe
+  (`100dvh` abzüglich des `body`-Paddings, deshalb liegen dessen Werte als
+  `--body-pad-y`/`--body-pad-x` in `:root`). Kopfzeile, eigene Karten,
+  Fähigkeiten und Aktions-Leiste behalten ihre Höhe, `.table-felt` nimmt
+  als einziges Element den Rest und schrumpft mit – dadurch sind Tisch,
+  eigene Karten und Fold/Check/Call auf jeder Bildschirmgröße gleichzeitig
+  sichtbar, ohne zu scrollen. Vorher hatte der Tisch ein festes
+  Seitenverhältnis und schob die Aktions-Leiste ausnahmslos überall unter
+  die Falz. Zwei Sonderfälle: `padding-inline` am Tisch-Screen reserviert
+  Platz für die Sitzplätze, die konstruktionsbedingt seitlich über die
+  Filzkante hinausragen (sonst ragten sie zwischen ~640px und ~830px
+  Fensterbreite aus dem Viewport), und im **Querformat** (`orientation:
+  landscape` mit geringer Höhe) wechselt der Screen auf ein Raster mit
+  Tisch links und Karten/Fähigkeiten/Aktionen rechts daneben.
+- **Touch-Zielgrößen**: Unter `@media (pointer: coarse)` sind die Knöpfe
+  der Aktions-Leiste mindestens 44px hoch (WCAG 2.5.5). Der
+  Bet-Schieberegler ist jetzt ein 32px hohes, transparentes Element mit
+  gemalter 6px-Schiene (`::-webkit-slider-runnable-track`) – vorher war das
+  Element selbst nur so hoch wie die dünne Linie und damit kaum zu treffen.
+  Die beiden getrennten Zahlenfelder für Bet und Raise wurden durch ein
+  gemeinsames Feld direkt neben dem Regler ersetzt: Beide Aktionen nutzen
+  denselben Betrag, und die doppelte Eingabe kostete eine ganze Zeile.
+- **Pleite-Spieler & Nachkaufen**: Wer keine Chips mehr hat, setzt die Hand
+  aus (`sittingOut` in `table.js`) statt mit 0 Chips als "all-in" bis zum
+  Showdown mitzulaufen, ohne je etwas gewinnen zu können. In normalen
+  Räumen (eigener Code/Freundes-Einladung) bietet ein Banner
+  `💰 1000 Chips nachkaufen` an (`socket.on('rebuy')`); in den
+  Matchmaking-Modi bewusst nicht, dort ist das Ausscheiden Teil der
+  Wertung.
+- **Zug-Zeitlimit** (`TURN_TIMEOUT_MS`, Standard 45s, per Umgebungsvariable
+  überschreibbar): Läuft die Bedenkzeit ab, führt der Server automatisch
+  Check aus (falls nichts nachzuzahlen ist) bzw. Fold. Ohne das blockierte
+  ein verbundener, aber untätiger Spieler den Tisch dauerhaft – die
+  bestehende Gnadenfrist greift nur bei einem echten Verbindungsabbruch.
+  Der Ablaufzeitpunkt geht als `state.actingDeadline` an die Clients, die
+  daraus denselben Countdown anzeigen (`#turn-timer`).
+- **Kleinere Spiellogik-Korrekturen**: Einsätze werden am Hand-Ende
+  zurückgesetzt (`_clearBets()`) – vorher stand bis zur nächsten Hand
+  weiter "Einsatz: 10" am Sitzplatz, obwohl der Pot längst ausgezahlt war.
+  Der Raise-Knopf ist deaktiviert, wenn der eigene Stack den aktuellen
+  Einsatz gar nicht überbieten kann (z. B. gegen ein deckendes All-In) –
+  vorher quittierte jeder Klick dort nur mit einer Fehlermeldung.
+
+- **Tisch-Chat** (`socket.on('chat-message')` im Server, Schublade
+  `#chat-drawer` im Client): Nachrichten gehen an alle im selben Raum, der
+  Absendername kommt aus dem Tisch statt aus der Nachricht (niemand kann
+  unter fremdem Namen schreiben). Der Verlauf (die letzten
+  `CHAT_HISTORY_LIMIT` Nachrichten) liegt nur im Arbeitsspeicher und wird
+  mit dem Raum gelöscht; Nachzügler laden ihn per `get-chat-history` nach.
+  Ein einfacher Flood-Schutz (`CHAT_MIN_INTERVAL_MS`) verwirft zu schnelle
+  Folgenachrichten. Die Schublade schwebt bewusst über dem Tisch, statt Teil
+  der Flex-Spalte von `#table-screen` zu sein – sonst würde sie das
+  bildschirmfüllende Layout wieder sprengen.
+- **Poker-Hilfe** (`#help-overlay`, Knopf ❓ in der Tisch-Kopfzeile):
+  Handrangfolge, Ablauf einer Hand, Bedeutung der Aktionen und der
+  Fähigkeiten – damit auch jemand ohne Poker-Vorwissen sofort mitspielen
+  kann, statt die Regeln woanders nachschlagen zu müssen.
+- **Installierbar als PWA** (`public/manifest.webmanifest`, `public/sw.js`,
+  Icons in `public/icons/` via `design/generate-web-icons.js`): Die App
+  lässt sich auf dem Handy zum Startbildschirm hinzufügen und startet dann
+  im Vollbild ohne Browserleiste. Der Service Worker ist bewusst eng
+  gefasst – "network-first" nur für die bekannte statische Oberfläche,
+  `/socket.io/` und alle Nicht-GET-Anfragen bleiben unangetastet, damit
+  der Cache niemals den Live-Spielzustand verfälscht.
+
 ## Mögliche nächste Schritte (für Claude Code)
 
 Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
@@ -801,10 +867,12 @@ Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
 - **Postgres/Supabase statt lokaler SQLite-Datei**: sinnvoll, sobald die
   App auf mehreren Server-Prozessen/Maschinen laufen soll (SQLite ist
   an eine einzelne Datei auf einer Maschine gebunden).
-- **Hand-Historie & Chat**: vergangene Hände und Nachrichten pro Raum
-  anzeigen (SQLite ist dafür bereits vorhanden und würde sich anbieten).
-- **Mobile-optimiertes UI**: Die Action-Bar und Karten-Reihen sind noch
-  nicht für kleine Bildschirme optimiert.
+- **Hand-Historie**: vergangene Hände pro Raum anzeigen (SQLite ist dafür
+  bereits vorhanden und würde sich anbieten). Der Chat existiert
+  inzwischen, die Historie fehlt noch.
+- **Push-Benachrichtigung, wenn man am Zug ist**: sinnvoll in Kombination
+  mit dem Zug-Zeitlimit, damit ein weggelegtes Handy nicht automatisch
+  foldet.
 
 ## Guter erster Prompt für Claude Code
 

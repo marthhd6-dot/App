@@ -490,4 +490,84 @@ run('Side Pot: Ein gefoldeter Spieler finanziert den Neben-Pot, kann ihn aber ni
   assert.strictEqual(table.pot, 0);
 });
 
+run('Spieler ohne Chips setzt die Hand aus statt als Geisterspieler mitzulaufen', () => {
+  const table = makeTable(['a', 'b', 'c']);
+  table.players.find((p) => p.id === 'c').chips = 0;
+  table.startHand();
+
+  const c = table.players.find((p) => p.id === 'c');
+  assert.strictEqual(c.sittingOut, true);
+  assert.strictEqual(c.holeCards.length, 0, 'Aussetzende Spieler bekommen keine Karten');
+  assert.strictEqual(c.folded, true, 'Für die Wettlogik zählt Aussetzen wie gefoldet');
+  assert.strictEqual(c.isAllIn, false, 'Aussetzen ist kein All-In');
+  assert.strictEqual(c.abilities, null);
+
+  // Die Blinds müssen auf die beiden zahlungsfähigen Spieler fallen, nicht
+  // auf den ausgesetzten Platz.
+  const zahlend = table.players.filter((p) => !p.sittingOut);
+  assert.strictEqual(zahlend.filter((p) => p.bet > 0).length, 2);
+  assert.strictEqual(c.bet, 0);
+  // Bei nur noch zwei mitspielenden Spielern greift die Heads-up-Regel:
+  // der Dealer ist Small Blind.
+  assert.strictEqual(table.players[table.dealerIndex].bet, table.smallBlind);
+});
+
+run('startHand verlangt mindestens zwei Spieler MIT Chips', () => {
+  const table = makeTable(['a', 'b']);
+  table.players.find((p) => p.id === 'b').chips = 0;
+  assert.throws(() => table.startHand(), /Mindestens 2 Spieler mit Chips/);
+});
+
+run('Ein ausgesetzter Spieler kann nach Chip-Zuwachs wieder mitspielen', () => {
+  const table = makeTable(['a', 'b', 'c']);
+  const c = table.players.find((p) => p.id === 'c');
+  c.chips = 0;
+  table.startHand();
+  assert.strictEqual(c.sittingOut, true);
+
+  // Nachkaufen (siehe socket.on('rebuy') im Server) und neu austeilen
+  c.chips = 1000;
+  table.players.forEach((p) => {
+    p.folded = false;
+    p.isAllIn = false;
+  });
+  table.startHand();
+  assert.strictEqual(c.sittingOut, false);
+  assert.strictEqual(c.holeCards.length, 2);
+});
+
+run('Einsätze werden am Hand-Ende zurückgesetzt (Sieg durch Fold)', () => {
+  const table = makeTable(['a', 'b']);
+  table.startHand();
+  table.raise(table.getCurrentPlayer().id, 60);
+  table.fold(table.getCurrentPlayer().id);
+
+  assert.strictEqual(table.phase, 'showdown');
+  table.players.forEach((p) =>
+    assert.strictEqual(p.bet, 0, 'Nach dem Hand-Ende darf kein Einsatz mehr am Sitzplatz stehen')
+  );
+});
+
+run('Einsätze werden am Hand-Ende zurückgesetzt (Showdown nach River-Bet)', () => {
+  const table = makeTable(['a', 'b']);
+  table.startHand();
+  table.call(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.dealFlop();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.dealTurn();
+  table.check(table.getCurrentPlayer().id);
+  table.check(table.getCurrentPlayer().id);
+  table.dealRiver();
+  // Auf dem River wird tatsächlich gesetzt und gecallt – genau hier blieb
+  // der Einsatz vorher bis zur nächsten Hand am Sitzplatz stehen.
+  table.placeBet(table.getCurrentPlayer().id, 40);
+  table.call(table.getCurrentPlayer().id);
+  table.showdown();
+
+  table.players.forEach((p) => assert.strictEqual(p.bet, 0));
+  assert.strictEqual(totalChips(table), 2000, 'Chips bleiben trotz Zurücksetzen erhalten');
+});
+
 console.log('\nAlle Tests durchgelaufen.');

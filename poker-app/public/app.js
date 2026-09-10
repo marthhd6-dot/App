@@ -101,12 +101,16 @@ const checkBtn = document.getElementById('check-btn');
 const callBtn = document.getElementById('call-btn');
 const betBtn = document.getElementById('bet-btn');
 const raiseBtn = document.getElementById('raise-btn');
-const betInput = document.getElementById('bet-input');
-const raiseInput = document.getElementById('raise-input');
 const startHandBtn = document.getElementById('start-hand-btn');
+const rebuyBanner = document.getElementById('rebuy-banner');
+const turnTimerEl = document.getElementById('turn-timer');
 const betSizerEl = document.getElementById('bet-sizer');
 const betAmountSlider = document.getElementById('bet-amount-slider');
-const betAmountValueEl = document.getElementById('bet-amount-value');
+// Ein einziges Betragsfeld für Bet UND Raise (früher zwei getrennte
+// Zahlenfelder plus eine reine Anzeige): Beide Aktionen brauchen denselben
+// Wert, und die doppelte Eingabe kostete eine komplette zusätzliche Zeile
+// in der Aktions-Leiste – genau die Zeile, die sie unter die Falz schob.
+const betAmountInput = document.getElementById('bet-amount-input');
 const quarterPotBtn = document.getElementById('quarter-pot-btn');
 const halfPotBtn = document.getElementById('half-pot-btn');
 const allInBtn = document.getElementById('all-in-btn');
@@ -141,6 +145,12 @@ socket.on('room-joined', ({ code, ranked, casual4, rankedTeam, casualTeam, vsBot
   communityDealtCount = 0;
   prevState = null;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code, name: myName }));
+  // Chat des neuen Raums frisch laden (siehe get-chat-history im Server)
+  chatMessagesEl.innerHTML = '';
+  chatDrawer.hidden = true;
+  unreadChatCount = 0;
+  renderChatUnread();
+  socket.emit('get-chat-history');
   reconnectBanner.hidden = true;
   rankedMatchOverBanner.hidden = true;
   rankedBadge.hidden = !isRanked;
@@ -728,6 +738,10 @@ startHandBtn.addEventListener('click', () => {
   playUiClickSound();
   socket.emit('start-hand');
 });
+document.getElementById('rebuy-btn').addEventListener('click', () => {
+  playUiClickSound();
+  socket.emit('rebuy');
+});
 foldBtn.addEventListener('click', () => {
   playUiClickSound();
   socket.emit('fold');
@@ -742,25 +756,22 @@ callBtn.addEventListener('click', () => {
 });
 betBtn.addEventListener('click', () => {
   playUiClickSound();
-  socket.emit('bet', { amount: Number(betInput.value) });
+  socket.emit('bet', { amount: Number(betAmountInput.value) });
 });
 raiseBtn.addEventListener('click', () => {
   playUiClickSound();
-  socket.emit('raise', { amount: Number(raiseInput.value) });
+  socket.emit('raise', { amount: Number(betAmountInput.value) });
 });
 
-// Setzt Schieberegler, Live-Anzeige und das gerade aktive Betrag-Feld
-// (bet-input im Bet-Modus, sonst raise-input) synchron auf denselben,
-// auf die aktuell legalen Grenzen geklemmten Betrag – genutzt sowohl vom
+// Setzt Schieberegler und Betragsfeld synchron auf denselben, auf die
+// aktuell legalen Grenzen geklemmten Betrag – genutzt sowohl vom
 // Schieberegler selbst als auch von den ¼/½-Pot- und All-In-Knöpfen.
 function setBetSizerValue(amount) {
   const { min, max } = betSizerBounds;
   if (max <= 0) return;
   const clamped = Math.min(max, Math.max(min, Math.round(amount)));
   betAmountSlider.value = clamped;
-  betAmountValueEl.textContent = clamped;
-  const target = betInput.disabled ? raiseInput : betInput;
-  target.value = clamped;
+  betAmountInput.value = clamped;
 }
 
 betAmountSlider.addEventListener('input', () => setBetSizerValue(Number(betAmountSlider.value)));
@@ -777,19 +788,17 @@ allInBtn.addEventListener('click', () => {
   setBetSizerValue(betSizerBounds.max);
 });
 
-// Manuelle Eingabe in den bestehenden Zahlenfeldern hält den Schieberegler
-// synchron, damit beide Bedienwege (Regler vs. Zahl eintippen) konsistent
-// denselben Betrag zeigen.
-function syncSliderFromInput(inputEl) {
-  if (inputEl.disabled || betSizerBounds.max <= 0) return;
-  const val = Number(inputEl.value);
+// Manuelle Eingabe im Betragsfeld hält den Schieberegler synchron, damit
+// beide Bedienwege (Regler vs. Zahl eintippen) denselben Betrag zeigen.
+// Der eingetippte Wert selbst wird hier bewusst nicht überschrieben –
+// sonst könnte man beim Tippen keine Zahl erreichen, die unterwegs
+// kurzzeitig außerhalb der Grenzen liegt (z. B. "1" auf dem Weg zu "150").
+betAmountInput.addEventListener('input', () => {
+  if (betAmountInput.disabled || betSizerBounds.max <= 0) return;
+  const val = Number(betAmountInput.value);
   if (!Number.isFinite(val)) return;
-  const clamped = Math.min(betSizerBounds.max, Math.max(betSizerBounds.min, val));
-  betAmountSlider.value = clamped;
-  betAmountValueEl.textContent = inputEl.value;
-}
-betInput.addEventListener('input', () => syncSliderFromInput(betInput));
-raiseInput.addEventListener('input', () => syncSliderFromInput(raiseInput));
+  betAmountSlider.value = Math.min(betSizerBounds.max, Math.max(betSizerBounds.min, val));
+});
 
 // Berechnet die aktuell legalen Bet-/Raise-Grenzen (siehe placeBet()/
 // raise() in table.js für dieselbe Logik server-seitig, die hier nur zur
@@ -804,7 +813,7 @@ function renderBetSizer(state, me, canBet, canRaise) {
     betAmountSlider.min = 0;
     betAmountSlider.max = 0;
     betAmountSlider.value = 0;
-    betAmountValueEl.textContent = '0';
+    betAmountInput.value = '';
     betAmountSlider.disabled = true;
     quarterPotBtn.disabled = true;
     halfPotBtn.disabled = true;
@@ -1010,7 +1019,11 @@ function renderSeats(state, winnerIds, animateDeal, justRevealed) {
     const badges = [];
     if (team !== undefined) badges.push({ label: `TEAM ${team + 1}`, cls: `badge-team-${team}` });
     if (p.isAllIn) badges.push({ label: 'ALL-IN', cls: 'badge-allin' });
-    if (p.folded) badges.push({ label: 'FOLD', cls: 'badge-fold' });
+    // sittingOut ist technisch ebenfalls "folded" (siehe startHand() in
+    // table.js), meint aber "hat keine Chips mehr und sitzt diese Hand aus"
+    // – als FOLD angezeigt wäre das schlicht falsch.
+    if (p.sittingOut) badges.push({ label: 'PLEITE', cls: 'badge-broke' });
+    else if (p.folded) badges.push({ label: 'FOLD', cls: 'badge-fold' });
     if (p.disconnected) badges.push({ label: 'GETRENNT', cls: 'badge-disconnected' });
 
     const seat = document.createElement('div');
@@ -1256,6 +1269,105 @@ function animatePotTo(target) {
   potAnimationFrame = requestAnimationFrame(step);
 }
 
+// --- Tisch-Chat ------------------------------------------------------------
+// Der Verlauf lebt nur im Server-Arbeitsspeicher (siehe chatHistory dort)
+// und wird nach dem Beitritt einmalig nachgeladen. Bei geschlossener
+// Schublade zählt ein Punkt am Chat-Knopf ungelesene Nachrichten.
+const chatDrawer = document.getElementById('chat-drawer');
+const chatMessagesEl = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const chatUnreadEl = document.getElementById('chat-unread');
+let unreadChatCount = 0;
+
+function renderChatUnread() {
+  chatUnreadEl.hidden = unreadChatCount === 0;
+  chatUnreadEl.textContent = unreadChatCount > 9 ? '9+' : String(unreadChatCount);
+}
+
+function appendChatMessage({ name, text, at }) {
+  const row = document.createElement('div');
+  row.className = 'chat-message' + (name === myName ? ' chat-message-own' : '');
+  const time = new Date(at || Date.now()).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  row.innerHTML = `<span class="chat-message-meta">${escapeHtml(name)} · ${time}</span><span class="chat-message-text">${escapeHtml(text)}</span>`;
+  chatMessagesEl.appendChild(row);
+  // Immer ans Ende scrollen: Die neueste Nachricht ist die relevante.
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+}
+
+function openChat() {
+  chatDrawer.hidden = false;
+  unreadChatCount = 0;
+  renderChatUnread();
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  chatInput.focus();
+}
+
+document.getElementById('chat-toggle-btn').addEventListener('click', () => {
+  playUiClickSound();
+  if (chatDrawer.hidden) openChat();
+  else chatDrawer.hidden = true;
+});
+document.getElementById('chat-close-btn').addEventListener('click', () => {
+  chatDrawer.hidden = true;
+});
+document.getElementById('chat-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = chatInput.value.trim();
+  if (!text) return;
+  socket.emit('chat-message', { text });
+  chatInput.value = '';
+});
+
+socket.on('chat-history', (messages) => {
+  chatMessagesEl.innerHTML = '';
+  (messages || []).forEach(appendChatMessage);
+});
+
+socket.on('chat-message', (message) => {
+  appendChatMessage(message);
+  if (chatDrawer.hidden && message.name !== myName) {
+    unreadChatCount += 1;
+    renderChatUnread();
+  }
+});
+
+// --- Poker-Hilfe -----------------------------------------------------------
+const helpOverlay = document.getElementById('help-overlay');
+document.getElementById('help-btn').addEventListener('click', () => {
+  playUiClickSound();
+  helpOverlay.hidden = false;
+});
+document.getElementById('help-close-btn').addEventListener('click', () => {
+  helpOverlay.hidden = true;
+});
+
+// --- Zug-Countdown ---------------------------------------------------------
+// Der Server erzwingt nach TURN_TIMEOUT_MS automatisch Check bzw. Fold
+// (siehe ensureTurnTimer() dort) und schickt den Ablaufzeitpunkt als
+// state.actingDeadline mit. Hier läuft nur die Anzeige dazu – eigener
+// Sekundentakt statt Neurendern des ganzen Tisches, damit der Countdown
+// auch zwischen zwei State-Updates weiterläuft.
+let actingDeadline = null;
+let turnTimerInterval = null;
+
+function renderTurnTimer() {
+  if (!actingDeadline) {
+    turnTimerEl.hidden = true;
+    return;
+  }
+  const secondsLeft = Math.max(0, Math.ceil((actingDeadline - Date.now()) / 1000));
+  turnTimerEl.hidden = false;
+  turnTimerEl.textContent = `⏱ ${secondsLeft}s`;
+  turnTimerEl.classList.toggle('turn-timer-urgent', secondsLeft <= 10);
+}
+
+function updateTurnTimer(deadline) {
+  actingDeadline = deadline || null;
+  renderTurnTimer();
+  clearInterval(turnTimerInterval);
+  if (actingDeadline) turnTimerInterval = setInterval(renderTurnTimer, 1000);
+}
+
 function burstConfetti() {
   playWinSound();
   hapticMedium();
@@ -1275,6 +1387,7 @@ function burstConfetti() {
 
 function render(state) {
   document.getElementById('phase-label').textContent = PHASE_LABELS[state.phase] || state.phase;
+  updateTurnTimer(state.actingDeadline);
   animatePotTo(state.pot);
   document.getElementById('current-bet-label').textContent =
     state.currentBet > 0 ? `Aktueller Einsatz: ${state.currentBet}` : '';
@@ -1373,14 +1486,27 @@ function render(state) {
   foldBtn.disabled = !canAct;
   checkBtn.disabled = !canAct || !betsMatch;
   callBtn.disabled = !canAct || betsMatch;
-  betBtn.disabled = !canAct || state.currentBet !== 0;
-  betInput.disabled = betBtn.disabled;
-  raiseBtn.disabled = !canAct || state.currentBet === 0;
-  raiseInput.disabled = raiseBtn.disabled;
+  // Ein Raise ist nur möglich, wenn der eigene Gesamteinsatz den aktuellen
+  // überhaupt überbieten KANN (siehe raise() in table.js: raiseSize > 0).
+  // Gegen ein All-In, das den eigenen Stack exakt deckt, gibt es keinen
+  // legalen Raise-Betrag mehr – vorher blieb der Knopf trotzdem aktiv und
+  // quittierte jeden Klick mit einer Fehlermeldung, statt Call/Fold als
+  // die tatsächlich verbleibenden Optionen erkennbar zu machen.
+  const myMaxTotalBet = me ? me.bet + me.chips : 0;
+  betBtn.disabled = !canAct || state.currentBet !== 0 || !me || me.chips <= 0;
+  raiseBtn.disabled = !canAct || state.currentBet === 0 || myMaxTotalBet <= state.currentBet;
+  // Ein gemeinsames Betragsfeld für beide Aktionen: bedienbar, sobald eine
+  // von beiden möglich ist.
+  betAmountInput.disabled = betBtn.disabled && raiseBtn.disabled;
   renderBetSizer(state, me, !betBtn.disabled, !raiseBtn.disabled);
   wasMyTurn = isMyTurn;
 
   startHandBtn.hidden = state.phase !== 'waiting' && state.phase !== 'showdown';
+
+  // Nachkaufen nur im eigenen Tisch anbieten: In den Matchmaking-Modi ist
+  // das Ausscheiden Teil der Wertung (siehe socket.on('rebuy') im Server).
+  const inMatchMode = isRanked || isCasual4 || isRankedTeam || isCasualTeam || isVsBots;
+  rebuyBanner.hidden = !(me && me.chips === 0 && !inMatchMode);
 
   if (state.lastHandResult) {
     if (handResultEl.hidden) {
@@ -1401,4 +1527,19 @@ function render(state) {
   }
 
   prevState = state;
+}
+
+// --- PWA-Installation ------------------------------------------------------
+// Registriert den Service Worker (siehe sw.js), damit sich die App auf dem
+// Handy zum Startbildschirm hinzufügen lässt und die Oberfläche auch ohne
+// Netz erscheint. Bewusst abgesichert: In der gebündelten nativen App
+// (Capacitor, eigenes Schema statt http/https) gibt es keinen Service
+// Worker – ein Fehlschlag darf das Spiel dort nicht beeinträchtigen.
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      // Nicht verfügbar (privater Modus, blockiert, native App) – die App
+      // funktioniert auch ohne, nur eben ohne Installations-Angebot.
+    });
+  });
 }

@@ -23,6 +23,12 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="style.css" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Rumble Poker" />
   </head>
   <body>
     <div class="bg-glow bg-glow-1"></div>
@@ -51,6 +57,62 @@
         <a href="cookies.html">Cookie-Richtlinie</a>.
       </p>
       <button id="cookie-banner-ack-btn" class="btn btn-primary btn-small">Verstanden</button>
+    </div>
+
+    <!-- Chat-Schublade: schwebt über dem Tisch, statt Teil der Flex-Spalte
+         von #table-screen zu sein – so bleibt das bildschirmfüllende
+         Tisch-Layout unangetastet. -->
+    <div id="chat-drawer" class="chat-drawer" hidden>
+      <div class="chat-drawer-head">
+        <span>💬 Tisch-Chat</span>
+        <button id="chat-close-btn" class="btn btn-ghost btn-small" aria-label="Chat schließen">✕</button>
+      </div>
+      <div id="chat-messages" class="chat-messages"></div>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-input" type="text" maxlength="200" placeholder="Nachricht …" aria-label="Chat-Nachricht" />
+        <button type="submit" class="btn btn-primary btn-small">Senden</button>
+      </form>
+    </div>
+
+    <div id="help-overlay" class="modal-overlay" hidden>
+      <div class="panel panel-wide help-panel">
+        <h1>❓ Poker-Hilfe</h1>
+        <h2>Handrangfolge (stärkste zuerst)</h2>
+        <ol class="help-hands">
+          <li><strong>Royal Flush</strong> – 10 J Q K A in einer Farbe</li>
+          <li><strong>Straight Flush</strong> – fünf aufeinanderfolgende Karten einer Farbe</li>
+          <li><strong>Vierling</strong> – vier gleiche Werte</li>
+          <li><strong>Full House</strong> – Drilling + Paar</li>
+          <li><strong>Flush</strong> – fünf Karten derselben Farbe</li>
+          <li><strong>Straße</strong> – fünf aufeinanderfolgende Werte</li>
+          <li><strong>Drilling</strong> – drei gleiche Werte</li>
+          <li><strong>Zwei Paare</strong></li>
+          <li><strong>Ein Paar</strong></li>
+          <li><strong>Höchste Karte</strong></li>
+        </ol>
+        <h2>Ablauf einer Hand</h2>
+        <p class="help-text">
+          Jeder bekommt zwei verdeckte Karten. Danach folgen vier Wettrunden: Preflop, Flop (3 offene Karten),
+          Turn (1) und River (1). Wer am Ende die beste Kombination aus seinen zwei und den fünf offenen Karten
+          hat, gewinnt den Pot.
+        </p>
+        <h2>Deine Aktionen</h2>
+        <ul class="help-text">
+          <li><strong>Check</strong> – weiterschieben, ohne zu setzen (nur wenn nichts zu zahlen ist)</li>
+          <li><strong>Call</strong> – den aktuellen Einsatz mitgehen</li>
+          <li><strong>Bet / Raise</strong> – selbst setzen bzw. erhöhen (Betrag über Regler oder Feld)</li>
+          <li><strong>Fold</strong> – aussteigen und die Hand abgeben</li>
+        </ul>
+        <h2>Fähigkeiten</h2>
+        <p class="help-text">
+          Jede Hand bekommst du vier Fähigkeiten – eine pro Kategorie, jede einmal einsetzbar: Kartentausch,
+          Pot-Bonus, Spionage und Chip-Boost. Alle Spieler bekommen dieselben vier Kategorien, es entsteht also
+          kein Vorteil für Einzelne.
+        </p>
+        <div class="join-row">
+          <button id="help-close-btn" class="btn btn-ghost">Schließen</button>
+        </div>
+      </div>
     </div>
 
     <div id="friends-overlay" class="modal-overlay" hidden>
@@ -253,6 +315,10 @@
         <button id="ranked-back-to-menu-btn" class="btn btn-primary btn-small">Neues Match suchen</button>
       </div>
       <div id="hand-result" class="hand-result" hidden></div>
+      <div id="rebuy-banner" class="hand-result rebuy-banner" hidden>
+        <span>Du hast keine Chips mehr.</span>
+        <button id="rebuy-btn" class="btn btn-primary btn-small">💰 1000 Chips nachkaufen</button>
+      </div>
 
       <div class="table-header">
         <span id="room-code-label" class="room-code-label"></span>
@@ -262,6 +328,7 @@
         <span id="casual-team-badge" class="casual-team-badge" hidden>👥 2v2 CASUAL</span>
         <span id="bots-badge" class="bots-badge" hidden>🤖 GEGEN BOTS</span>
         <span id="phase-label" class="phase-label"></span>
+        <span id="turn-timer" class="turn-timer" hidden></span>
         <span id="current-bet-label" class="current-bet-label"></span>
         <button
           id="friends-btn-table"
@@ -270,6 +337,12 @@
           aria-label="Freunde einladen"
         >
           👥
+        </button>
+        <button id="chat-toggle-btn" class="btn btn-ghost btn-small" title="Chat" aria-label="Chat öffnen">
+          💬<span id="chat-unread" class="chat-unread" hidden></span>
+        </button>
+        <button id="help-btn" class="btn btn-ghost btn-small" title="Poker-Hilfe" aria-label="Poker-Hilfe öffnen">
+          ❓
         </button>
         <button
           id="sound-toggle-btn"
@@ -300,7 +373,7 @@
         <div id="fx-layer" class="fx-layer"></div>
       </div>
 
-      <div class="my-hand">
+      <div id="my-hand" class="my-hand">
         <h2>Deine Karten</h2>
         <div id="my-cards" class="card-row my-card-row"></div>
         <div id="my-abilities" class="ability-row"></div>
@@ -333,21 +406,21 @@
               step="1"
               aria-label="Bet-/Raise-Betrag"
             />
-            <span id="bet-amount-value" class="bet-amount-value">0</span>
+            <input
+              id="bet-amount-input"
+              type="number"
+              min="1"
+              class="bet-amount-value"
+              aria-label="Einsatzbetrag"
+            />
           </div>
         </div>
         <button id="start-hand-btn" class="btn btn-primary">▶ Hand starten</button>
         <button id="fold-btn" class="btn btn-fold">Fold</button>
         <button id="check-btn" class="btn btn-neutral">Check</button>
         <button id="call-btn" class="btn btn-call">Call</button>
-        <span class="bet-control">
-          <input id="bet-input" type="number" min="1" placeholder="Betrag" aria-label="Bet-Betrag" />
-          <button id="bet-btn" class="btn btn-raise">Bet</button>
-        </span>
-        <span class="bet-control">
-          <input id="raise-input" type="number" min="1" placeholder="Raise auf" aria-label="Raise-Betrag" />
-          <button id="raise-btn" class="btn btn-raise">Raise</button>
-        </span>
+        <button id="bet-btn" class="btn btn-raise">Bet</button>
+        <button id="raise-btn" class="btn btn-raise">Raise</button>
       </div>
     </div>
 

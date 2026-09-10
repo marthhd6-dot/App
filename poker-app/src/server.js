@@ -114,6 +114,21 @@ function persist() {
 // steigen turnierartig, damit ein Match trotzdem in endlicher Zeit zu
 // einem Ergebnis kommt.
 const RANKED_STARTING_CHIPS = 1000;
+// Nachkauf-Stack in normalen Räumen (siehe socket.on('rebuy')): derselbe
+// Betrag wie beim Beitreten, damit niemand durch Nachkaufen besser oder
+// schlechter dasteht als ein frisch dazugekommener Spieler.
+const REBUY_CHIPS = 1000;
+
+// --- Tisch-Chat ------------------------------------------------------------
+// Bewusst nur im Arbeitsspeicher und pro Raum begrenzt: Der Chat soll den
+// laufenden Tisch begleiten, nicht dauerhaft protokolliert werden (siehe
+// auch Datenschutzerklärung – es entsteht kein gespeicherter Nachrichten-
+// verlauf). Beim Entfernen eines Raums wird der Verlauf mitgelöscht.
+const CHAT_HISTORY_LIMIT = 50;
+const CHAT_MAX_LENGTH = 200;
+// Einfacher Flood-Schutz: schnellere Folgenachrichten werden verworfen.
+const CHAT_MIN_INTERVAL_MS = 600;
+const chatHistory = new Map(); // roomCode -> [{ name, text, at }]
 // Anzahl Spieler pro Ranked-Tisch ("1v1v1v1").
 const RANKED_GROUP_SIZE = 4;
 
@@ -702,6 +717,65 @@ io.on('connection', (socket) => {
     handleAction(socket, (table) => table.raise(socket.id, amount));
   });
 
+  // Chips nachkaufen, wenn man in einem normalen Tisch (eigener Raum-Code
+  // bzw. Freundes-Einladung) pleite ist. In den Matchmaking-Modi bewusst
+  // nicht möglich: Dort IST das Ausscheiden das Spielziel, und die
+  // Platzierung/Wertung hängt daran (siehe trackEliminations()).
+  // Chat-Verlauf des eigenen Raums nachladen – der Client fragt ihn direkt
+  // nach dem Beitritt an, damit auch Nachzügler den bisherigen Verlauf
+  // sehen (statt diesen an alle sieben room-joined-Stellen zu hängen).
+  socket.on('get-chat-history', () => {
+    const code = socket.data.roomCode;
+    if (!code) return;
+    socket.emit('chat-history', chatHistory.get(code) || []);
+  });
+
+  socket.on('chat-message', ({ text } = {}) => {
+    const code = socket.data.roomCode;
+    const table = code && rooms.getTable(code);
+    if (!table) {
+      socket.emit('error-message', 'Du bist in keinem Raum.');
+      return;
+    }
+    const trimmed = typeof text === 'string' ? text.trim().slice(0, CHAT_MAX_LENGTH) : '';
+    if (!trimmed) return;
+
+    const now = Date.now();
+    if (now - (socket.data.lastChatAt || 0) < CHAT_MIN_INTERVAL_MS) return;
+    socket.data.lastChatAt = now;
+
+    // Name aus dem Tisch statt aus der Client-Nachricht: So kann niemand
+    // unter fremdem Namen schreiben (siehe resolveName() für dasselbe
+    // Prinzip beim Beitreten).
+    const player = table.players.find((p) => p.id === socket.id);
+    const message = { name: player ? player.name : 'Unbekannt', text: trimmed, at: now };
+
+    const history = chatHistory.get(code) || [];
+    history.push(message);
+    if (history.length > CHAT_HISTORY_LIMIT) history.splice(0, history.length - CHAT_HISTORY_LIMIT);
+    chatHistory.set(code, history);
+
+    io.to(code).emit('chat-message', message);
+  });
+
+  socket.on('rebuy', () => {
+    const code = socket.data.roomCode;
+    if (getMatchEntry(code)) {
+      socket.emit('error-message', 'In diesem Spielmodus kannst du keine Chips nachkaufen.');
+      return;
+    }
+    handleAction(socket, (table) => {
+      const player = table.players.find((p) => p.id === socket.id);
+      if (!player) throw new Error('Du sitzt nicht an diesem Tisch.');
+      if (player.chips > 0) throw new Error('Nachkaufen geht erst, wenn du keine Chips mehr hast.');
+      player.chips = REBUY_CHIPS;
+      // Erst ab der nächsten Hand wieder dabei: Mitten in einer laufenden
+      // Hand einzusteigen, würde die bereits gesetzten Beträge und die
+      // Side-Pot-Berechnung durcheinanderbringen (siehe _computePots()).
+      player.sittingOut = table.phase === 'waiting' ? false : player.sittingOut;
+    });
+  });
+
   socket.on('disconnect', () => {
     console.log(`Spieler getrennt: ${socket.id}`);
     markOffline(socket);
@@ -749,6 +823,8 @@ io.on('connection', (socket) => {
         rankedTeamRooms.delete(roomCode);
         casualTeamRooms.delete(roomCode);
         botRooms.delete(roomCode);
+        chatHistory.delete(roomCode);
+        clearTurnTimer(roomCode);
       } else {
         broadcastRoomState(roomCode);
       }
@@ -1374,6 +1450,86 @@ function applyBotDecision(table, botId, decision) {
 // Bot-Sitzplatz ganz normal als "am Zug" an (state.actingPlayerId ändert
 // sich erst mit dem tatsächlichen Zug). Rekursion ist unproblematisch, da
 // eine Hand nur endlich viele Aktionen hat.
+// --- Zug-Timer -------------------------------------------------------------
+// Ohne Zeitlimit blockiert ein Spieler, der einfach nicht handelt (Tab im
+// Hintergrund, Handy weggelegt, Verbindung steht aber niemand schaut hin),
+// den kompletten Tisch dauerhaft – alle anderen können nur noch den Raum
+// verlassen. Die vorhandene Gnadenfrist greift ausschließlich bei einem
+// echten Verbindungsabbruch (siehe disconnectTimers), nicht bei bloßer
+// Untätigkeit. Läuft die Zeit ab, wird automatisch die harmloseste legale
+// Aktion ausgeführt: Check, wenn nichts zu zahlen ist, sonst Fold.
+// Über TURN_TIMEOUT_MS überschreibbar, analog zu BOT_THINK_DELAY_MIN_MS –
+// vor allem, um den Ablauf testen zu können, ohne 45 Sekunden zu warten.
+const TURN_TIMEOUT_MS = Number(process.env.TURN_TIMEOUT_MS) || 45000;
+const turnTimers = new Map(); // roomCode -> { timer, playerId, deadline }
+
+function clearTurnTimer(code) {
+  const existing = turnTimers.get(code);
+  if (existing) {
+    clearTimeout(existing.timer);
+    turnTimers.delete(code);
+  }
+}
+
+// Sorgt dafür, dass für den aktuell am Zug befindlichen Spieler ein Timer
+// läuft, und gibt dessen Ablaufzeitpunkt zurück (null, wenn niemand am Zug
+// ist oder ein Bot dran ist – Bots handeln über maybeTriggerBotActions()
+// ohnehin binnen Sekunden). Ist derselbe Spieler schon vorher am Zug
+// gewesen, bleibt der laufende Timer erhalten: Sonst würde jede
+// Zwischen-Aktualisierung (z. B. eine eingesetzte Fähigkeit eines
+// Mitspielers) die Bedenkzeit heimlich verlängern.
+function ensureTurnTimer(code) {
+  const table = rooms.getTable(code);
+  const current = table && table.getCurrentPlayer();
+  if (!current) {
+    clearTurnTimer(code);
+    return null;
+  }
+  const entry = getMatchEntry(code);
+  if (entry && entry.bots && entry.bots.has(current.id)) {
+    clearTurnTimer(code);
+    return null;
+  }
+
+  const existing = turnTimers.get(code);
+  if (existing && existing.playerId === current.id) return existing.deadline;
+
+  clearTurnTimer(code);
+  const deadline = Date.now() + TURN_TIMEOUT_MS;
+  const timer = setTimeout(() => forceTurnTimeout(code, current.id), TURN_TIMEOUT_MS);
+  turnTimers.set(code, { timer, playerId: current.id, deadline });
+  return deadline;
+}
+
+function forceTurnTimeout(code, playerId) {
+  turnTimers.delete(code);
+  const table = rooms.getTable(code);
+  if (!table) return;
+  const current = table.getCurrentPlayer();
+  // Zwischenzeitlich hat schon jemand anders gehandelt – nichts zu tun.
+  if (!current || current.id !== playerId) return;
+
+  try {
+    // Check ist die schonendere Variante und immer dann legal, wenn nichts
+    // mehr nachzuzahlen ist (siehe check() in table.js).
+    if (current.bet >= table.currentBet) table.check(playerId);
+    else table.fold(playerId);
+  } catch {
+    // Sollte nicht vorkommen; falls doch, den Tisch keinesfalls hängen
+    // lassen.
+    try {
+      table.fold(playerId);
+    } catch {
+      return;
+    }
+  }
+  advancePhaseIfRoundComplete(table);
+  broadcastRoomState(code);
+  dispatchMatchFinishIfShowdown(code, table);
+  persist();
+  maybeTriggerBotActions(code);
+}
+
 function maybeTriggerBotActions(code) {
   const entry = getMatchEntry(code);
   if (!entry || !entry.bots || entry.bots.size === 0) return;
@@ -1463,6 +1619,10 @@ function broadcastRoomState(code) {
   // Mitspieler/-Gegner neben echten Menschen enthalten).
   const matchEntry = getMatchEntry(code);
   const botIds = matchEntry && matchEntry.bots ? [...matchEntry.bots.keys()] : [];
+  // Zug-Timer für den aktuell am Zug befindlichen Spieler (neu) starten und
+  // den Ablaufzeitpunkt mitschicken, damit die Clients denselben Countdown
+  // anzeigen können, den der Server tatsächlich anwendet.
+  const actingDeadline = ensureTurnTimer(code);
   const socketsInRoom = io.sockets.adapter.rooms.get(code);
   if (!socketsInRoom) return;
   for (const socketId of socketsInRoom) {
@@ -1478,6 +1638,7 @@ function broadcastRoomState(code) {
     const state = table.getPublicState(socketId, extraVisibleIds);
     if (teamEntry) state.teams = teamEntry.teams;
     if (botIds.length > 0) state.botIds = botIds;
+    state.actingDeadline = actingDeadline;
     clientSocket.emit('state', state);
   }
 }
