@@ -1863,7 +1863,17 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 16px;
+  gap: 12px;
+}
+
+/* Die aufgedeckten Gegnerkarten sind reine Information ("wogegen habe ich
+   verloren?") und erscheinen zusätzlich zu allem anderen. Deshalb bewusst
+   kleiner als die eigenen Karten – sonst schiebt allein dieser Block die
+   Aktions-Leiste auf Handys wieder aus dem Bild. */
+.showdown-reveal-cards .card {
+  width: 42px;
+  height: 59px;
+  font-size: 1rem;
 }
 
 .showdown-reveal-entry {
@@ -2507,8 +2517,18 @@ button:disabled {
    alles Feste flacher – der Tisch bleibt dadurch spielbar groß. */
 @media (max-height: 740px) {
   .table-felt {
-    min-height: 170px;
+    min-height: 140px;
     margin-bottom: 8px;
+  }
+  .showdown-reveal-cards .card {
+    width: 34px;
+    height: 48px;
+    font-size: 0.8rem;
+  }
+  /* Wie bei den eigenen Karten entfällt die Überschrift – die Namen über
+     den Kartenpaaren sagen ohnehin, wessen Karten das sind. */
+  .showdown-reveal h2 {
+    display: none;
   }
   #my-hand h2 {
     display: none;

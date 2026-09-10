@@ -809,6 +809,14 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   Fensterbreite aus dem Viewport), und im **Querformat** (`orientation:
   landscape` mit geringer Höhe) wechselt der Screen auf ein Raster mit
   Tisch links und Karten/Fähigkeiten/Aktionen rechts daneben.
+  Zwischen zwei Händen (Phase `waiting`/`showdown`) blendet `render()`
+  zusätzlich alles aus, was dann ohnehin nicht bedienbar ist: den
+  Bet-Schieberegler, die fünf Wett-Knöpfe und die Fähigkeiten-Karten
+  (`useAbility()` lehnt sie in diesen Phasen serverseitig ab). Das ist
+  nicht nur ehrlicher als eine Reihe toter Knöpfe – es schafft genau den
+  Platz, den der Showdown-Bereich mit den aufgedeckten Gegnerkarten
+  braucht, der sonst auf Handys die Aktions-Leiste wieder aus dem Bild
+  geschoben hat.
 - **Touch-Zielgrößen**: Unter `@media (pointer: coarse)` sind die Knöpfe
   der Aktions-Leiste mindestens 44px hoch (WCAG 2.5.5). Der
   Bet-Schieberegler ist jetzt ein 32px hohes, transparentes Element mit
