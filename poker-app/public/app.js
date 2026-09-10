@@ -1415,7 +1415,13 @@ function render(state) {
 
   const me = state.players.find((p) => p.id === mySocketId);
   renderMyCards((me && me.holeCards) || [], isNewHand);
-  renderAbilities(me && me.abilities);
+  // Zwischen zwei Händen (waiting/showdown) lassen sich Fähigkeiten ohnehin
+  // nicht einsetzen – useAbility() im Server lehnt das ab. Sie dann
+  // auszublenden, ist nicht nur ehrlicher, sondern schafft auf kleinen
+  // Bildschirmen genau den Platz, den der Showdown-Bereich mit den
+  // aufgedeckten Gegnerkarten braucht.
+  const handLaeuft = state.phase !== 'waiting' && state.phase !== 'showdown';
+  renderAbilities(handLaeuft ? me && me.abilities : null);
 
   // Im 2v2-Casual-Modus schickt der Server zusätzlich die Hole Cards des
   // Teammitglieds mit (siehe extraVisibleIds in server.js). Team-bewusst
@@ -1501,7 +1507,15 @@ function render(state) {
   renderBetSizer(state, me, !betBtn.disabled, !raiseBtn.disabled);
   wasMyTurn = isMyTurn;
 
-  startHandBtn.hidden = state.phase !== 'waiting' && state.phase !== 'showdown';
+  startHandBtn.hidden = handLaeuft;
+  // Zwischen zwei Händen sind Regler und Wett-Knöpfe ausnahmslos
+  // deaktiviert – sie dann ganz auszublenden macht sichtbar, dass jetzt nur
+  // "Hand starten" zählt, und gibt auf kleinen Bildschirmen über 100px für
+  // den Showdown-Bereich frei, statt eine Reihe toter Knöpfe zu zeigen.
+  betSizerEl.hidden = !handLaeuft;
+  [foldBtn, checkBtn, callBtn, betBtn, raiseBtn].forEach((btn) => {
+    btn.hidden = !handLaeuft;
+  });
 
   // Nachkaufen nur im eigenen Tisch anbieten: In den Matchmaking-Modi ist
   // das Ausscheiden Teil der Wertung (siehe socket.on('rebuy') im Server).
