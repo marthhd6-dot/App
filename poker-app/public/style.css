@@ -244,14 +244,22 @@ h2 {
   height: calc(100dvh - 2 * var(--body-pad-y));
 }
 
-/* Kopfzeile, eigene Karten, Fähigkeiten und Aktions-Leiste behalten ihre
+/* Kopfzeile und der Block mit Karten/Fähigkeiten/Aktionen behalten ihre
    Höhe; nur der Tisch gibt nach. */
 #table-screen > .table-header,
-#table-screen > .my-hand,
-#table-screen > .action-bar,
+#table-screen > .table-side,
 #table-screen > .error-banner,
 #table-screen > .hand-result {
   flex: 0 0 auto;
+}
+
+/* Im Hochformat nur ein gewöhnlicher Block – die enthaltenen Bereiche
+   stapeln sich wie zuvor unter dem Tisch. Im Querformat wird daraus die
+   rechte Spalte neben dem Tisch (siehe die Media Queries am Dateiende). */
+.table-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* max-width + margin: 0 auto zentrieren jedes .panel innerhalb seines
@@ -992,16 +1000,30 @@ button:disabled {
   pointer-events: none;
 }
 
-.pot-display {
+/* Pot und Community Cards liegen als EIN mittig ausgerichteter Stapel auf
+   dem Filz. Vorher waren beide einzeln in Prozent positioniert (Pot bei
+   26%, Karten bei 52%) – auf einem flachen Tisch (Tablet im Querformat,
+   Filzhöhe nur ~280px) rückten diese beiden Prozentwerte so dicht
+   zusammen, dass die Karten den Pot-Betrag verdeckten. Als Flex-Spalte
+   mit fester Lücke kann das konstruktionsbedingt nicht mehr passieren,
+   unabhängig von den Proportionen des Tisches. */
+.felt-center {
   position: absolute;
-  top: 26%;
   left: 50%;
+  top: 44%;
   transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
   z-index: 2;
+}
+
+.pot-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Poker-Chip-Optik statt reiner Kreisfläche: der gestrichelte Rand
@@ -1055,11 +1077,6 @@ button:disabled {
 }
 
 .community-row {
-  position: absolute;
-  top: 52%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
   min-height: unset;
   margin: 0;
 }
@@ -2690,7 +2707,7 @@ button:disabled {
     padding-inline: 26px;
     display: grid;
     grid-template-columns: 1fr minmax(190px, 250px);
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto 1fr;
     column-gap: 10px;
   }
   /* Kopfzeile über beide Spalten, Tisch links über die volle Resthöhe,
@@ -2704,7 +2721,7 @@ button:disabled {
   }
   .table-felt {
     grid-column: 1;
-    grid-row: 2 / -1;
+    grid-row: 2;
     /* Der eigene Sitzplatz und der Dealer-Button sitzen am unteren Rand
        des Ovals und ragen ein Stück darunter hinaus – im Hochformat fängt
        das der Bereich mit den eigenen Karten auf, hier braucht es einen
@@ -2718,15 +2735,11 @@ button:disabled {
   .table-drop-shadow {
     display: none;
   }
-  #my-hand {
+  /* Karten oben, Aktions-Leiste unten am Spaltenende. */
+  .table-side {
     grid-column: 2;
     grid-row: 2;
-    align-self: start;
-  }
-  #table-screen > .action-bar {
-    grid-column: 2;
-    grid-row: 3;
-    align-self: end;
+    justify-content: space-between;
   }
   /* Im Querformat ist rechts nur Platz für die eigenen Karten – die
      Showdown-Karten der Gegner sind ohnehin an deren Sitzplätzen zu sehen. */
@@ -2946,4 +2959,75 @@ ul.help-text {
 
 .help-text strong {
   color: var(--text);
+}
+
+/* Große Querformat-Bildschirme (Tablet quer, Desktop): Hier stapelten sich
+   Tisch, eigene Karten, Fähigkeiten und Aktions-Leiste bisher untereinander
+   – auf einem iPad im Querformat blieben dem Tisch dadurch nur ~280px Höhe,
+   während der Block darunter über 400px belegte. Der Tisch bekommt jetzt
+   dieselbe zweispaltige Aufteilung wie im Handy-Querformat, nur mit
+   großzügigeren Maßen: Er nimmt links die volle Resthöhe UND -breite ein,
+   Karten, Fähigkeiten und Aktionen rücken als eigene Spalte daneben.
+   Abgegrenzt von der kompakten Variante über die Mindesthöhe, damit sich
+   die beiden Media Queries nicht überschneiden. */
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 561px) {
+  #table-screen {
+    max-width: none;
+    /* Reservestreifen für die seitlich über die Filzkante hinausragenden
+       Sitzplätze (halbe Sitzbreite, siehe seatPositionByOrderedIndex). */
+    padding-inline: 40px;
+    display: grid;
+    grid-template-columns: 1fr minmax(280px, 360px);
+    grid-template-rows: auto 1fr;
+    column-gap: 26px;
+  }
+  #table-screen > .table-header,
+  #table-screen > .error-banner,
+  #table-screen > .hand-result {
+    grid-column: 1 / -1;
+  }
+  .table-felt {
+    grid-column: 1;
+    grid-row: 2;
+    /* Ohne Deckelung: Der Tisch darf die ganze linke Spalte ausfüllen –
+       genau das ist hier der Sinn der Aufteilung. */
+    max-width: none;
+    /* Reserve für den eigenen Sitzplatz und den Dealer-Button, die unten
+       über den Filzrand hinausragen. */
+    margin-bottom: 30px;
+    min-height: 0;
+  }
+  /* Der Schlagschatten ragt konstruktionsbedingt 8% unter den Filz. Bei
+     einem so großen Tisch sind das über 60px, die als vertikaler Überlauf
+     eine Scrollleiste erzeugen würden – hier bleibt er deshalb innerhalb
+     der Tischfläche. Sichtbar ist er trotzdem, er ist ohnehin nur ein
+     weich auslaufender Verlauf. */
+  .table-drop-shadow {
+    bottom: 0;
+  }
+  .table-side {
+    grid-column: 2;
+    grid-row: 2;
+    /* Karten oben, Aktions-Leiste unten – der Platz dazwischen bleibt frei,
+       statt alles oben zusammenzudrängen. */
+    justify-content: space-between;
+    min-width: 0;
+  }
+  /* In der schmaleren Spalte passen vier Fähigkeiten-Karten nicht mehr
+     nebeneinander; ein 2x2-Raster wirkt ausgeglichener als ein 3+1-Umbruch
+     (dieselbe Überlegung wie bei sehr schmalen Handys weiter oben). */
+  .ability-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-inline: auto;
+    max-width: 280px;
+  }
+  .ability-card {
+    width: auto;
+  }
+  /* Der Regler bekommt in der schmalen Spalte die volle Breite. */
+  #bet-amount-slider {
+    max-width: none;
+  }
 }

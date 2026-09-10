@@ -844,6 +844,27 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   Platz, den der Showdown-Bereich mit den aufgedeckten Gegnerkarten
   braucht, der sonst auf Handys die Aktions-Leiste wieder aus dem Bild
   geschoben hat.
+- **Zweispaltiges Layout auf Querformat-Bildschirmen** (`.table-side`):
+  Auf Tablets im Querformat stapelten sich Tisch, eigene Karten,
+  Fähigkeiten und Aktions-Leiste untereinander – dem Tisch blieben dadurch
+  nur ~280px Höhe, während der Block darunter über 400px belegte. Karten,
+  Fähigkeiten und Aktions-Leiste sitzen jetzt in einem gemeinsamen
+  Container (`.table-side`), der im Hochformat wie bisher unter dem Tisch
+  steht und im Querformat als eigene Spalte daneben rückt. Der Tisch
+  bekommt links die volle Resthöhe und -breite: auf dem iPad im Querformat
+  wächst er dadurch von 760×279 auf 682×678, auf 1440×900 auf 942×758.
+  Zwei getrennte Media Queries, abgegrenzt über die Höhe, damit sie sich
+  nicht überschneiden: die kompakte Variante für Handys im Querformat
+  (`max-height: 560px`) und die großzügige ab `min-width: 900px` und
+  `min-height: 561px`.
+- **Pot und Community Cards als ein Stapel** (`.felt-center`): Beide waren
+  einzeln in Prozent auf dem Filz positioniert (Pot bei 26%, Karten bei
+  52%). Auf einem flachen Tisch rückten diese Prozentwerte so dicht
+  zusammen, dass die Karten den Pot-Betrag verdeckten. Als Flex-Spalte mit
+  fester Lücke kann das konstruktionsbedingt nicht mehr passieren,
+  unabhängig von den Proportionen des Tisches. Die Startposition der
+  fliegenden Chips wird deshalb gemessen (`potPosition()` in `app.js`)
+  statt fest verdrahtet – der Pot verschiebt sich jetzt je nach Tischhöhe.
 - **Touch-Zielgrößen**: Unter `@media (pointer: coarse)` sind die Knöpfe
   der Aktions-Leiste mindestens 44px hoch (WCAG 2.5.5). Der
   Bet-Schieberegler ist jetzt ein 32px hohes, transparentes Element mit
