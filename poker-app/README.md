@@ -767,6 +767,33 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   Formularfelder ohne sichtbares `<label>`) – Farbkontrast (heller Text auf
   sehr dunklem Grund) und sichtbare Fokus-Zustände bei Eingabefeldern waren
   bereits vor dieser Änderung gegeben.
+- **Karten-Animationen: echter 3D-Flip und Feder-Physik** (`.card::before`
+  sowie die Keyframes `deal-in`/`card-reveal-flip` in `style.css`):
+  - Jede Karte hat jetzt eine echte Rückseite. `.card` ist die Vorderseite,
+    `.card::before` die um 180° weggedrehte Rückseite (dasselbe Rautenmuster
+    wie die verdeckten Mini-Karten an den Sitzplätzen); zusammen mit
+    `transform-style: preserve-3d` und `backface-visibility: hidden` ergibt
+    das eine Karte, die sich wirklich umdrehen lässt. Vorher drehten die
+    Flip-Animationen eine Karte OHNE Rückseite – in der ersten Hälfte der
+    Drehung sah man schlicht die gespiegelte Vorderseite.
+  - **Fallstrick, der leicht wieder hereinrutscht**: Ein `opacity` unter 1
+    auf der Karte hebt `preserve-3d` auf und flacht die 3D-Ebene ab – die
+    Rückseite verschwindet dann komplett und man sieht während der halben
+    Drehung gar nichts. Die Deal-/Flip-Keyframes animieren deshalb bewusst
+    KEINE Deckkraft mehr.
+  - Die Stützstellen der Bewegung sind keine handgewählten Werte, sondern
+    die nachgerechnete Bahn einer gedämpften Feder (Steifigkeit 340,
+    Dämpfung 88, Masse 1, fester Zeitschritt 1/60s). Der Dämpfungsgrad
+    liegt bei 2,39 – die Feder ist überdämpft, die Karte schwingt also
+    nicht nach, sondern startet sehr schnell und läuft lang und weich aus.
+    Deshalb steht die Timing-Funktion auf `linear`: Die Kurve steckt in den
+    Keyframes, eine zusätzliche Easing-Funktion würde sie ein zweites Mal
+    verzerren.
+  - *Quelle der Technik*: [react-poker](https://github.com/therewillbecode/react-deck)
+    von therewillbecode (ISC-Lizenz) – dort über getrennte `.front`/`.back`-
+    Elemente und `react-motion` gelöst. Übernommen wurden der Ansatz und die
+    Feder-Parameter, nicht der Code: Die Bibliothek setzt React voraus, das
+    Frontend hier ist bewusst reines Browser-JS ohne Build-Schritt.
 - **Sound & Spielgefühl** (`public/sound.js`, eingebunden in `index.html`
   vor `app.js`): Soundeffekte für Deal, Kartenaufdeckung/Showdown, Check,
   Call, Bet/Raise (Lautstärke/Klick-Anzahl skaliert mit dem Einsatz
