@@ -62,9 +62,9 @@
     <!-- Chat-Schublade: schwebt über dem Tisch, statt Teil der Flex-Spalte
          von #table-screen zu sein – so bleibt das bildschirmfüllende
          Tisch-Layout unangetastet. -->
-    <div id="chat-drawer" class="chat-drawer" hidden>
+    <div id="chat-drawer" class="chat-drawer" role="dialog" aria-labelledby="chat-drawer-title" hidden>
       <div class="chat-drawer-head">
-        <span>💬 Tisch-Chat</span>
+        <span id="chat-drawer-title">💬 Tisch-Chat</span>
         <button id="chat-close-btn" class="btn btn-ghost btn-small" aria-label="Chat schließen">✕</button>
       </div>
       <div id="chat-messages" class="chat-messages"></div>
@@ -75,8 +75,8 @@
     </div>
 
     <div id="help-overlay" class="modal-overlay" hidden>
-      <div class="panel panel-wide help-panel">
-        <h1>❓ Poker-Hilfe</h1>
+      <div class="panel panel-wide help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+        <h1 id="help-title">❓ Poker-Hilfe</h1>
         <h2>Handrangfolge (stärkste zuerst)</h2>
         <ol class="help-hands">
           <li><strong>Royal Flush</strong> – 10 J Q K A in einer Farbe</li>
@@ -116,8 +116,8 @@
     </div>
 
     <div id="friends-overlay" class="modal-overlay" hidden>
-      <div class="panel panel-wide">
-        <h1>👥 Freunde</h1>
+      <div class="panel panel-wide" role="dialog" aria-modal="true" aria-labelledby="friends-title">
+        <h1 id="friends-title">👥 Freunde</h1>
         <div id="friends-error" class="error-banner" hidden></div>
         <div class="join-row">
           <input
@@ -137,8 +137,8 @@
     </div>
 
     <div id="account-overlay" class="modal-overlay" hidden>
-      <div class="panel">
-        <h1>👤 Account</h1>
+      <div class="panel" role="dialog" aria-modal="true" aria-labelledby="account-title">
+        <h1 id="account-title">👤 Account</h1>
         <p class="account-hint">
           Ein Account schützt deinen Namen mit einem Passwort, damit ihn niemand sonst verwenden kann. Ohne Account
           kannst du weiterhin einfach mit einem beliebigen Namen spielen.

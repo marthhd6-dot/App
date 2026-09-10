@@ -883,6 +883,22 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   Folgenachrichten. Die Schublade schwebt bewusst über dem Tisch, statt Teil
   der Flex-Spalte von `#table-screen` zu sein – sonst würde sie das
   bildschirmfüllende Layout wieder sprengen.
+- **Dialog-Verhalten für alle Overlays** (`dialogOeffnen()`/
+  `dialogGeschlossen()` in `app.js`): Account, Freunde, Hilfe und Chat
+  ließen sich vorher ausschließlich über ihren Schließen-Knopf beenden, der
+  Fokus blieb dahinter im Hintergrund hängen, und per Tab landete man
+  mitten im verdeckten Tisch. Jetzt gelten die üblichen Konventionen für
+  modale Dialoge (WAI-ARIA-Muster "Dialog (Modal)", wie es auch shadcn/ui
+  über Radix umsetzt): Escape schließt, ein Klick auf den abgedunkelten
+  Hintergrund schließt, der Fokus wandert beim Öffnen in den Dialog, bleibt
+  per Tab darin gefangen und kehrt beim Schließen auf das auslösende
+  Element zurück. Dazu `role="dialog"`, `aria-modal` und `aria-labelledby`
+  auf dem jeweiligen Panel.
+  Die **Chat-Schublade läuft bewusst als NICHT-modaler Dialog**: Sie
+  verdeckt den Tisch nicht, das Spiel läuft daneben weiter. Escape und
+  Fokus-Rückgabe gelten dort ebenso, eine Fokusfalle wäre aber falsch –
+  man muss jederzeit zurück an den Tisch tabben können. Deshalb trägt sie
+  auch kein `aria-modal`.
 - **Poker-Hilfe** (`#help-overlay`, Knopf ❓ in der Tisch-Kopfzeile):
   Handrangfolge, Ablauf einer Hand, Bedeutung der Aktionen und der
   Fähigkeiten – damit auch jemand ohne Poker-Vorwissen sofort mitspielen

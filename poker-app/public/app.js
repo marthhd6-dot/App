@@ -286,7 +286,11 @@ socket.on('login-success', ({ username, token }) => {
   document.getElementById('account-btn').hidden = true;
   document.getElementById('logout-btn').hidden = false;
   document.getElementById('account-error').hidden = true;
-  document.getElementById('account-overlay').hidden = true;
+  // Über closeAccountOverlay(), damit auch nach erfolgreichem Login der
+  // Fokus wieder dort landet, wo der Dialog geöffnet wurde – der
+  // Account-Knopf selbst ist danach ausgeblendet, dann greift die
+  // Sichtbarkeitsprüfung in dialogGeschlossen().
+  closeAccountOverlay();
   socket.emit('get-rank', { name: username });
 });
 
@@ -508,19 +512,110 @@ document.getElementById('bots-close-btn').addEventListener('click', () => {
   showScreen('join');
 });
 
+// --- Dialog-Verhalten (Tastatur & Fokus) ----------------------------------
+// Gemeinsames Verhalten für alle Overlays (Account, Freunde, Hilfe, Chat).
+// Vorher ließen sie sich ausschließlich über ihren Schließen-Knopf beenden,
+// der Fokus blieb dahinter im Hintergrund hängen und man konnte per Tab aus
+// dem geöffneten Dialog heraus in den verdeckten Tisch tabben.
+// Umgesetzt sind die üblichen Konventionen für modale Dialoge (WAI-ARIA
+// "Dialog (Modal)"-Muster, wie es auch shadcn/ui über Radix anwendet):
+//   - Escape schließt
+//   - Klick auf den abgedunkelten Hintergrund schließt
+//   - beim Öffnen wandert der Fokus in den Dialog
+//   - Tab bleibt im Dialog gefangen (Fokusfalle)
+//   - beim Schließen kehrt der Fokus auf das auslösende Element zurück
+//
+// Die Chat-Schublade läuft bewusst als NICHT-modaler Dialog: Sie verdeckt
+// den Tisch nicht vollständig, das Spiel läuft daneben weiter – Escape und
+// Fokus-Rückgabe gelten, eine Fokusfalle wäre hier aber falsch, weil man
+// jederzeit zurück an den Tisch tabben können muss.
+
+const FOKUSSIERBAR =
+  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+let offenerDialog = null; // { element, schliessen, ausloeser, modal }
+
+function fokussierbareElemente(element) {
+  // offsetParent === null filtert alles aus, was gerade ausgeblendet ist
+  // (z. B. der "Abmelden"-Knopf oder ein hidden Fehler-Banner).
+  return [...element.querySelectorAll(FOKUSSIERBAR)].filter((el) => el.offsetParent !== null);
+}
+
+// element: das sichtbar werdende Overlay, schliessen: dessen eigene
+// Schließen-Funktion (damit Aufräumarbeiten wie das Stoppen des
+// Freunde-Pollings nicht doppelt gepflegt werden müssen).
+function dialogOeffnen(element, schliessen, { modal = true } = {}) {
+  const ausloeser = document.activeElement;
+  element.hidden = false;
+  offenerDialog = { element, schliessen, ausloeser, modal };
+  const ziele = fokussierbareElemente(element);
+  if (ziele.length > 0) ziele[0].focus();
+}
+
+// Von jeder Schließen-Funktion aufzurufen, NACHDEM das Overlay versteckt
+// wurde – gibt den Fokus an das Element zurück, das den Dialog geöffnet hat.
+function dialogGeschlossen(element) {
+  if (!offenerDialog || offenerDialog.element !== element) return;
+  const { ausloeser } = offenerDialog;
+  offenerDialog = null;
+  if (ausloeser && typeof ausloeser.focus === 'function' && ausloeser.offsetParent !== null) {
+    ausloeser.focus();
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!offenerDialog) return;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    offenerDialog.schliessen();
+    return;
+  }
+
+  if (e.key !== 'Tab' || !offenerDialog.modal) return;
+
+  const ziele = fokussierbareElemente(offenerDialog.element);
+  if (ziele.length === 0) return;
+  const erstes = ziele[0];
+  const letztes = ziele[ziele.length - 1];
+
+  // Am Rand angekommen auf die andere Seite springen; steht der Fokus
+  // (etwa nach einem Klick daneben) außerhalb des Dialogs, ihn zurückholen.
+  if (!offenerDialog.element.contains(document.activeElement)) {
+    e.preventDefault();
+    erstes.focus();
+  } else if (e.shiftKey && document.activeElement === erstes) {
+    e.preventDefault();
+    letztes.focus();
+  } else if (!e.shiftKey && document.activeElement === letztes) {
+    e.preventDefault();
+    erstes.focus();
+  }
+});
+
+// Klick auf den abgedunkelten Hintergrund schließt – nur wenn der Klick
+// wirklich der Hintergrundfläche selbst gilt und nicht dem Panel darin.
+document.addEventListener('mousedown', (e) => {
+  if (!offenerDialog || !offenerDialog.modal) return;
+  if (e.target === offenerDialog.element) offenerDialog.schliessen();
+});
+
 // --- Account -------------------------------------------------------------
 
 const accountOverlay = document.getElementById('account-overlay');
 const accountErrorEl = document.getElementById('account-error');
 
+function closeAccountOverlay() {
+  accountOverlay.hidden = true;
+  dialogGeschlossen(accountOverlay);
+}
+
 document.getElementById('account-btn').addEventListener('click', () => {
   accountErrorEl.hidden = true;
-  accountOverlay.hidden = false;
+  dialogOeffnen(accountOverlay, closeAccountOverlay);
 });
 
-document.getElementById('account-close-btn').addEventListener('click', () => {
-  accountOverlay.hidden = true;
-});
+document.getElementById('account-close-btn').addEventListener('click', closeAccountOverlay);
 
 function submitAccountForm(eventName) {
   const username = document.getElementById('account-username-input').value.trim();
@@ -556,7 +651,7 @@ const friendsOverlay = document.getElementById('friends-overlay');
 const friendsErrorEl = document.getElementById('friends-error');
 
 function openFriendsOverlay() {
-  friendsOverlay.hidden = false;
+  dialogOeffnen(friendsOverlay, closeFriendsOverlay);
   renderFriendsList();
   refreshFriendsStatus();
   clearInterval(friendsPollTimer);
@@ -566,6 +661,7 @@ function openFriendsOverlay() {
 function closeFriendsOverlay() {
   friendsOverlay.hidden = true;
   clearInterval(friendsPollTimer);
+  dialogGeschlossen(friendsOverlay);
 }
 
 function refreshFriendsStatus() {
@@ -1295,21 +1391,26 @@ function appendChatMessage({ name, text, at }) {
 }
 
 function openChat() {
-  chatDrawer.hidden = false;
+  // Nicht-modal: Der Tisch bleibt daneben bedienbar, deshalb keine
+  // Fokusfalle – Escape und Fokus-Rückgabe gelten trotzdem.
+  dialogOeffnen(chatDrawer, closeChat, { modal: false });
   unreadChatCount = 0;
   renderChatUnread();
   chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
   chatInput.focus();
 }
 
+function closeChat() {
+  chatDrawer.hidden = true;
+  dialogGeschlossen(chatDrawer);
+}
+
 document.getElementById('chat-toggle-btn').addEventListener('click', () => {
   playUiClickSound();
   if (chatDrawer.hidden) openChat();
-  else chatDrawer.hidden = true;
+  else closeChat();
 });
-document.getElementById('chat-close-btn').addEventListener('click', () => {
-  chatDrawer.hidden = true;
-});
+document.getElementById('chat-close-btn').addEventListener('click', closeChat);
 document.getElementById('chat-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const text = chatInput.value.trim();
@@ -1333,13 +1434,15 @@ socket.on('chat-message', (message) => {
 
 // --- Poker-Hilfe -----------------------------------------------------------
 const helpOverlay = document.getElementById('help-overlay');
+function closeHelpOverlay() {
+  helpOverlay.hidden = true;
+  dialogGeschlossen(helpOverlay);
+}
 document.getElementById('help-btn').addEventListener('click', () => {
   playUiClickSound();
-  helpOverlay.hidden = false;
+  dialogOeffnen(helpOverlay, closeHelpOverlay);
 });
-document.getElementById('help-close-btn').addEventListener('click', () => {
-  helpOverlay.hidden = true;
-});
+document.getElementById('help-close-btn').addEventListener('click', closeHelpOverlay);
 
 // --- Zug-Countdown ---------------------------------------------------------
 // Der Server erzwingt nach TURN_TIMEOUT_MS automatisch Check bzw. Fold
