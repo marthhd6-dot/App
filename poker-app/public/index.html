@@ -44,6 +44,30 @@
     </div>
     <div id="confetti-container" class="confetti-container"></div>
 
+    <!-- Die vier Kartenfarben als wiederverwendbare Symbole. Sie ersetzen
+         die früheren Emojis in der Lobby: Die Anordnung der Symbole sagt,
+         WIE gespielt wird (vier einzeln = jeder für sich, zwei Paare =
+         Teams, ausgefüllt gegen umrandet = Mensch gegen Bots), die Farbe
+         sagt, WOFÜR (Gold = Ranked, Grün = Casual, Blau = Üben). Bewusst
+         als Pfade statt als Schriftzeichen, damit sie unabhängig von
+         installierten Schriften überall gleich aussehen. -->
+    <svg class="suit-sprite" aria-hidden="true" focusable="false">
+      <defs>
+        <symbol id="suit-spade" viewBox="0 0 24 24">
+          <path d="M12 2.2C12 2.2 3.6 9 3.6 14.1a4.3 4.3 0 0 0 7.3 3.1c.1 2.1-.9 3.5-2.2 4.6h6.6c-1.3-1.1-2.3-2.5-2.2-4.6a4.3 4.3 0 0 0 7.3-3.1C20.4 9 12 2.2 12 2.2Z"/>
+        </symbol>
+        <symbol id="suit-heart" viewBox="0 0 24 24">
+          <path d="M12 21.4S2.9 14.6 2.9 8.8a4.9 4.9 0 0 1 9.1-2.5 4.9 4.9 0 0 1 9.1 2.5c0 5.8-9.1 12.6-9.1 12.6Z"/>
+        </symbol>
+        <symbol id="suit-diamond" viewBox="0 0 24 24">
+          <path d="M12 1.8 20.6 12 12 22.2 3.4 12 12 1.8Z"/>
+        </symbol>
+        <symbol id="suit-club" viewBox="0 0 24 24">
+          <path d="M12 2.1a3.9 3.9 0 0 0-3.2 6.1 3.9 3.9 0 1 0-.9 7.4 3.9 3.9 0 0 0 2.9-1.3c.1 2.6-.8 4.3-2 5.5h6.4c-1.2-1.2-2.1-2.9-2-5.5a3.9 3.9 0 0 0 2.9 1.3 3.9 3.9 0 1 0-.9-7.4A3.9 3.9 0 0 0 12 2.1Z"/>
+        </symbol>
+      </defs>
+    </svg>
+
     <div id="friend-invite-banner" class="error-banner invite-banner" hidden>
       <span id="friend-invite-text"></span>
       <button id="friend-invite-join-btn" class="btn btn-primary btn-small">Beitreten</button>
@@ -64,7 +88,7 @@
          Tisch-Layout unangetastet. -->
     <div id="chat-drawer" class="chat-drawer" role="dialog" aria-labelledby="chat-drawer-title" hidden>
       <div class="chat-drawer-head">
-        <span id="chat-drawer-title">💬 Tisch-Chat</span>
+        <span id="chat-drawer-title">Tisch-Chat</span>
         <button id="chat-close-btn" class="btn btn-ghost btn-small" aria-label="Chat schließen">✕</button>
       </div>
       <div id="chat-messages" class="chat-messages"></div>
@@ -76,7 +100,7 @@
 
     <div id="help-overlay" class="modal-overlay" hidden>
       <div class="panel panel-wide help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
-        <h1 id="help-title">❓ Poker-Hilfe</h1>
+        <h1 id="help-title">Poker-Hilfe</h1>
         <h2>Handrangfolge (stärkste zuerst)</h2>
         <ol class="help-hands">
           <li><strong>Royal Flush</strong> – 10 J Q K A in einer Farbe</li>
@@ -117,7 +141,7 @@
 
     <div id="friends-overlay" class="modal-overlay" hidden>
       <div class="panel panel-wide" role="dialog" aria-modal="true" aria-labelledby="friends-title">
-        <h1 id="friends-title">👥 Freunde</h1>
+        <h1 id="friends-title">Freunde</h1>
         <div id="friends-error" class="error-banner" hidden></div>
         <div class="join-row">
           <input
@@ -138,7 +162,7 @@
 
     <div id="account-overlay" class="modal-overlay" hidden>
       <div class="panel" role="dialog" aria-modal="true" aria-labelledby="account-title">
-        <h1 id="account-title">👤 Account</h1>
+        <h1 id="account-title">Account</h1>
         <p class="account-hint">
           Ein Account schützt deinen Namen mit einem Passwort, damit ihn niemand sonst verwenden kann. Ohne Account
           kannst du weiterhin einfach mit einem beliebigen Namen spielen.
@@ -162,83 +186,119 @@
       </div>
     </div>
 
+    <!-- Lobby: zwei Spalten auf breiten Bildschirmen (links Identität,
+         Name und eigener Tisch, rechts die Spielmodi als Raster), auf
+         schmalen Geräten einspaltig untereinander. -->
     <div id="join-screen" class="screen">
-      <div class="panel lobby-panel">
-        <div class="brand">
-          <span class="brand-chip">♠</span>
-          <h1>Rumble Poker</h1>
-        </div>
-        <p>
-          Erstelle einen neuen Tisch, tritt einem bestehenden per Code bei, oder spiele 1v1v1v1 oder 2v2 – jeweils
-          Ranked oder Casual. Im 2v2 Casual siehst du zusätzlich die Karten deines Teammitglieds. Zum Üben geht's
-          auch sofort gegen Bots, deren Stärke sich nach der gewählten Rang-Stufe richtet.
-        </p>
-        <div id="join-error" class="error-banner" hidden></div>
-        <div class="account-bar">
-          <input id="name-input" type="text" placeholder="Dein Name" aria-label="Dein Name" maxlength="20" />
-          <button id="account-btn" class="btn btn-ghost btn-small">👤 Account</button>
-          <button id="logout-btn" class="btn btn-ghost btn-small" hidden>Abmelden</button>
-        </div>
-        <div id="my-rank-label" class="rank-label" hidden></div>
+      <div class="lobby">
+        <div class="lobby-intro">
+          <div class="brand">
+            <span class="brand-chip" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="brand-chip-suit"><use href="#suit-spade" /></svg>
+            </span>
+            <h1>Rumble Poker</h1>
+          </div>
+          <p class="lobby-claim">
+            Texas Hold'em im Browser – gegen Freunde, fremde Gegner oder Bots. Kein Download, kein Echtgeld.
+          </p>
 
-        <div class="lobby-section">
-          <div class="lobby-section-label">
-            <span class="lobby-chip-dot lobby-chip-dot-table"></span>Eigener Tisch
-          </div>
-          <div class="join-row">
-            <button id="create-room-btn" class="btn btn-ghost">Neuen Tisch erstellen</button>
-          </div>
-          <div class="join-row">
-            <input id="room-code-input" type="text" placeholder="Raum-Code" aria-label="Raum-Code" maxlength="4" />
-            <button id="join-room-btn" class="btn btn-ghost">Tisch beitreten</button>
-          </div>
-        </div>
+          <div id="join-error" class="error-banner" hidden></div>
 
-        <div class="lobby-section">
-          <div class="lobby-section-label lobby-section-label-ranked">
-            <span class="lobby-chip-dot lobby-chip-dot-ranked"></span>Ranked · zählt für deinen Rang
+          <div class="account-bar">
+            <input id="name-input" type="text" placeholder="Dein Name" aria-label="Dein Name" maxlength="20" />
+            <button id="account-btn" class="btn btn-ghost btn-small">Account</button>
+            <button id="logout-btn" class="btn btn-ghost btn-small" hidden>Abmelden</button>
           </div>
-          <div class="join-row">
-            <button id="ranked-queue-btn" class="btn btn-mode btn-mode-ranked">🏆 1v1v1v1 spielen</button>
+          <div id="my-rank-label" class="rank-label" hidden></div>
+
+          <div class="lobby-block">
+            <h2>Eigener Tisch</h2>
+            <p>Ein privater Tisch für deine Runde. Teile den Code, dann kommen die anderen dazu.</p>
+            <div class="join-row">
+              <button id="create-room-btn" class="btn btn-ghost">Neuen Tisch erstellen</button>
+            </div>
+            <div class="join-row">
+              <input id="room-code-input" type="text" placeholder="Raum-Code" aria-label="Raum-Code" maxlength="4" />
+              <button id="join-room-btn" class="btn btn-ghost">Tisch beitreten</button>
+            </div>
           </div>
-          <div class="join-row">
-            <button id="ranked-team-queue-btn" class="btn btn-mode btn-mode-ranked">🏆 2v2 spielen</button>
-          </div>
-          <div class="join-row">
+
+          <div class="lobby-links">
             <button id="leaderboard-btn" class="btn btn-ghost btn-small">Bestenliste</button>
-            <button id="rank-path-btn" class="btn btn-ghost btn-small">📈 Mein Rang</button>
+            <button id="rank-path-btn" class="btn btn-ghost btn-small">Mein Rang</button>
+            <button id="friends-btn" class="btn btn-ghost btn-small">Freunde</button>
+          </div>
+
+          <div class="legal-footer">
+            <a href="datenschutz.html">Datenschutz</a>
+            <a href="agb.html">AGB</a>
+            <a href="cookies.html">Cookies</a>
+            <a href="mailto:marthhd.6@gmail.com">Kontakt</a>
           </div>
         </div>
 
-        <div class="lobby-section">
-          <div class="lobby-section-label lobby-section-label-casual">
-            <span class="lobby-chip-dot lobby-chip-dot-casual"></span>Casual · zum Spaß, ohne Rang-Bezug
-          </div>
-          <div class="join-row">
-            <button id="casual4-queue-btn" class="btn btn-mode btn-mode-casual">🎲 1v1v1v1 spielen</button>
-          </div>
-          <div class="join-row">
-            <button id="casual-team-queue-btn" class="btn btn-mode btn-mode-casual">🎲 2v2 spielen</button>
-          </div>
-        </div>
+        <div class="lobby-modes">
+          <button id="ranked-queue-btn" class="mode-card mode-card-ranked mode-card-hero">
+            <!-- Vier einzelne Farben im Kreis: vier Spieler, jeder für sich. -->
+            <svg class="mode-mark" viewBox="0 0 56 40" aria-hidden="true">
+              <use href="#suit-spade" x="21" y="1" width="14" height="14" />
+              <use href="#suit-heart" x="38" y="13" width="14" height="14" />
+              <use href="#suit-diamond" x="21" y="25" width="14" height="14" />
+              <use href="#suit-club" x="4" y="13" width="14" height="14" />
+            </svg>
+            <span class="mode-name">1v1v1v1</span>
+            <span class="mode-kind">Ranked</span>
+            <span class="mode-note">Vier Spieler, jeder für sich. Zählt für deinen Rang.</span>
+          </button>
 
-        <div class="lobby-section">
-          <div class="lobby-section-label lobby-section-label-practice">
-            <span class="lobby-chip-dot lobby-chip-dot-practice"></span>Üben
-          </div>
-          <div class="join-row">
-            <button id="bots-setup-btn" class="btn btn-mode btn-mode-practice">🤖 Gegen Bots üben</button>
-          </div>
-        </div>
+          <button id="ranked-team-queue-btn" class="mode-card mode-card-ranked mode-card-wide">
+            <!-- Zwei Paare mit Lücke dazwischen: zwei Teams. -->
+            <svg class="mode-mark" viewBox="0 0 56 40" aria-hidden="true">
+              <use href="#suit-spade" x="3" y="6" width="14" height="14" />
+              <use href="#suit-club" x="12" y="16" width="14" height="14" />
+              <use href="#suit-heart" x="30" y="6" width="14" height="14" />
+              <use href="#suit-diamond" x="39" y="16" width="14" height="14" />
+            </svg>
+            <span class="mode-name">2v2</span>
+            <span class="mode-kind">Ranked</span>
+            <span class="mode-note">Zwei Teams. Zählt für deinen Rang.</span>
+          </button>
 
-        <div class="lobby-footer">
-          <button id="friends-btn" class="btn btn-ghost btn-small">👥 Freunde</button>
-        </div>
-        <div class="legal-footer">
-          <a href="datenschutz.html">Datenschutz</a>
-          <a href="agb.html">AGB</a>
-          <a href="cookies.html">Cookies</a>
-          <a href="mailto:marthhd.6@gmail.com">Kontakt</a>
+          <button id="casual4-queue-btn" class="mode-card mode-card-casual">
+            <svg class="mode-mark" viewBox="0 0 56 40" aria-hidden="true">
+              <use href="#suit-spade" x="21" y="1" width="14" height="14" />
+              <use href="#suit-heart" x="38" y="13" width="14" height="14" />
+              <use href="#suit-diamond" x="21" y="25" width="14" height="14" />
+              <use href="#suit-club" x="4" y="13" width="14" height="14" />
+            </svg>
+            <span class="mode-name">1v1v1v1</span>
+            <span class="mode-kind">Casual</span>
+            <span class="mode-note">Gleiches Spiel, ohne Auswirkung auf den Rang.</span>
+          </button>
+
+          <button id="casual-team-queue-btn" class="mode-card mode-card-casual">
+            <svg class="mode-mark" viewBox="0 0 56 40" aria-hidden="true">
+              <use href="#suit-spade" x="3" y="6" width="14" height="14" />
+              <use href="#suit-club" x="12" y="16" width="14" height="14" />
+              <use href="#suit-heart" x="30" y="6" width="14" height="14" />
+              <use href="#suit-diamond" x="39" y="16" width="14" height="14" />
+            </svg>
+            <span class="mode-name">2v2</span>
+            <span class="mode-kind">Casual</span>
+            <span class="mode-note">Hier siehst du zusätzlich die Karten deines Teammitglieds.</span>
+          </button>
+
+          <button id="bots-setup-btn" class="mode-card mode-card-practice mode-card-wide">
+            <!-- Eine ausgefüllte Farbe gegen umrandete: du gegen Bots. -->
+            <svg class="mode-mark" viewBox="0 0 56 40" aria-hidden="true">
+              <use href="#suit-spade" x="3" y="13" width="14" height="14" />
+              <use href="#suit-heart" x="21" y="13" width="14" height="14" class="mode-mark-hollow" />
+              <use href="#suit-club" x="39" y="13" width="14" height="14" class="mode-mark-hollow" />
+            </svg>
+            <span class="mode-name">Gegen Bots üben</span>
+            <span class="mode-kind">Üben</span>
+            <span class="mode-note">Sofort loslegen, Anzahl und Stärke der Gegner wählst du selbst.</span>
+          </button>
         </div>
       </div>
     </div>
@@ -256,7 +316,7 @@
 
     <div id="leaderboard-screen" class="screen" hidden>
       <div class="panel panel-wide">
-        <h1>🏆 Bestenliste</h1>
+        <h1>Bestenliste</h1>
         <div id="leaderboard-list" class="leaderboard-list"></div>
         <div class="join-row">
           <button id="leaderboard-close-btn" class="btn btn-ghost">Zurück</button>
@@ -266,7 +326,7 @@
 
     <div id="rank-screen" class="screen" hidden>
       <div class="panel panel-wide">
-        <h1>📈 Mein Rang</h1>
+        <h1>Mein Rang</h1>
         <div id="rank-path-name" class="rank-path-name"></div>
         <div id="rank-path" class="rank-path"></div>
         <div class="rank-progress-bar">
@@ -281,7 +341,7 @@
 
     <div id="bots-screen" class="screen" hidden>
       <div class="panel panel-wide">
-        <h1>🤖 Gegen Bots üben</h1>
+        <h1>Gegen Bots üben</h1>
         <p>
           Wähle Anzahl und Stärke der Bot-Gegner. Bots handeln automatisch – ideal zum Üben ohne echte Mitspieler.
           Kein Rating-Bezug.
@@ -317,16 +377,16 @@
       <div id="hand-result" class="hand-result" hidden></div>
       <div id="rebuy-banner" class="hand-result rebuy-banner" hidden>
         <span>Du hast keine Chips mehr.</span>
-        <button id="rebuy-btn" class="btn btn-primary btn-small">💰 1000 Chips nachkaufen</button>
+        <button id="rebuy-btn" class="btn btn-primary btn-small">1000 Chips nachkaufen</button>
       </div>
 
       <div class="table-header">
         <span id="room-code-label" class="room-code-label"></span>
-        <span id="ranked-badge" class="ranked-badge" hidden>🏆 1v1v1v1 RANKED</span>
-        <span id="casual4-badge" class="casual4-badge" hidden>🎲 1v1v1v1 CASUAL</span>
-        <span id="ranked-team-badge" class="ranked-team-badge" hidden>⚔️ 2v2 RANKED</span>
-        <span id="casual-team-badge" class="casual-team-badge" hidden>👥 2v2 CASUAL</span>
-        <span id="bots-badge" class="bots-badge" hidden>🤖 GEGEN BOTS</span>
+        <span id="ranked-badge" class="ranked-badge" hidden>1v1v1v1 Ranked</span>
+        <span id="casual4-badge" class="casual4-badge" hidden>1v1v1v1 Casual</span>
+        <span id="ranked-team-badge" class="ranked-team-badge" hidden>2v2 Ranked</span>
+        <span id="casual-team-badge" class="casual-team-badge" hidden>2v2 Casual</span>
+        <span id="bots-badge" class="bots-badge" hidden>Gegen Bots</span>
         <span id="phase-label" class="phase-label"></span>
         <span id="turn-timer" class="turn-timer" hidden></span>
         <span id="current-bet-label" class="current-bet-label"></span>
