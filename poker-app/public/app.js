@@ -1004,17 +1004,11 @@ const ABILITY_CATEGORY_LABELS = {
   resource: 'Ressourcen',
 };
 
-// Rendert die eigenen vier Fähigkeiten-Karten (eine je Kategorie, siehe
-// abilities.js) neben den eigenen Hole Cards. abilities kommt direkt aus
-// state.players[...].abilities (siehe describeAbilitiesForClient() in
-// table.js) – null, solange noch keine Hand gestartet wurde. Jede noch
-// ungenutzte Karte ist klickbar und löst use-ability aus; eine bereits
-// eingesetzte Karte bleibt bis zur nächsten Hand sichtbar, aber deaktiviert.
 // Welches Symbol aus dem Sprite in index.html eine Fähigkeit bekommt.
 // Die Zuordnung liegt im Frontend, nicht im Server-Katalog: Der Server
-// sagt, WELCHE Fähigkeit ein Spieler hat, das Aussehen ist Sache der
-// Oberflaeche. Unbekannte ids fallen auf das Kartensymbol zurueck, damit
-// nie ein leerer Verweis in der Seite landet.
+// sagt, WELCHE Fähigkeit ein Spieler hat, wie sie aussieht, ist Sache
+// der Oberfläche. Unbekannte ids fallen auf das Kartensymbol zurück,
+// damit nie ein leerer Verweis in der Seite landet.
 const ABILITY_SYMBOLS = {
   cardSwap: 'icon-ability-swap',
   potBonus: 'icon-ability-pot',
@@ -1022,6 +1016,12 @@ const ABILITY_SYMBOLS = {
   chipBoost: 'icon-ability-boost',
 };
 
+// Rendert die eigenen vier Fähigkeiten-Karten (eine je Kategorie, siehe
+// abilities.js) neben den eigenen Hole Cards. abilities kommt direkt aus
+// state.players[...].abilities (siehe describeAbilitiesForClient() in
+// table.js) – null, solange noch keine Hand gestartet wurde. Jede noch
+// ungenutzte Karte ist klickbar und löst use-ability aus; eine bereits
+// eingesetzte Karte bleibt bis zur nächsten Hand sichtbar, aber deaktiviert.
 function renderAbilities(abilities) {
   const container = document.getElementById('my-abilities');
   container.innerHTML = '';
