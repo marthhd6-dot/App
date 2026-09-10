@@ -24,19 +24,21 @@ const ABILITY_CHIP_BOOST_RATE = 0.1;
 // Table._applyPotBonusIfActive()).
 const ABILITY_POT_BONUS_RATE = 0.2;
 
+// Der Katalog führt bewusst kein Feld für die Darstellung. Früher stand
+// hier je ein Emoji, das der Server bis in die Seite durchgereicht hat.
+// Welches Bild eine Fähigkeit bekommt, entscheidet jetzt allein das
+// Frontend anhand der id (siehe ABILITY_SYMBOLS in public/app.js).
 const ABILITIES = {
   cardSwap: {
     id: 'cardSwap',
     category: 'cards',
     name: 'Kartentausch',
-    icon: '🔄',
     description: 'Tausche eine deiner Hole Cards gegen eine neue, zufällige Karte vom Deck.',
   },
   potBonus: {
     id: 'potBonus',
     category: 'pot',
     name: 'Pot-Bonus',
-    icon: '💰',
     description: `Gewinnst du diese Hand, erhältst du zusätzlich ${Math.round(
       ABILITY_POT_BONUS_RATE * 100
     )}% Bonus-Chips obendrauf.`,
@@ -45,14 +47,12 @@ const ABILITIES = {
     id: 'spy',
     category: 'intel',
     name: 'Spionage',
-    icon: '👁️',
     description: 'Deckt eine zufällige Hole Card eines zufälligen Gegners auf – nur für dich sichtbar.',
   },
   chipBoost: {
     id: 'chipBoost',
     category: 'resource',
     name: 'Chip-Boost',
-    icon: '⚡',
     description: `Erhalte sofort ${Math.round(ABILITY_CHIP_BOOST_RATE * 100)}% deiner aktuellen Chips als Bonus.`,
   },
 };
@@ -88,7 +88,6 @@ function describeAbilitiesForClient(abilities) {
       category,
       id: slot.id,
       name: meta.name,
-      icon: meta.icon,
       description: meta.description,
       used: slot.used,
     };

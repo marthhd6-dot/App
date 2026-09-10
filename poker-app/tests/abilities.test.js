@@ -41,7 +41,7 @@ run('describeAbilitiesForClient: null bleibt null, sonst 4 Einträge mit Katalog
   const described = describeAbilitiesForClient(assignAbilities());
   assert.strictEqual(described.length, 4);
   described.forEach((entry) => {
-    assert.ok(entry.name && entry.icon && entry.description);
+    assert.ok(entry.name && entry.description);
     assert.strictEqual(entry.used, false);
   });
 });

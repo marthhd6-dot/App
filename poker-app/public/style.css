@@ -760,7 +760,10 @@ h2 {
 }
 
 /* Der Sprite selbst wird nie gezeichnet, nur seine Symbole referenziert. */
-.suit-sprite {
+/* Der Symbolvorrat selbst wird nie gezeichnet – nur die <use>-Verweise
+   darauf. Er steht trotzdem im Dokument, damit jedes Symbol die Farbe
+   seines Knopfes erben kann; eine externe Datei könnte das nicht. */
+.icon-sprite {
   position: absolute;
   width: 0;
   height: 0;
@@ -822,6 +825,50 @@ button:disabled {
 .btn-small {
   padding: 8px 14px;
   font-size: 0.85rem;
+}
+
+/* Ein gemeinsamer Strichstil für alle Symbole der Oberfläche: keine
+   Füllung, die Linie nimmt die Textfarbe des Knopfes an. Dadurch stimmt
+   das Symbol automatisch mit hellem wie dunklem Knopfgrund überein,
+   statt wie ein Emoji seine eigene Farbe mitzubringen. */
+.tool-icon,
+.ability-card-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: 0 0 auto;
+}
+
+.tool-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Im Zug-Zähler steht das Symbol neben kleiner Schrift und darf sie
+   nicht überragen. */
+#turn-timer .tool-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Knöpfe, die nur ein Symbol tragen, werden quadratisch statt breit –
+   und behalten dabei eine Fläche, die sich auf dem Handy sicher treffen
+   lässt. */
+.btn-icon,
+#turn-timer,
+#leave-table-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-icon {
+  min-width: 40px;
+  min-height: 36px;
+  padding: 8px;
 }
 
 .btn-fold {
@@ -2141,16 +2188,14 @@ button:disabled {
 }
 
 .ability-card-category {
-  font-size: 0.58rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+  font-size: 0.62rem;
+  font-weight: 600;
   opacity: 0.7;
 }
 
 .ability-card-icon {
-  font-size: 2rem;
-  line-height: 1.15;
+  width: 30px;
+  height: 30px;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
 }
 
@@ -2162,10 +2207,8 @@ button:disabled {
 }
 
 .ability-card-status {
-  font-size: 0.62rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 0.66rem;
+  font-weight: 600;
   opacity: 0.75;
   margin-top: 1px;
 }
@@ -2771,7 +2814,8 @@ button:disabled {
     padding: 7px 4px 6px;
   }
   .ability-card-icon {
-    font-size: 1.5rem;
+    width: 24px;
+    height: 24px;
   }
   .ability-card-name {
     font-size: 0.66rem;
@@ -2908,7 +2952,8 @@ button:disabled {
     display: none;
   }
   .ability-card-icon {
-    font-size: 1.3rem;
+    width: 21px;
+    height: 21px;
   }
   .ability-card-name {
     font-size: 0.62rem;

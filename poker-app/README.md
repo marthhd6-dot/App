@@ -344,7 +344,25 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   Tisch-Badges (`.ranked-badge`/`.ranked-team-badge` usw.), damit die
   Kategorie am Tisch genauso erkennbar bleibt wie im Menü. Die Badges
   tragen dabei keine Emoji und keine Versalien mehr, sondern nur noch den
-  Modusnamen in ihrer Kategoriefarbe. Zusätzlich
+  Modusnamen in ihrer Kategoriefarbe.
+- **Ein Strichsymbol-Satz für Werkzeugleiste und Fähigkeiten**
+  (`public/index.html`/`app.js`/`src/game/abilities.js`): Auch die
+  Symbolknöpfe der Tisch-Kopfzeile (Freunde, Chat, Hilfe, Ton, Menü), der
+  Zug-Zähler und die vier Fähigkeiten-Karten kommen ohne Emoji aus. Alle
+  Symbole liegen im selben Sprite wie die Kartenfarben (`.icon-sprite`,
+  `#icon-*`) und teilen sich einen Stil: 24er-Raster, keine Füllung,
+  Linienstärke 1.8, runde Enden und `stroke: currentColor`. Dadurch nimmt
+  jedes Symbol die Textfarbe seines Knopfes an – auf dem dunklen
+  Kopfzeilen-Grund hell, auf den hellen Fähigkeiten-Verläufen dunkel –
+  statt wie ein Emoji seine eigene Farbe und ihre Geräteabhängigkeit
+  mitzubringen. Der Fähigkeiten-Katalog auf dem Server führt deshalb kein
+  Darstellungsfeld mehr: Er sagt nur noch, welche Fähigkeit ein Spieler
+  hat, das Bild dazu wählt `ABILITY_SYMBOLS` in `app.js` anhand der id.
+  Zwei Fallen dabei: Der Ton-Schalter tauscht nur noch das `href` seines
+  `<use>` aus statt `textContent` zu setzen (das hätte das `<svg>` aus dem
+  Knopf geworfen), und der Zug-Zähler schreibt in ein eigenes
+  `#turn-timer-value`, damit das Uhr-Symbol daneben nicht bei jedem Tick
+  überschrieben wird. Zusätzlich
   bekommen Tisch-Kopfzeile (`.table-header`) und Aktions-Leiste
   (`.action-bar`) eine eigene, dezente Hintergrund-Fläche statt lose auf dem
   Seitenhintergrund zu schweben – wie eine Infotafel bzw. ein Bedienpult an
