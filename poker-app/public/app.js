@@ -997,13 +997,6 @@ function renderCommunityCards(cards, previouslyDealt) {
   if (newlyDealt > 0) playDealSound(newlyDealt);
 }
 
-const ABILITY_CATEGORY_LABELS = {
-  cards: 'Karten',
-  pot: 'Wette/Pot',
-  intel: 'Info/Gegner',
-  resource: 'Ressourcen',
-};
-
 // Welches Symbol aus dem Sprite in index.html eine Fähigkeit bekommt.
 // Die Zuordnung liegt im Frontend, nicht im Server-Katalog: Der Server
 // sagt, WELCHE Fähigkeit ein Spieler hat, wie sie aussieht, ist Sache
@@ -1032,13 +1025,20 @@ function renderAbilities(abilities) {
     card.className = `ability-card ability-${ability.category}${ability.used ? ' ability-used' : ''}`;
     card.disabled = ability.used;
     card.title = ability.description;
+    // Kategorie und "Einsetzen" standen früher als eigene Zeilen auf der
+    // Karte. Die Kategorie sagt die Farbe, und dass eine Karte ein Knopf
+    // ist, sagt der Knopf selbst – beides als Text zu wiederholen, hat die
+    // vier Karten lauter gemacht als die eigene Hand daneben. Für
+    // Screenreader bleibt der Zustand über aria-label erhalten.
+    card.setAttribute(
+      'aria-label',
+      ability.used ? `${ability.name}, bereits eingesetzt` : `${ability.name} einsetzen`
+    );
     card.innerHTML = `
-      <span class="ability-card-category">${ABILITY_CATEGORY_LABELS[ability.category] || ability.category}</span>
       <svg class="ability-card-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#${
         ABILITY_SYMBOLS[ability.id] || 'icon-ability-swap'
       }" /></svg>
       <span class="ability-card-name">${escapeHtml(ability.name)}</span>
-      <span class="ability-card-status">${ability.used ? 'Eingesetzt' : 'Einsetzen'}</span>
     `;
     card.addEventListener('click', () => {
       if (ability.used) return;

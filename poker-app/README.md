@@ -378,6 +378,34 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   ist unerreichbar weg. `align-items: safe center` zentriert nur solange
   Platz da ist und fällt sonst auf `flex-start` zurück. Die einfache
   `center`-Zeile bleibt als Rückfall für ältere Browser davor stehen.
+- **Rangfolge am Tisch umgedreht** (`public/style.css`/`app.js`/
+  `index.html`): Die vier Fähigkeiten-Karten standen als gefüllte
+  Farbflächen mit Dauerpuls da und haben die eigene Hand daneben
+  überstrahlt, obwohl die der Held dieses Bildschirms ist. Jetzt tragen
+  sie ihre Kategoriefarbe nur noch in Kante und Symbol auf dunklem Grund
+  (`--glow` je Kategorie), ohne Puls im Ruhezustand – Bewegung ohne
+  Nutzerauslöser bleibt dem vorbehalten, was gerade wirklich dran ist.
+  Die eigenen Karten wurden dafür größer (88×124 statt 76×106) und haben
+  als einziges Element auf diesem Bildschirm einen goldenen Lichtsaum.
+  Entfallen sind dabei drei Textzeilen, die nichts erklärt haben: die
+  Überschrift „DEINE KARTEN" über den eigenen Karten, die Kategoriezeile
+  auf jeder Fähigkeiten-Karte und das viermal wiederholte „Einsetzen" –
+  dass eine Karte ein Knopf ist, sagt der Knopf selbst. Für Screenreader
+  wandert der Zustand ins `aria-label`.
+- **Pot und Board in der echten Tischmitte** (`public/style.css`):
+  `.felt-center` saß bei 44 % Höhe, wodurch unterhalb über 40 % der
+  Filzfläche brach lagen – die eigenen Karten liegen ja nicht auf dem
+  Tisch, sondern daneben in der Spalte. Bei 50 % teilt sich der freie
+  Filz gleichmäßig auf. In der rechten Spalte schwebt die Hand jetzt in
+  der freien Höhe statt oben angeklebt zu sein, sodass kein Loch mehr
+  mitten in der Spalte steht.
+- **Aktions-Sprechblase verdeckte den Sitzplatz** (`public/style.css`):
+  `.action-bubble` stand `-160 %` ihrer eigenen Höhe über dem
+  Sitz-Ankerpunkt. Ein Sitzplatz ist je nach Bildschirm 75 bis 86 px
+  hoch und sein Anker liegt in der Mitte, also lag die Blase noch auf der
+  Platte und hat an den seitlichen Plätzen Name und Chips überschrieben.
+  Jetzt ist der Abstand ein fester Pixelwert (`calc(-100% - 50px)`), der
+  unabhängig von der Textlänge über der Platte bleibt.
 - **Glaubwürdiger 3D-Look für den Tisch, reines CSS** (`public/style.css`/
   `app.js`, keine neue Engine/kein Canvas/WebGL – die App bleibt reines
   Server-gerendertes HTML/CSS/JS ohne Build-Schritt, siehe Struktur oben):
