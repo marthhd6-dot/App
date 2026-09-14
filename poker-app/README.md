@@ -947,6 +947,24 @@ unverzerrt quadratisch, unabhängig vom Seitenverhältnis:
   `💰 1000 Chips nachkaufen` an (`socket.on('rebuy')`); in den
   Matchmaking-Modi bewusst nicht, dort ist das Ausscheiden Teil der
   Wertung.
+- **Hände starten von selbst** (`scheduleNextHand()` im Server, Countdown
+  `#next-hand` im Client): Früher musste zwischen zwei Händen jemand
+  „Hand starten" drücken. Das hielt den ganzen Tisch auf, sobald genau
+  diese Person gerade wegsah, und es war der einzige Knopf im Spiel, der
+  nichts über Poker aussagte. Jetzt läuft nach jeder Hand ein Countdown,
+  den alle Clients aus `state.nextHandDeadline` anzeigen, und danach
+  teilt der Server aus. Die Pause nach einer gespielten Hand
+  (`NEXT_HAND_DELAY_MS`, Standard 7s) ist länger als der erste Start
+  (`FIRST_HAND_DELAY_MS`, Standard 3s), weil sie der Moment ist, in dem
+  man den Showdown liest; beide sind per Umgebungsvariable
+  überschreibbar. Geplant wird nur, wenn gerade keine Hand läuft und
+  `table.canStartHand()` zutrifft – dieselbe Bedingung, die `startHand()`
+  selbst prüft, damit die beiden nicht auseinanderlaufen können. Ist ein
+  Match ausgewertet, startet nichts mehr: Sonst spielte etwa das
+  siegreiche 2v2-Team hinter seinem Abschluss-Banner munter weiter.
+  `socket.on('start-hand')` bleibt bestehen, weil die App als PWA
+  ausgeliefert wird und ein Client mit altem zwischengespeichertem Stand
+  den Aufruf noch senden kann.
 - **Zug-Zeitlimit** (`TURN_TIMEOUT_MS`, Standard 45s, per Umgebungsvariable
   überschreibbar): Läuft die Bedenkzeit ab, führt der Server automatisch
   Check aus (falls nichts nachzuzahlen ist) bzw. Fold. Ohne das blockierte

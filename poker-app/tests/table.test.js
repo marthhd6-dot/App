@@ -570,4 +570,62 @@ run('Einsätze werden am Hand-Ende zurückgesetzt (Showdown nach River-Bet)', ()
   assert.strictEqual(totalChips(table), 2000, 'Chips bleiben trotz Zurücksetzen erhalten');
 });
 
+// canStartHand() entscheidet, ob der Server von selbst die nächste Hand
+// austeilt (siehe scheduleNextHand() in server.js). Weil dort niemand mehr
+// einen Knopf drückt, darf die Antwort nicht von startHand() abweichen –
+// sonst bliebe ein Tisch stumm stehen oder teilte aus, obwohl es nicht geht.
+run('canStartHand: unter zwei Spielern mit Chips nicht spielbar', () => {
+  const table = new Table();
+  assert.strictEqual(table.canStartHand(), false, 'leerer Tisch');
+
+  table.addPlayer('a', 'Anna');
+  assert.strictEqual(table.canStartHand(), false, 'ein Spieler allein');
+
+  table.addPlayer('b', 'Ben');
+  assert.strictEqual(table.canStartHand(), true, 'zwei Spieler mit Chips');
+});
+
+run('canStartHand: Spieler ohne Chips zählen nicht mit', () => {
+  const table = new Table();
+  table.addPlayer('a', 'Anna');
+  table.addPlayer('b', 'Ben');
+  table.addPlayer('c', 'Cem');
+  table.players[1].chips = 0;
+  table.players[2].chips = 0;
+  assert.strictEqual(table.canStartHand(), false);
+
+  table.players[1].chips = 1000;
+  assert.strictEqual(table.canStartHand(), true);
+});
+
+run('canStartHand: nach einem Nachkauf zählt der Spieler sofort wieder mit', () => {
+  const table = new Table();
+  table.addPlayer('a', 'Anna');
+  table.addPlayer('b', 'Ben');
+  table.startHand();
+  // Ben geht pleite und kauft nach. sittingOut bleibt bis zur nächsten Hand
+  // stehen, weil es erst in startHand() neu gesetzt wird – die Prüfung darf
+  // sich davon nicht täuschen lassen.
+  table.players[1].chips = 0;
+  table.players[1].sittingOut = true;
+  assert.strictEqual(table.canStartHand(), false, 'ohne Chips nicht spielbar');
+
+  table.players[1].chips = 1000;
+  assert.strictEqual(table.canStartHand(), true, 'nach dem Nachkauf wieder spielbar');
+  assert.strictEqual(table.players[1].sittingOut, true, 'sittingOut steht noch');
+  table.startHand();
+  assert.strictEqual(table.players[1].sittingOut, false, 'erst startHand() räumt es weg');
+});
+
+run('canStartHand: stimmt mit dem überein, was startHand() zulässt', () => {
+  const table = new Table();
+  table.addPlayer('a', 'Anna');
+  assert.strictEqual(table.canStartHand(), false);
+  assert.throws(() => table.startHand(), /Mindestens 2 Spieler/);
+
+  table.addPlayer('b', 'Ben');
+  assert.strictEqual(table.canStartHand(), true);
+  assert.doesNotThrow(() => table.startHand());
+});
+
 console.log('\nAlle Tests durchgelaufen.');

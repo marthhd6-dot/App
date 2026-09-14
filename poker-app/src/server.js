@@ -660,30 +660,14 @@ io.on('connection', (socket) => {
     socket.emit('invite-sent', { friendName: trimmed });
   });
 
+  // Hände starten von selbst (siehe scheduleNextHand()). Der Handler bleibt
+  // trotzdem bestehen: Die App wird als PWA ausgeliefert, ein Client mit
+  // altem zwischengespeichertem Stand kann diesen Aufruf also noch senden.
+  // Dann startet die Hand eben sofort statt nach Ablauf des Countdowns.
   socket.on('start-hand', () => {
-    // In allen Modi (Ranked und Casual, 1v1v1v1 und 2v2, sowie "Gegen Bots
-    // üben") vor jeder Hand die Blinds nach dem Turnier-Zeitplan setzen und
-    // den Hand-Zähler erhöhen (siehe blindsForHandsPlayed()): alle
-    // RANKED_BLIND_INCREASE_EVERY_HANDS Hände verdoppeln sich die Blinds,
-    // gedeckelt bei RANKED_MAX_SMALL_BLIND/-2x (aktuell 160/320).
     const code = socket.data.roomCode;
-    const escalatingEntry = getMatchEntry(code);
-    handleAction(socket, (table) => {
-      if (escalatingEntry) {
-        const { smallBlind, bigBlind } = blindsForHandsPlayed(escalatingEntry.handsPlayed);
-        table.smallBlind = smallBlind;
-        table.bigBlind = bigBlind;
-        escalatingEntry.handsPlayed += 1;
-      }
-      table.startHand();
-    });
-    // Nur wenn startHand() oben tatsächlich erfolgreich war (Phase ist dann
-    // 'preflop') – schlägt sie fehl (z. B. <2 Spieler), hat handleAction()
-    // den Fehler schon an den Client gemeldet, hier gibt es dann nichts zu
-    // tun. Eigener Schritt statt Teil von handleAction()'s Callback, weil
-    // Fähigkeiten pro Hand (nicht pro Aktion) ausgelöst werden.
-    const table = code && rooms.getTable(code);
-    if (table && table.phase === 'preflop') triggerBotAbilitiesForNewHand(code, table);
+    if (!code) return;
+    startHandInRoom(code);
   });
 
   // Setzt eine der vier Fähigkeiten-Kategorien des Spielers für die laufende
@@ -825,6 +809,8 @@ io.on('connection', (socket) => {
         botRooms.delete(roomCode);
         chatHistory.delete(roomCode);
         clearTurnTimer(roomCode);
+        clearHandStartTimer(roomCode);
+        beendeteMatchRaeume.delete(roomCode);
       } else {
         broadcastRoomState(roomCode);
       }
@@ -1152,6 +1138,41 @@ function handleAction(socket, action) {
   }
 }
 
+// Startet in einem Raum die nächste Hand. Sammelt alles, was zu einem
+// Handbeginn gehört, an einer Stelle: Blinds nach Turnier-Zeitplan setzen,
+// austeilen, Bot-Fähigkeiten für die neue Hand auslösen, Zustand verteilen
+// und speichern.
+//
+// Anders als handleAction() ohne Socket, weil der Auslöser in aller Regel
+// ein Timer ist und kein Spieler (siehe scheduleNextHand()). Ein
+// fehlgeschlagener Start ist hier deshalb auch kein Fehler, den jemand
+// sehen müsste: Fehlt ein zweiter Spieler mit Chips, bleibt der Tisch
+// einfach stehen, bis sich das ändert.
+function startHandInRoom(code) {
+  const table = code && rooms.getTable(code);
+  if (!table) return false;
+  clearHandStartTimer(code);
+  const escalatingEntry = getMatchEntry(code);
+  try {
+    if (escalatingEntry) {
+      const { smallBlind, bigBlind } = blindsForHandsPlayed(escalatingEntry.handsPlayed);
+      table.smallBlind = smallBlind;
+      table.bigBlind = bigBlind;
+      escalatingEntry.handsPlayed += 1;
+    }
+    table.startHand();
+  } catch {
+    // Noch nicht genug Spieler mit Chips. broadcastRoomState() plant den
+    // nächsten Versuch, sobald sich die Lage ändert.
+    return false;
+  }
+  triggerBotAbilitiesForNewHand(code, table);
+  broadcastRoomState(code);
+  persist();
+  maybeTriggerBotActions(code);
+  return true;
+}
+
 // Prüft nach einer Aktion (menschlich oder Bot), ob die Hand gerade am
 // Showdown angekommen ist, und ruft dafür den zum Raumtyp passenden
 // maybeFinish*Match()-Handler auf. Geteilt zwischen handleAction() (nach
@@ -1159,11 +1180,21 @@ function handleAction(socket, action) {
 // Bot-Zug), damit diese Fallunterscheidung nicht doppelt gepflegt wird.
 function dispatchMatchFinishIfShowdown(code, table) {
   if (table.phase !== 'showdown') return;
+  // Die maybeFinish*-Handler löschen den Eintrag ihres Raums, sobald das
+  // Match ausgewertet ist. War vorher einer da und danach keiner mehr, ist
+  // das Match vorbei – der Tisch darf dann keine Hand mehr von selbst
+  // starten, sonst spielte etwa das siegreiche 2v2-Team nach dem
+  // Abschluss-Banner munter weiter.
+  const warMatch = !!getMatchEntry(code);
   if (rankedRooms.has(code)) maybeFinishRankedMatch(code, table);
   else if (casualMatchRooms.has(code)) maybeFinishCasualMatch(code, table);
   else if (rankedTeamRooms.has(code)) maybeFinishRankedTeamMatch(code, table);
   else if (casualTeamRooms.has(code)) maybeFinishCasualTeamMatch(code, table);
   else if (botRooms.has(code)) maybeFinishBotMatch(code, table);
+  if (warMatch && !getMatchEntry(code)) {
+    beendeteMatchRaeume.add(code);
+    clearHandStartTimer(code);
+  }
 }
 
 // Wird nach jeder Aktion aufgerufen. Solange die aktuelle Wettrunde fertig
@@ -1501,6 +1532,57 @@ function ensureTurnTimer(code) {
   return deadline;
 }
 
+// --- Automatischer Handstart ---------------------------------------------
+// Früher musste jemand zwischen zwei Händen "Hand starten" drücken. Das
+// hielt den ganzen Tisch auf, wenn diese eine Person gerade wegsah, und es
+// war der einzige Knopf im Spiel, der nichts über Poker aussagte. Jetzt
+// läuft nach jeder Hand ein Countdown, den alle Clients sehen
+// (state.nextHandDeadline), und danach teilt der Server von selbst aus.
+//
+// Die Pause ist kein technisches Detail, sondern der Moment, in dem man den
+// Showdown liest und sieht, wer gewonnen hat. Deshalb nach einer gespielten
+// Hand länger als beim allerersten Start, wo es nichts zu lesen gibt.
+const NEXT_HAND_DELAY_MS = Number(process.env.NEXT_HAND_DELAY_MS) || 7000;
+const FIRST_HAND_DELAY_MS = Number(process.env.FIRST_HAND_DELAY_MS) || 3000;
+const handStartTimers = new Map(); // roomCode -> { timer, deadline }
+// Räume, deren Match ausgewertet ist (siehe dispatchMatchFinishIfShowdown).
+const beendeteMatchRaeume = new Set();
+
+function clearHandStartTimer(code) {
+  const existing = handStartTimers.get(code);
+  if (existing) {
+    clearTimeout(existing.timer);
+    handStartTimers.delete(code);
+  }
+}
+
+// Plant den Start der nächsten Hand, sofern gerade keine läuft und
+// genügend Spieler mit Chips am Tisch sitzen, und gibt den Zeitpunkt
+// zurück, zu dem ausgeteilt wird (null, wenn nichts geplant ist). Ein
+// bereits laufender Countdown bleibt stehen – sonst würde ihn jede
+// Zwischen-Aktualisierung, etwa ein Chat-Beitrag, heimlich verlängern.
+function scheduleNextHand(code) {
+  const table = rooms.getTable(code);
+  const laeuft = table && table.phase !== 'waiting' && table.phase !== 'showdown';
+  const genugSpieler = table && table.canStartHand();
+  if (!table || laeuft || !genugSpieler || beendeteMatchRaeume.has(code)) {
+    clearHandStartTimer(code);
+    return null;
+  }
+
+  const existing = handStartTimers.get(code);
+  if (existing) return existing.deadline;
+
+  const wartezeit = table.phase === 'showdown' ? NEXT_HAND_DELAY_MS : FIRST_HAND_DELAY_MS;
+  const deadline = Date.now() + wartezeit;
+  const timer = setTimeout(() => {
+    handStartTimers.delete(code);
+    startHandInRoom(code);
+  }, wartezeit);
+  handStartTimers.set(code, { timer, deadline });
+  return deadline;
+}
+
 function forceTurnTimeout(code, playerId) {
   turnTimers.delete(code);
   const table = rooms.getTable(code);
@@ -1623,6 +1705,9 @@ function broadcastRoomState(code) {
   // den Ablaufzeitpunkt mitschicken, damit die Clients denselben Countdown
   // anzeigen können, den der Server tatsächlich anwendet.
   const actingDeadline = ensureTurnTimer(code);
+  // Genauso für den Countdown bis zur nächsten Hand: Der Server plant ihn,
+  // die Clients zeigen denselben Zeitpunkt an.
+  const nextHandDeadline = scheduleNextHand(code);
   const socketsInRoom = io.sockets.adapter.rooms.get(code);
   if (!socketsInRoom) return;
   for (const socketId of socketsInRoom) {
@@ -1639,6 +1724,7 @@ function broadcastRoomState(code) {
     if (teamEntry) state.teams = teamEntry.teams;
     if (botIds.length > 0) state.botIds = botIds;
     state.actingDeadline = actingDeadline;
+    state.nextHandDeadline = nextHandDeadline;
     clientSocket.emit('state', state);
   }
 }
