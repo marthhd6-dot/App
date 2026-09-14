@@ -1291,7 +1291,11 @@ button:disabled {
 .felt-center {
   position: absolute;
   left: 50%;
-  top: 44%;
+  /* Echte Mitte statt 44 %: Darunter lagen sonst über 40 % der Filzhöhe
+     brach, weil die eigenen Karten nicht auf dem Tisch liegen, sondern
+     daneben in der Spalte. Bei 50 % teilt sich der freie Filz gleichmäßig
+     ober- und unterhalb des Boards auf. */
+  top: 50%;
   transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
@@ -1687,9 +1691,15 @@ button:disabled {
   }
 }
 
+/* Der Abstand zum Sitzplatz ist bewusst ein fester Pixelwert, kein
+   Anteil der eigenen Höhe: Bei -160 % lag die Unterkante der Blase noch
+   innerhalb der Sitzplatte und hat an den seitlichen Plätzen Name und
+   Chips verdeckt. Ein Sitzplatz ist je nach Bildschirm 75 bis 86 px hoch,
+   sein Ankerpunkt liegt in der Mitte – 50 px räumen die obere Hälfte
+   überall frei, unabhängig davon wie lang "Raise 120" gerade ausfällt. */
 .action-bubble {
   position: absolute;
-  transform: translate(-50%, -160%);
+  transform: translate(-50%, calc(-100% - 50px));
   background: rgba(8, 20, 15, 0.92);
   border: 1px solid rgba(232, 191, 74, 0.4);
   color: var(--text);
@@ -1706,19 +1716,19 @@ button:disabled {
 @keyframes action-bubble-pop {
   0% {
     opacity: 0;
-    transform: translate(-50%, -140%) scale(0.7);
+    transform: translate(-50%, calc(-100% - 42px)) scale(0.7);
   }
   15% {
     opacity: 1;
-    transform: translate(-50%, -170%) scale(1);
+    transform: translate(-50%, calc(-100% - 54px)) scale(1);
   }
   80% {
     opacity: 1;
-    transform: translate(-50%, -170%) scale(1);
+    transform: translate(-50%, calc(-100% - 54px)) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -185%) scale(0.95);
+    transform: translate(-50%, calc(-100% - 64px)) scale(0.95);
   }
 }
 
@@ -2082,11 +2092,12 @@ button:disabled {
   margin-top: 4px;
 }
 
+/* Gilt nur noch für die beiden Gruppen, deren Überschrift etwas sagt,
+   das man den Karten nicht ansieht: die Karten des Teammitglieds und die
+   aufgedeckten Hände beim Showdown. */
 .my-hand h2 {
   font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-weight: 600;
   color: var(--text-dim);
   text-align: center;
   margin-bottom: 6px;
@@ -2103,11 +2114,15 @@ button:disabled {
   color: var(--text);
 }
 
+/* Die eigenen Karten sind die eine laute Stelle auf diesem Bildschirm:
+   größer als alles andere in der Spalte, mit einem goldenen Lichtsaum,
+   den sonst nichts hier trägt. Alles daneben ordnet sich unter. */
 .my-card-row .card {
-  width: 76px;
-  height: 106px;
-  font-size: 1.85rem;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18), 0 14px 26px -6px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+  width: 88px;
+  height: 124px;
+  font-size: 2.1rem;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18), 0 18px 34px -8px rgba(0, 0, 0, 0.6),
+    0 0 26px -6px rgba(232, 191, 74, 0.32), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
 /* Spionage-Indikator am Gegner-Sitzplatz (siehe spiedCardHtml in app.js):
@@ -2121,16 +2136,13 @@ button:disabled {
 
 /* --- Fähigkeiten-Karten (siehe abilities.js, renderAbilities() in app.js)
    ---------------------------------------------------------------------------
-   Eine Reihe aus vier Karten neben den eigenen Hole Cards, eine je Kategorie
-   (Karten/Wette-Pot/Info-Gegner/Ressourcen). Bewusst auffällig statt
-   dezent: jede Kategorie bekommt denselben kräftigen Verlauf + "3D"-Kanten-
-   Schatten wie die Modus-Karten im Hauptmenü (.mode-card-ranked etc.) und
-   die Wettrunden-Buttons (.btn-fold/.btn-call/.btn-raise), plus einen
-   pulsierenden Farb-Glow (wie .seat.acting), solange die Karte noch
-   einsetzbar ist – zieht den Blick genauso auf sich wie der pulsierende
-   "Hand starten"-Knopf (#start-hand-btn), ohne eine neue visuelle Sprache
-   einzuführen. --glow/--edge sind pro Kategorie gesetzte Custom
-   Properties, die derselbe gemeinsame @keyframes-Puls unten nutzt. */
+   Eine Reihe aus vier Karten neben den eigenen Hole Cards, eine je
+   Kategorie. Bewusst zurückhaltend: Sie standen früher als vier gefüllte
+   Farbflächen mit Dauerpuls da und haben damit die eigene Hand daneben
+   überstrahlt, obwohl die der Held dieses Bildschirms ist. Die Kategorie
+   steckt jetzt in Kante und Symbol statt in der Fläche – dieselbe
+   Information, ohne den Wettstreit. --glow ist der Farbton der Kategorie,
+   den .ability-card für Kante, Symbol und den Hover-Schein ableitet. */
 .ability-row {
   display: flex;
   flex-wrap: wrap;
@@ -2141,36 +2153,36 @@ button:disabled {
 
 .ability-card {
   --glow: rgba(255, 255, 255, 0.4);
-  --edge: rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
   width: 96px;
-  padding: 10px 7px 8px;
+  padding: 11px 7px 10px;
   border-radius: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid color-mix(in srgb, var(--glow) 55%, transparent);
+  /* Dunkler Grund statt kräftigem Verlauf. Vier gefüllte Farbflächen
+     nebeneinander haben die eigene Hand überstrahlt, obwohl die der Held
+     sein soll. Die Kategorie steckt jetzt in Kante und Symbol – dieselbe
+     Information, ohne den Wettstreit um Aufmerksamkeit. */
+  background: linear-gradient(180deg, color-mix(in srgb, var(--glow) 16%, transparent), rgba(0, 0, 0, 0.3)),
+    rgba(12, 22, 18, 0.82);
+  color: var(--text);
   font-family: inherit;
   cursor: pointer;
-  box-shadow: 0 4px 0 var(--edge), 0 10px 20px -6px rgba(0, 0, 0, 0.6), 0 0 0 0 var(--glow);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
-  animation: ability-pulse 2.4s ease-in-out infinite;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 18px -10px rgba(0, 0, 0, 0.8);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
 }
 
-@keyframes ability-pulse {
-  0%,
-  100% {
-    box-shadow: 0 4px 0 var(--edge), 0 10px 20px -6px rgba(0, 0, 0, 0.6), 0 0 0 0 var(--glow);
-  }
-  50% {
-    box-shadow: 0 4px 0 var(--edge), 0 10px 20px -6px rgba(0, 0, 0, 0.6), 0 0 20px 6px var(--glow);
-  }
-}
-
-.ability-card:hover:not(:disabled) {
-  transform: translateY(-4px) scale(1.04);
-  filter: brightness(1.08);
-  box-shadow: 0 6px 0 var(--edge), 0 16px 26px -6px rgba(0, 0, 0, 0.65), 0 0 24px 7px var(--glow);
+/* Kein Dauerpuls mehr auf vier Karten gleichzeitig: Bewegung ohne
+   Nutzerauslöser bleibt dem einen Moment vorbehalten, der wirklich
+   gerade dran ist. Auf Berührung antwortet die Karte weiterhin. */
+.ability-card:hover:not(:disabled),
+.ability-card:focus-visible:not(:disabled) {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--glow) 95%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 24px -12px rgba(0, 0, 0, 0.85),
+    0 0 20px -4px var(--glow);
 }
 
 .ability-card:active:not(:disabled) {
@@ -2180,75 +2192,45 @@ button:disabled {
 .ability-card:disabled,
 .ability-card.ability-used {
   cursor: default;
-  opacity: 0.4;
-  filter: grayscale(0.75);
-  border-color: rgba(255, 255, 255, 0.14);
-  animation: none;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), 0 4px 10px -4px rgba(0, 0, 0, 0.5);
-}
-
-.ability-card-category {
-  font-size: 0.62rem;
-  font-weight: 600;
-  opacity: 0.7;
+  opacity: 0.34;
+  filter: grayscale(0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
 }
 
 .ability-card-icon {
-  width: 30px;
-  height: 30px;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+  width: 28px;
+  height: 28px;
+  color: var(--glow);
 }
 
 .ability-card-name {
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 600;
   text-align: center;
   line-height: 1.15;
+  color: var(--text-dim);
 }
 
-.ability-card-status {
-  font-size: 0.66rem;
-  font-weight: 600;
-  opacity: 0.75;
-  margin-top: 1px;
-}
-
-/* Kategorie-Farben: derselbe kräftige Verlauf + dunkle "3D"-Kante wie die
-   bestehenden Modus-/Aktions-Knöpfe mit vergleichbarer Bedeutung
-   (Gold=.mode-card-ranked, Rot=.btn-fold, Blau=.mode-card-practice,
-   Grün=.mode-card-casual/.btn-call) – dieselbe Zuordnung wie
-   ABILITY_CATEGORY_LABELS in app.js. Dunkler Text statt var(--text), da
-   alle vier Verläufe hell genug für guten Kontrast sind. */
+/* Kategorie-Farben. Jede Kategorie behält ihre Farbe aus dem restlichen
+   Spiel (Gold=.mode-card-ranked, Rot=.btn-fold, Blau=.mode-card-practice,
+   Grün=.mode-card-casual/.btn-call), trägt sie aber nur noch in Kante und
+   Symbol statt als gefüllte Fläche. Nur --glow wird gesetzt, den Rest
+   leitet .ability-card daraus ab. */
 .ability-card.ability-cards {
-  --glow: rgba(232, 191, 74, 0.65);
-  --edge: #a3801f;
-  background: linear-gradient(160deg, var(--accent-bright), var(--accent) 70%);
-  border-color: #fff3c4;
-  color: #1b1a15;
+  --glow: var(--accent-bright);
 }
 
 .ability-card.ability-pot {
-  --glow: rgba(255, 92, 92, 0.6);
-  --edge: #a23636;
-  background: linear-gradient(160deg, #ff9d9d, var(--danger) 70%);
-  border-color: #ffd7d7;
-  color: #2a0d0d;
+  --glow: #ff9d9d;
 }
 
 .ability-card.ability-intel {
-  --glow: rgba(111, 180, 255, 0.6);
-  --edge: #34506e;
-  background: linear-gradient(160deg, #cfe0ff, var(--info) 70%);
-  border-color: #eaf2ff;
-  color: #10192b;
+  --glow: #cfe0ff;
 }
 
 .ability-card.ability-resource {
-  --glow: rgba(53, 214, 138, 0.6);
-  --edge: #1f8a5c;
-  background: linear-gradient(160deg, #8ff0c0, var(--success) 70%);
-  border-color: #e2fbee;
-  color: #0a2417;
+  --glow: #8ff0c0;
 }
 
 /* Aufgedeckte Gegner-Hände bei einem echten Showdown (siehe
@@ -2948,9 +2930,6 @@ button:disabled {
     width: 66px;
     padding: 5px 3px 4px;
   }
-  .ability-card-category {
-    display: none;
-  }
   .ability-card-icon {
     width: 21px;
     height: 21px;
@@ -3060,12 +3039,9 @@ button:disabled {
     width: 48px;
     padding: 3px 2px;
   }
-  .ability-card-category,
-  .ability-card-status {
-    display: none;
-  }
   .ability-card-icon {
-    font-size: 1.15rem;
+    width: 18px;
+    height: 18px;
   }
   .ability-card-name {
     font-size: 0.55rem;
@@ -3287,10 +3263,18 @@ ul.help-text {
   .table-side {
     grid-column: 2;
     grid-row: 2;
-    /* Karten oben, Aktions-Leiste unten – der Platz dazwischen bleibt frei,
-       statt alles oben zusammenzudrängen. */
-    justify-content: space-between;
+    /* Aktions-Leiste unten, die Hand darüber in der freien Höhe
+       schwebend statt oben angeklebt: Zwei gleiche auto-Ränder teilen
+       den Rest über und unter der Hand auf, sodass kein Loch mitten in
+       der Spalte stehen bleibt. */
+    justify-content: flex-start;
     min-width: 0;
+  }
+  #my-hand {
+    margin-top: auto;
+  }
+  .table-side > .action-bar {
+    margin-top: auto;
   }
   /* In der schmaleren Spalte passen vier Fähigkeiten-Karten nicht mehr
      nebeneinander; ein 2x2-Raster wirkt ausgeglichener als ein 3+1-Umbruch
