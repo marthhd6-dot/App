@@ -1034,6 +1034,27 @@ Der Gestaltungsteil übernimmt Leitlinien aus Anthropics
 Handschrift von Rumble Poker bezogen – die Quellenangabe liegt daneben in
 `NOTICE.md`.
 
+## Agenten für Claude Code
+
+Zwei Agenten im Wurzelverzeichnis unter `.claude/agents/`. Sie sind kein
+Ersatz für den Skill: Der sagt, **wie** an diesem Projekt gearbeitet wird
+und gehört deshalb in den Hauptkontext. Ein Agent **macht** eine Arbeit in
+seinem eigenen Kontext und meldet nur das Ergebnis zurück. Das lohnt sich
+dort, wo viel Zwischenkram anfällt, von dem am Ende ein Satz zählt.
+
+- **`tisch-pruefer`** fährt die Live-Prüfung des Layouts über alle sechs
+  Bildschirmgrößen, jeweils mitten in einer Hand und im Showdown, und
+  meldet „hält" oder den konkreten Befund mit Größe, Zustand und Messwert.
+  Die anfallenden Messreihen und Screenshots bleiben bei ihm.
+- **`regel-pruefer`** spielt Hände gegen den laufenden Server und sucht
+  Abweichungen zwischen dem, was der Client anbietet, und dem, was der
+  Server erlaubt, sowie Tische die hängen bleiben. Die vier Fehler dieser
+  Art, die hier schon auftraten (Geisterspieler, stehengebliebene
+  Einsätze, eingefrorener Tisch, illegaler Raise-Knopf), stehen ihm als
+  Suchmuster in der Datei.
+
+Beide ändern keinen Projektcode, committen nicht und pushen nicht.
+
 ## Mögliche nächste Schritte (für Claude Code)
 
 Die ursprüngliche Roadmap ist komplett. Ideen, um weiterzubauen:
