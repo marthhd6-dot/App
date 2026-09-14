@@ -86,6 +86,15 @@ class Table {
     return oldId;
   }
 
+  // Ob am Tisch überhaupt eine Hand gespielt werden kann. Bewusst nur die
+  // Chips und nicht sittingOut: Das Flag wird erst in startHand() neu
+  // gesetzt, ein Spieler der gerade nachgekauft hat trägt es also noch.
+  // Wer danach fragt, muss dieselbe Antwort bekommen wie startHand() selbst
+  // – deshalb steht die Bedingung nur an dieser einen Stelle.
+  canStartHand() {
+    return this.players.filter((p) => p.chips > 0).length >= 2;
+  }
+
   // Startet eine Hand mit allen Spielern, die noch Chips haben. Wer bei 0
   // Chips steht, setzt diese Hand aus (sittingOut): Er bekommt keine Karten
   // und wird für die gesamte Wettlogik wie ein gefoldeter Spieler behandelt.
@@ -95,8 +104,7 @@ class Table {
   // ein Geisterspieler, der in Räumen ohne Ausscheiden-Logik dauerhaft
   // einen Platz blockierte.
   startHand() {
-    const inHand = this.players.filter((p) => p.chips > 0);
-    if (inHand.length < 2) {
+    if (!this.canStartHand()) {
       throw new Error('Mindestens 2 Spieler mit Chips nötig, um eine Hand zu starten.');
     }
     this.deck = shuffle(createDeck());

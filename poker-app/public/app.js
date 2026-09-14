@@ -101,7 +101,9 @@ const checkBtn = document.getElementById('check-btn');
 const callBtn = document.getElementById('call-btn');
 const betBtn = document.getElementById('bet-btn');
 const raiseBtn = document.getElementById('raise-btn');
-const startHandBtn = document.getElementById('start-hand-btn');
+const nextHandEl = document.getElementById('next-hand');
+const nextHandTextEl = document.getElementById('next-hand-text');
+const nextHandFillEl = document.getElementById('next-hand-fill');
 const rebuyBanner = document.getElementById('rebuy-banner');
 const turnTimerEl = document.getElementById('turn-timer');
 // Der Zähler schreibt nur in dieses <span>, nicht in den ganzen Knopf –
@@ -837,10 +839,6 @@ function renderRankPath({ name, rating, tier, wins, losses, tiers }) {
 // wirkt dadurch spürbar niedriger als das Warten auf die eigentliche
 // Aktions-/Chip-Sound-Bestätigung aus detectAndShowActionFx, die erst mit
 // dem nächsten Server-State eintrifft).
-startHandBtn.addEventListener('click', () => {
-  playUiClickSound();
-  socket.emit('start-hand');
-});
 document.getElementById('rebuy-btn').addEventListener('click', () => {
   playUiClickSound();
   socket.emit('rebuy');
@@ -1508,6 +1506,42 @@ function updateTurnTimer(deadline) {
   if (actingDeadline) turnTimerInterval = setInterval(renderTurnTimer, 1000);
 }
 
+// --- Countdown bis zur nächsten Hand -------------------------------------
+// Der Server teilt von selbst aus und schickt dazu den Zeitpunkt mit
+// (state.nextHandDeadline, siehe scheduleNextHand() in server.js). Hier
+// läuft nur die Anzeige: Sekunden plus ein Balken, der leerläuft, damit die
+// verbleibende Zeit auch ohne Lesen erfassbar ist.
+let nextHandDeadline = null;
+let nextHandInterval = null;
+let nextHandSpanne = 0;
+
+function renderNextHandCountdown() {
+  if (!nextHandDeadline) {
+    nextHandEl.hidden = true;
+    return;
+  }
+  const restMs = Math.max(0, nextHandDeadline - Date.now());
+  const sekunden = Math.ceil(restMs / 1000);
+  nextHandEl.hidden = false;
+  nextHandTextEl.textContent = sekunden > 0 ? `Nächste Hand in ${sekunden}s` : 'Es wird ausgeteilt …';
+  const anteil = nextHandSpanne > 0 ? restMs / nextHandSpanne : 0;
+  nextHandFillEl.style.transform = `scaleX(${Math.min(1, Math.max(0, anteil))})`;
+}
+
+function updateNextHandCountdown(deadline) {
+  const neu = deadline || null;
+  // Nur bei einem wirklich neuen Zeitpunkt die Gesamtspanne neu bestimmen –
+  // sonst würde jede Zustands-Aktualisierung den Balken zurücksetzen.
+  if (neu !== nextHandDeadline) {
+    nextHandDeadline = neu;
+    nextHandSpanne = neu ? Math.max(1, neu - Date.now()) : 0;
+  }
+  renderNextHandCountdown();
+  clearInterval(nextHandInterval);
+  // Feiner als sekündlich, damit der Balken gleichmäßig läuft.
+  if (nextHandDeadline) nextHandInterval = setInterval(renderNextHandCountdown, 100);
+}
+
 function burstConfetti() {
   playWinSound();
   hapticMedium();
@@ -1647,11 +1681,11 @@ function render(state) {
   renderBetSizer(state, me, !betBtn.disabled, !raiseBtn.disabled);
   wasMyTurn = isMyTurn;
 
-  startHandBtn.hidden = handLaeuft;
+  updateNextHandCountdown(state.nextHandDeadline);
   // Zwischen zwei Händen sind Regler und Wett-Knöpfe ausnahmslos
-  // deaktiviert – sie dann ganz auszublenden macht sichtbar, dass jetzt nur
-  // "Hand starten" zählt, und gibt auf kleinen Bildschirmen über 100px für
-  // den Showdown-Bereich frei, statt eine Reihe toter Knöpfe zu zeigen.
+  // deaktiviert – sie dann ganz auszublenden gibt auf kleinen Bildschirmen
+  // über 100px für den Showdown-Bereich frei, statt eine Reihe toter
+  // Knöpfe zu zeigen.
   betSizerEl.hidden = !handLaeuft;
   [foldBtn, checkBtn, callBtn, betBtn, raiseBtn].forEach((btn) => {
     btn.hidden = !handLaeuft;

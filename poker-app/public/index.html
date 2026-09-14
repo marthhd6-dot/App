@@ -554,7 +554,15 @@
             />
           </div>
         </div>
-        <button id="start-hand-btn" class="btn btn-primary">▶ Hand starten</button>
+        <!-- An der Stelle stand der Knopf "Hand starten". Hände beginnen
+             jetzt von selbst; hier läuft stattdessen der Countdown bis zum
+             Austeilen, den der Server vorgibt (state.nextHandDeadline). -->
+        <div id="next-hand" class="next-hand" role="status" hidden>
+          <span id="next-hand-text" class="next-hand-text"></span>
+          <span class="next-hand-track" aria-hidden="true"
+            ><span id="next-hand-fill" class="next-hand-fill"></span
+          ></span>
+        </div>
         <button id="fold-btn" class="btn btn-fold">Fold</button>
         <button id="check-btn" class="btn btn-neutral">Check</button>
         <button id="call-btn" class="btn btn-call">Call</button>
